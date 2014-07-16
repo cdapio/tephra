@@ -1,4 +1,0 @@
-tephra
-======
-
-Transaction for HBase
