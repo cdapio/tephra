@@ -30,6 +30,11 @@
 
   <dependencies>
     <dependency>
+      <groupId>com.continuuity</groupId>
+      <artifactId>tx-api</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <dependency>
       <groupId>com.google.guava</groupId>
       <artifactId>guava</artifactId>
     </dependency>
