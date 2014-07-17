@@ -38,6 +38,10 @@
       <id>apache.snapshots</id>
       <url>https://repository.apache.org/content/repositories/snapshots</url>
     </repository>
+    <repository>
+      <id>continuuity-public</id>
+      <url>https://repository.continuuity.com/content/groups/public</url>
+    </repository>
   </repositories>
 
   <distributionManagement>
@@ -62,8 +66,7 @@
     <guice.version>3.0</guice.version>
     <logback.version>1.0.9</logback.version>
     <hadoop.version>2.2.0</hadoop.version>
-    <hbase94.version>0.94.21</hbase94.version>
-
+    <hbase94.version>0.94.6.1.continuuity</hbase94.version>
     <hbase96.version>0.96.2-hadoop2</hbase96.version>
     <junit.version>4.11</junit.version>
     <slf4j.version>1.7.5</slf4j.version>
@@ -151,37 +154,6 @@
         <groupId>org.apache.twill</groupId>
         <artifactId>twill-discovery-core</artifactId>
         <version>${twill.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.twill</groupId>
-        <artifactId>twill-yarn</artifactId>
-        <version>${twill.version}</version>
-        <exclusions>
-          <exclusion>
-            <groupId>org.apache.hadoop</groupId>
-            <artifactId>hadoop-yarn-api</artifactId>
-          </exclusion>
-          <exclusion>
-            <groupId>org.apache.hadoop</groupId>
-            <artifactId>hadoop-yarn-common</artifactId>
-          </exclusion>
-          <exclusion>
-            <groupId>org.apache.hadoop</groupId>
-            <artifactId>hadoop-yarn-client</artifactId>
-          </exclusion>
-          <exclusion>
-            <groupId>org.apache.hadoop</groupId>
-            <artifactId>hadoop-common</artifactId>
-          </exclusion>
-          <exclusion>
-            <groupId>org.apache.hadoop</groupId>
-            <artifactId>hadoop-hdfs</artifactId>
-          </exclusion>
-          <exclusion>
-            <groupId>org.slf4j</groupId>
-            <artifactId>jcl-over-slf4j</artifactId>
-          </exclusion>
-        </exclusions>
       </dependency>
       <dependency>
         <groupId>org.apache.twill</groupId>

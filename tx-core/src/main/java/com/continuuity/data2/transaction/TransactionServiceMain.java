@@ -19,7 +19,6 @@ package com.continuuity.data2.transaction;
 import com.continuuity.data2.transaction.distributed.TransactionService;
 import com.continuuity.data2.transaction.runtime.ConfigModule;
 import com.continuuity.data2.transaction.runtime.DiscoveryModules;
-import com.continuuity.data2.transaction.runtime.LocationModules;
 import com.continuuity.data2.transaction.runtime.TransactionClientModule;
 import com.continuuity.data2.transaction.runtime.TransactionModules;
 import com.continuuity.data2.transaction.runtime.ZKModule;
@@ -94,7 +93,6 @@ public class TransactionServiceMain {
     Injector injector = Guice.createInjector(
       new ConfigModule(conf),
       new ZKModule(),
-      new LocationModules().getDistributedModules(),
       new DiscoveryModules().getDistributedModules(),
       new TransactionModules().getDistributedModules(),
       new TransactionClientModule()

@@ -20,7 +20,6 @@ import com.continuuity.data2.transaction.inmemory.InMemoryTransactionManager;
 import com.continuuity.data2.transaction.inmemory.InMemoryTxSystemClient;
 import com.continuuity.data2.transaction.runtime.ConfigModule;
 import com.continuuity.data2.transaction.runtime.DiscoveryModules;
-import com.continuuity.data2.transaction.runtime.LocationModules;
 import com.continuuity.data2.transaction.runtime.TransactionModules;
 import com.continuuity.data2.transaction.snapshot.DefaultSnapshotCodec;
 import com.google.common.collect.ImmutableList;
@@ -62,7 +61,6 @@ public class TransactionExecutorTest {
     conf.set(TxConstants.Manager.CFG_TX_SNAPSHOT_DIR, tmpFolder.newFolder().getAbsolutePath());
     Injector injector = Guice.createInjector(
       new ConfigModule(conf),
-      new LocationModules().getInMemoryModules(),
       new DiscoveryModules().getInMemoryModules(),
       Modules.override(
         new TransactionModules().getInMemoryModules()).with(new AbstractModule() {
@@ -515,7 +513,7 @@ public class TransactionExecutorTest {
     }
 
     @Override
-    public String getName() {
+    public String getTransactionAwareName() {
       return "dummy";
     }
   }

@@ -25,7 +25,6 @@ import com.continuuity.data2.transaction.distributed.thrift.TTransactionCouldNot
 import com.continuuity.data2.transaction.distributed.thrift.TTransactionNotInProgressException;
 import com.continuuity.data2.transaction.runtime.ConfigModule;
 import com.continuuity.data2.transaction.runtime.DiscoveryModules;
-import com.continuuity.data2.transaction.runtime.LocationModules;
 import com.continuuity.data2.transaction.runtime.TransactionClientModule;
 import com.continuuity.data2.transaction.runtime.TransactionModules;
 import com.continuuity.data2.transaction.runtime.ZKModule;
@@ -77,7 +76,6 @@ public class TransactionServiceClient implements TransactionSystemClient {
     LOG.info("Starting tx server client test.");
     Injector injector = Guice.createInjector(
       new ConfigModule(conf),
-      new LocationModules().getDistributedModules(),
       new ZKModule(),
       new DiscoveryModules().getDistributedModules(),
       new TransactionModules().getDistributedModules(),
