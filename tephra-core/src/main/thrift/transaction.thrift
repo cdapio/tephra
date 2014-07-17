@@ -12,7 +12,7 @@
 # License for the specific language governing permissions and limitations under
 # the License.
 
-namespace java com.continuuity.data2.transaction.distributed.thrift
+namespace java com.continuuity.tephra.distributed.thrift
 
 struct TTransaction {
   1: i64 writePointer,

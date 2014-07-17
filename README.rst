@@ -200,14 +200,14 @@ For HBase 0.94::
 
   <property>
     <name>hbase.coprocessor.region.classes</name>
-    <value>com.continuuity.data2.transaction.coprocessor.hbase94.TransactionDataJanitor</value>
+    <value>com.continuuity.tephra.coprocessor.hbase94.TransactionDataJanitor</value>
   </property>
 
 For HBase 0.96 and 0.98::
 
   <property>
     <name>hbase.coprocessor.region.classes</name>
-    <value>com.continuuity.data2.transaction.coprocessor.hbase96.TransactionDataJanitor</value>
+    <value>com.continuuity.tephra.coprocessor.hbase96.TransactionDataJanitor</value>
   </property>
 
 
