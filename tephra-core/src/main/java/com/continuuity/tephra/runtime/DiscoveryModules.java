@@ -21,11 +21,14 @@ import com.google.inject.Module;
 import com.google.inject.PrivateModule;
 import com.google.inject.Provides;
 import com.google.inject.Singleton;
+import org.apache.twill.common.Cancellable;
+import org.apache.twill.discovery.Discoverable;
 import org.apache.twill.discovery.DiscoveryService;
 import org.apache.twill.discovery.DiscoveryServiceClient;
 import org.apache.twill.discovery.InMemoryDiscoveryService;
+import org.apache.twill.discovery.ServiceDiscovered;
 import org.apache.twill.discovery.ZKDiscoveryService;
-import org.apache.twill.zookeeper.ZKClient;
+import org.apache.twill.zookeeper.ZKClientService;
 
 /**
  * Provides access to Google Guice modules for in-memory, single-node, and distributed operation for
@@ -62,17 +65,44 @@ public final class DiscoveryModules {
 
     @Override
     protected void configure() {
-      bind(DiscoveryService.class).to(ZKDiscoveryService.class);
-      bind(DiscoveryServiceClient.class).to(ZKDiscoveryService.class);
-
       expose(DiscoveryService.class);
       expose(DiscoveryServiceClient.class);
     }
 
     @Provides
     @Singleton
-    private ZKDiscoveryService providesDiscoveryService(ZKClient zkClient) {
+    private ZKDiscoveryService providesZKDiscoveryService(ZKClientService zkClient) {
       return new ZKDiscoveryService(zkClient);
+    }
+
+    @Provides
+    @Singleton
+    private DiscoveryService providesDiscoveryService(final ZKClientService zkClient,
+                                                      final ZKDiscoveryService delegate) {
+      return new DiscoveryService() {
+        @Override
+        public Cancellable register(Discoverable discoverable) {
+          if (!zkClient.isRunning()) {
+            zkClient.startAndWait();
+          }
+          return delegate.register(discoverable);
+        }
+      };
+    }
+
+    @Provides
+    @Singleton
+    private DiscoveryServiceClient providesDiscoveryServiceClient(final ZKClientService zkClient,
+                                                                  final ZKDiscoveryService delegate) {
+      return new DiscoveryServiceClient() {
+        @Override
+        public ServiceDiscovered discover(String s) {
+          if (!zkClient.isRunning()) {
+            zkClient.startAndWait();
+          }
+          return delegate.discover(s);
+        }
+      };
     }
   }
 }

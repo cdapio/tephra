@@ -49,6 +49,14 @@ public class TransactionServiceMain {
     instance.doMain(args);
   }
 
+  public TransactionServiceMain() {
+    this(null);
+  }
+
+  public TransactionServiceMain(Configuration conf) {
+    this.conf = conf;
+  }
+
   /**
    * The main method. It simply call methods in the same sequence
    * as if the program is started by jsvc.
@@ -83,7 +91,9 @@ public class TransactionServiceMain {
    * Invoked by jsvc to initialize the program.
    */
   public void init(String[] args) {
-    conf = HBaseConfiguration.create();
+    if (conf == null) {
+      conf = HBaseConfiguration.create();
+    }
   }
 
   /**
