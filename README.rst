@@ -4,7 +4,7 @@ Continuuity Tephra
 
 
 Continuuity Tephra provides globally consistent transactions on top of Apache HBase.  While HBase
-provides strong consistency and row-level or region-level ACID operations, it sacrifices
+provides strong consistency with row- or region-level ACID operations, it sacrifices
 cross-region and cross-table consistency in favor of scalability.  This trade-off requires
 application developers to handle the complexity of ensuring consistency when their modifications
 span region boundaries.  By providing support for global transactions that span regions, tables, or
@@ -15,18 +15,18 @@ How It Works
 ------------
 
 Tephra leverages HBase's native data versioning to provide multi-versioned concurrency
-control (MVCC) for transactional reads and writes.  Using this MVCC capability, each transaction
-sees its own consistent "snapshot" of data (which provides `snapshot isolation 
-<http://en.wikipedia.org/wiki/Snapshot_isolation>`_ of concurrent transactions).
+control (MVCC) for transactional reads and writes.  With MVCC capability, each transaction
+sees its own consistent "snapshot" of data, providing `snapshot isolation 
+<http://en.wikipedia.org/wiki/Snapshot_isolation>`__ of concurrent transactions.
 
-The Tephra implementation consists of three main components:
+Tephra consists of three main components:
 
 - **Transaction Server** - maintains global view of transaction state, assigns new transaction IDs
-  and performs conflict detection
-- **Transaction Client** - coordinates start, commit, and rollback of transactions
-- **TransactionDataJanitor Coprocessor** - applies filtering of data read based on a given
-  transaction's data snapshot, and cleans up data from old (no longer visible) transaction
-  versions)
+  and performs conflict detection;
+- **Transaction Client** - coordinates start, commit, and rollback of transactions; and
+- **TransactionDataJanitor Coprocessor** - applies filtering to the data read (based on a 
+  given transaction's data snapshot) and cleans up any data from old (no longer visible) 
+  transaction versions.
 
 Transaction Server
 ..................
@@ -49,21 +49,21 @@ writes for the transaction), as well as a list of transaction IDs to exclude for
 in-progress or invalidated transactions).  When performing writes, the client overrides the
 timestamp for all modified HBase cells with the transaction ID.  When reading data from HBase, the
 client skips cells associated with any of the excluded transaction IDs.  The read exclusions are
-applied through a server-side filter injected by the TransactionsDataJanitor coprocessor.
+applied through a server-side filter injected by the ``TransactionsDataJanitor`` coprocessor.
 
 TransactionDataJanitor Coprocessor
 ..................................
 
 The ``TransactionDataJanitor`` coprocessor is loaded on all HBase tables where transactional reads
 and writes are performed.  When clients read data, it coordinates the server-side filtering
-performed, based on the client transaction's snapshot -- data cells from any transactions that are
-currently in-progress or that failed, but could not be rolled back ("invalid" transactions) will
-be skipped on these reads.  In addition, the ``TransactionDataJanitor`` cleans up any data
-versions that are no longer visible to any running transactions, either because the transaction
-that the cell is associated with failed or a write from a newer transaction was successfully
-committed to the same column.
+performed based on the client transaction's snapshot. Data cells from any transactions that are
+currently in-progress or those that have failed and could not be rolled back ("invalid" 
+transactions) will be skipped on these reads.  In addition, the ``TransactionDataJanitor`` cleans 
+up any data versions that are no longer visible to any running transactions, either because the 
+transaction that the cell is associated with failed or a write from a newer transaction was 
+successfully committed to the same column.
 
-More details on how Tephra transactions work and the interactions between these components may be
+More details on how Tephra transactions work and the interactions between these components can be
 found in our `Transactions over HBase
 <http://www.slideshare.net/alexbaranau/transactions-over-hbase>`_ presentation.
 
@@ -111,8 +111,8 @@ For HBase 0.96.x and 0.98.x::
   </dependency>
 
 
-Deployment & Configuration
---------------------------
+Deployment and Configuration
+----------------------------
 
 Tephra makes use of a central transaction server to assign unique transaction IDs for data
 modifications and to perform conflict detection.  Only a single transaction server can actively
@@ -136,9 +136,9 @@ properties can be added to the ``hbase-site.xml`` file on the server's ``CLASSPA
 +---------------------------+------------+---------------------------------------------------------+
 | data.tx.bind.address      | 0.0.0.0    | Server address to listen on                             |
 +---------------------------+------------+---------------------------------------------------------+
-| data.tx.server.io.threads | 2          | Num. of threads for socket IO                           |
+| data.tx.server.io.threads | 2          | Number of threads for socket IO                         |
 +---------------------------+------------+---------------------------------------------------------+
-| data.tx.server.threads    | 20         | Num. of handler threads                                 |
+| data.tx.server.threads    | 20         | Number of handler threads                               |
 +---------------------------+------------+---------------------------------------------------------+
 | data.tx.timeout           | 30         | Timeout for a transaction to complete (seconds)         |
 +---------------------------+------------+---------------------------------------------------------+
@@ -148,7 +148,7 @@ properties can be added to the ``hbase-site.xml`` file on the server's ``CLASSPA
 +---------------------------+------------+---------------------------------------------------------+
 | data.tx.snapshot.interval | 300        | Frequency to write new snapshots                        |
 +---------------------------+------------+---------------------------------------------------------+
-| data.tx.snapshot.retain   | 10         | Num. of old transaction snapshots to retain             |
+| data.tx.snapshot.retain   | 10         | Number of old transaction snapshots to retain           |
 +---------------------------+------------+---------------------------------------------------------+
 
 TODO: Add details on running transaction server when ENG-4084 is merged
@@ -169,17 +169,17 @@ properties can be added to the ``hbase-site.xml`` file on the client's ``CLASSPA
 +======================================+===========+===============================================+
 | data.tx.client.timeout               | 30000     | Client socket timeout (milliseconds)          |
 +--------------------------------------+-----------+-----------------------------------------------+
-| data.tx.client.provider              | pool      | Client provider strategy ("pool" uses a pool  |
-|                                      |           | of clients, "thread-local" a client per       |
-|                                      |           | thread).                                      |
+| data.tx.client.provider              | pool      | Client provider strategy: "pool" uses a pool  |
+|                                      |           | of clients; "thread-local" a client per       |
+|                                      |           | thread                                        |
 +--------------------------------------+-----------+-----------------------------------------------+
 | data.tx.client.count                 | 5         | Max num. of clients for "pool" provider       |
 +--------------------------------------+-----------+-----------------------------------------------+
-| data.tx.client.retry.strategy        | backoff   | Client retry strategy ("backoff" for backoff  |
-|                                      |           | between attempts, "n-times" for fixed num. of |
-|                                      |           | tries).                                       |
+| data.tx.client.retry.strategy        | backoff   | Client retry strategy: "backoff" for back off |
+|                                      |           | between attempts; "n-times" for fixed number  |
+|                                      |           | of tries                                      |
 +--------------------------------------+-----------+-----------------------------------------------+
-| data.tx.client.retry.attempts        | 2         | Num. of times to retry ("n-times" strategy)   |
+| data.tx.client.retry.attempts        | 2         | Number of times to retry ("n-times" strategy) |
 +--------------------------------------+-----------+-----------------------------------------------+
 | data.tx.client.retry.backoff.initial | 100       | Initial sleep time ("backoff" strategy)       |
 +--------------------------------------+-----------+-----------------------------------------------+
@@ -193,8 +193,9 @@ HBase Coprocessor Configuration
 ...............................
 
 In addition to the transaction server, Tephra requires an HBase coprocessor to be installed on all
-tables where transactional reads and writes will be performed.  To configure the coprocessor on
-all HBase tables, add the following to ``hbase-site.xml``.
+tables where transactional reads and writes will be performed.  
+
+To configure the coprocessor on all HBase tables, add the following to ``hbase-site.xml``.
 
 For HBase 0.94::
 
@@ -211,22 +212,22 @@ For HBase 0.96 and 0.98::
   </property>
 
 
-Alternately, you may configure the ``TransactionDataJanitor`` only on HBase tables that you will
-be using for transaction reads and writes.  You must ensure that the coprocessor is available on
-all impacted tables in order for Tephra to function correctly, however.
+You may configure the ``TransactionDataJanitor`` to be only on HBase tables that you will
+be using for transaction reads and writes.  However, you must ensure that the coprocessor is 
+available on all impacted tables in order for Tephra to function correctly.
 
 
-Known Issues & Limitations
---------------------------
+Known Issues and Limitations
+----------------------------
 
-- Currently ``Delete`` operations are implemented by writing a empty value (empty ``byte[]``) to the
+- Currently, ``Delete`` operations are implemented by writing a empty value (empty ``byte[]``) to the
   column.  This is necessary so that the changes can be rolled back in the case of a transaction
   failure -- normal HBase ``Delete`` operations cannot be undone.
 - Invalid transactions are not cleared from the exclusion list.  When a transaction is
-  invalidated, either from timing out or is invalidated by the client due to a failure to rollback
+  invalidated, either from timing out or being invalidated by the client due to a failure to rollback
   changes, its transaction ID is added to a list of excluded transactions.  Data from invalidated
   transactions will be dropped by the ``TransactionDataJanitor`` coprocessor on HBase region flush
-  and compaction operations.  However, currently the transaction ID is not removed from the list
+  and compaction operations.  Currently, however, the transaction ID is not removed from the list
   of excluded transaction IDs.
 
 
@@ -234,13 +235,13 @@ How to Contribute
 -----------------
 
 Interested in helping to improve Tephra? We welcome all contributions, whether in filing detailed
-bug reports, submitting pull requests for code changes or improvements, or asking questions and
+bug reports, submitting pull requests for code changes and improvements, or by asking questions and
 assisting others on the mailing list.
 
 Bug Reports & Feature Requests
 ..............................
 
-Bugs and tasks and tracked in a public JIRA issue tracker.  Details on access will be forthcoming.
+Bugs and tasks are tracked in a public JIRA issue tracker.  Details on access will be forthcoming.
 
 Pull Requests
 .............
@@ -250,14 +251,14 @@ features, or fixing bugs, here's how to do it:
 
 #. If you are planning a large change or contribution, discuss your plans on the ``tephra-dev``
    mailing list first.  This will help us understand your needs and best guide your solution in a
-   way that best fits the project.
-#. Fork Tephra into your own GitHub repository
-#. Create a topic branch with an appropriate name
-#. Work on the code to your heart's content
+   way that fits the project.
+#. Fork Tephra into your own GitHub repository.
+#. Create a topic branch with an appropriate name.
+#. Work on the code to your heart's content.
 #. Once you’re satisfied, create a pull request from your GitHub repo (it’s helpful if you fill in
-   all of the description fields)
-#. After we review and accept your request we’ll commit your code to the continuuity/tephra
-   repository
+   all of the description fields).
+#. After we review and accept your request, we’ll commit your code to the continuuity/tephra
+   repository.
 
 Thanks for helping to improve Tephra!
 
