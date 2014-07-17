@@ -1,6 +1,8 @@
-=======================================
-Continuuity Tephra           |(Tephra)|
-=======================================
+.. ==================
+.. Continuuity Tephra
+.. ==================
+
+|(Tephra)|
 
 **Transactions for Apache HBase** |(TM)|:
 Continuuity Tephra provides globally consistent transactions on top of Apache HBase.  While HBase
@@ -132,27 +134,27 @@ Java ``CLASSPATH``.
 The transaction server supports the following configuration properties.  All configuration
 properties can be added to the ``hbase-site.xml`` file on the server's ``CLASSPATH``:
 
-+---------------------------+------------+---------------------------------------------------------+
-| Name                      | Default    | Description                                             |
-+===========================+============+=========================================================+
-| data.tx.bind.port         | 15165      | Port to bind to                                         |
-+---------------------------+------------+---------------------------------------------------------+
-| data.tx.bind.address      | 0.0.0.0    | Server address to listen on                             |
-+---------------------------+------------+---------------------------------------------------------+
-| data.tx.server.io.threads | 2          | Number of threads for socket IO                         |
-+---------------------------+------------+---------------------------------------------------------+
-| data.tx.server.threads    | 20         | Number of handler threads                               |
-+---------------------------+------------+---------------------------------------------------------+
-| data.tx.timeout           | 30         | Timeout for a transaction to complete (seconds)         |
-+---------------------------+------------+---------------------------------------------------------+
-| data.tx.cleanup.interval  | 10         | Frequency to check for timed out transactions (seconds) |  
-+---------------------------+------------+---------------------------------------------------------+
-| data.tx.snapshot.dir      |            | HDFS directory used to store snapshots of tx state      |
-+---------------------------+------------+---------------------------------------------------------+
-| data.tx.snapshot.interval | 300        | Frequency to write new snapshots                        |
-+---------------------------+------------+---------------------------------------------------------+
-| data.tx.snapshot.retain   | 10         | Number of old transaction snapshots to retain           |
-+---------------------------+------------+---------------------------------------------------------+
++-------------------------------+------------+---------------------------------------------------------+
+| Name                          | Default    | Description                                             |
++===============================+============+=========================================================+
+| ``data.tx.bind.port``         | 15165      | Port to bind to                                         |
++-------------------------------+------------+---------------------------------------------------------+
+| ``data.tx.bind.address``      | 0.0.0.0    | Server address to listen on                             |
++-------------------------------+------------+---------------------------------------------------------+
+| ``data.tx.server.io.threads`` | 2          | Number of threads for socket IO                         |
++-------------------------------+------------+---------------------------------------------------------+
+| ``data.tx.server.threads``    | 20         | Number of handler threads                               |
++-------------------------------+------------+---------------------------------------------------------+
+| ``data.tx.timeout``           | 30         | Timeout for a transaction to complete (seconds)         |
++-------------------------------+------------+---------------------------------------------------------+
+| ``data.tx.cleanup.interval``  | 10         | Frequency to check for timed out transactions (seconds) |  
++-------------------------------+------------+---------------------------------------------------------+
+| ``data.tx.snapshot.dir``      |            | HDFS directory used to store snapshots of tx state      |
++-------------------------------+------------+---------------------------------------------------------+
+| ``data.tx.snapshot.interval`` | 300        | Frequency to write new snapshots                        |
++-------------------------------+------------+---------------------------------------------------------+
+| ``data.tx.snapshot.retain``   | 10         | Number of old transaction snapshots to retain           |
++-------------------------------+------------+---------------------------------------------------------+
 
 To run the Transaction server, execute the following command in your Tephra installation::
 
@@ -172,29 +174,29 @@ Client API usage is described in the `Client APIs`_ section.
 The transaction service client supports the following configuration properties.  All configuration
 properties can be added to the ``hbase-site.xml`` file on the client's ``CLASSPATH``:
 
-+--------------------------------------+-----------+-----------------------------------------------+
-| Name                                 | Default   | Description                                   |
-+======================================+===========+===============================================+
-| data.tx.client.timeout               | 30000     | Client socket timeout (milliseconds)          |
-+--------------------------------------+-----------+-----------------------------------------------+
-| data.tx.client.provider              | pool      | Client provider strategy: "pool" uses a pool  |
-|                                      |           | of clients; "thread-local" a client per       |
-|                                      |           | thread                                        |
-+--------------------------------------+-----------+-----------------------------------------------+
-| data.tx.client.count                 | 5         | Max number of clients for "pool" provider     |
-+--------------------------------------+-----------+-----------------------------------------------+
-| data.tx.client.retry.strategy        | backoff   | Client retry strategy: "backoff" for back off |
-|                                      |           | between attempts; "n-times" for fixed number  |
-|                                      |           | of tries                                      |
-+--------------------------------------+-----------+-----------------------------------------------+
-| data.tx.client.retry.attempts        | 2         | Number of times to retry ("n-times" strategy) |
-+--------------------------------------+-----------+-----------------------------------------------+
-| data.tx.client.retry.backoff.initial | 100       | Initial sleep time ("backoff" strategy)       |
-+--------------------------------------+-----------+-----------------------------------------------+
-| data.tx.client.retry.backoff.factor  | 4         | Multiplication factor for sleep time          |
-+--------------------------------------+-----------+-----------------------------------------------+
-| data.tx.client.retry.backoff.limit   | 30000     | Exit when sleep time reaches this limit       |
-+--------------------------------------+-----------+-----------------------------------------------+
++------------------------------------------+-----------+-----------------------------------------------+
+| Name                                     | Default   | Description                                   |
++==========================================+===========+===============================================+
+| ``data.tx.client.timeout``               | 30000     | Client socket timeout (milliseconds)          |
++------------------------------------------+-----------+-----------------------------------------------+
+| ``data.tx.client.provider``              | pool      | Client provider strategy: "pool" uses a pool  |
+|                                          |           | of clients; "thread-local" a client per       |
+|                                          |           | thread                                        |
++------------------------------------------+-----------+-----------------------------------------------+
+| ``data.tx.client.count``                 | 5         | Max number of clients for "pool" provider     |
++------------------------------------------+-----------+-----------------------------------------------+
+| ``data.tx.client.retry.strategy``        | backoff   | Client retry strategy: "backoff" for back off |
+|                                          |           | between attempts; "n-times" for fixed number  |
+|                                          |           | of tries                                      |
++------------------------------------------+-----------+-----------------------------------------------+
+| ``data.tx.client.retry.attempts``        | 2         | Number of times to retry ("n-times" strategy) |
++------------------------------------------+-----------+-----------------------------------------------+
+| ``data.tx.client.retry.backoff.initial`` | 100       | Initial sleep time ("backoff" strategy)       |
++------------------------------------------+-----------+-----------------------------------------------+
+| ``data.tx.client.retry.backoff.factor``  | 4         | Multiplication factor for sleep time          |
++------------------------------------------+-----------+-----------------------------------------------+
+| ``data.tx.client.retry.backoff.limit``   | 30000     | Exit when sleep time reaches this limit       |
++------------------------------------------+-----------+-----------------------------------------------+
 
 
 HBase Coprocessor Configuration
@@ -236,20 +238,20 @@ transactionally. These are:
   :widths: 100
   :delim: 0x9
 
-    exists(Get get)
-    exists(List<Get> gets)
-    get(Get get)
-    get(List<Get> gets)
-    batch(List<? extends Row> actions, Object[] results)
-    batch(List<? extends Row> actions)
-    batchCallback(List<? extends Row> actions, Object[] results, Batch.Callback<R> callback) [0.96]
-    batchCallback(List<? extends Row> actions, Batch.Callback<R> callback) [0.96]
-    getScanner(byte[] family)
-    getScanner(byte[] family, byte[] qualifier)
-    put(Put put)
-    put(List<Put> puts)
-    delete(Delete delete)
-    delete(List<Delete> deletes)
+    ``exists(Get get)``
+    ``exists(List<Get> gets)``
+    ``get(Get get)``
+    ``get(List<Get> gets)``
+    ``batch(List<? extends Row> actions, Object[] results)``
+    ``batch(List<? extends Row> actions)``
+    ``batchCallback(List<? extends Row> actions, Object[] results, Batch.Callback<R> callback)`` [0.96]
+    ``batchCallback(List<? extends Row> actions, Batch.Callback<R> callback)`` [0.96]
+    ``getScanner(byte[] family)``
+    ``getScanner(byte[] family, byte[] qualifier)``
+    ``put(Put put)``
+    ``put(List<Put> puts)``
+    ``delete(Delete delete)``
+    ``delete(List<Delete> deletes)``
 
 Other operations are not supported transactionally and will throw an ``UnsupportedOperationException`` if invoked.
 To allow use of these non-transactional operations, call ``setAllowNonTransactional(true)``. This
@@ -260,15 +262,15 @@ allows you to call the following methods non-transactionally:
   :widths: 100
   :delim: 0x9
 
-    getRowOrBefore(byte[] row, byte[], family)
-    checkAndPut(byte[] row, byte[] family, byte[] qualifier, byte[] value, Put put)
-    checkAndDelete(byte[] row, byte[] family, byte[] qualifier, byte[] value, Delete delete)
-    mutateRow(RowMutations rm)
-    append(Append append)
-    increment(Increment increment)
-    incrementColumnValue(byte[] row, byte[] family, byte[] qualifier, long amount)
-    incrementColumnValue(byte[] row, byte[] family, byte[] qualifier, long amount, Durability durability)
-    incrementColumnValue(byte[] row, byte[] family, byte[] qualifier, long amount, boolean writeToWAL)
+    ``getRowOrBefore(byte[] row, byte[], family)``
+    ``checkAndPut(byte[] row, byte[] family, byte[] qualifier, byte[] value, Put put)``
+    ``checkAndDelete(byte[] row, byte[] family, byte[] qualifier, byte[] value, Delete delete)``
+    ``mutateRow(RowMutations rm)``
+    ``append(Append append)``
+    ``increment(Increment increment)``
+    ``incrementColumnValue(byte[] row, byte[] family, byte[] qualifier, long amount)``
+    ``incrementColumnValue(byte[] row, byte[] family, byte[] qualifier, long amount, Durability durability)``
+    ``incrementColumnValue(byte[] row, byte[] family, byte[] qualifier, long amount, boolean writeToWAL)``
 
 Note that for ``batch`` operations, only certain supported operations (``get``, ``put``, and ``delete``)
 are applied transactionally.
@@ -279,7 +281,9 @@ To use a ``TransactionalAwareHTable``, you need an instance of ``TransactionCont
 ``TransactionContext`` provides the basic contract for client use of transactions.  At each point
 in the transaction lifecycle, it provides the necessary interactions with the Tephra Transaction
 Server in order to start, commit, and rollback transactions.  Basic usage of
-``TransactionContext`` is handled using the following pattern::
+``TransactionContext`` is handled using the following pattern:
+
+.. code:: java
 
   TransactionContext context = new TransactionContext(client, transactionAwareHTable);
   try {
@@ -306,7 +310,9 @@ Example
 .......
 To demonstrate how you might use ``TransactionAwareHTable``\s, below is a basic implementation of a
 ``SecondaryIndexTable``. This class encapsulates the usage of a ``TransactionContext`` and provides a simple interface
-to a user. ::
+to a user:
+
+.. code:: java
 
   /**
    * A Transactional SecondaryIndexTable.
@@ -321,7 +327,8 @@ to a user. ::
     private static final byte[] secondaryIndexQualifier = Bytes.toBytes('r');
     private static final byte[] DELIMITER  = new byte[] {0};
 
-    public SecondaryIndexTable(TransactionServiceClient transactionServiceClient, HTable hTable, byte[] secondaryIndex) {
+    public SecondaryIndexTable(TransactionServiceClient transactionServiceClient, HTable hTable, 
+                                                                          byte[] secondaryIndex) {
       secondaryIndexTableName = TableName.valueOf(hTable.getName().getNameAsString() + ".idx");
       HTable secondaryIndexHTable = null;
       HBaseAdmin hBaseAdmin = null;
@@ -506,4 +513,4 @@ Apache, Apache HBase, and HBase are trademarks of The Apache Software Foundation
 .. |(TM)| unicode:: U+2122 .. trademark sign
    :trim:
 
-.. |(Tephra)| image:: docs/_images/tephra_logo_light_bkgnd_small.png
+.. |(Tephra)| image:: docs/_images/tephra_logo_light_bknd_continuuity.png
