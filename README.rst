@@ -267,7 +267,8 @@ Thanks for helping to improve Tephra!
 Mailing List
 ............
 
-Tephra User Group and Development Discussions: tephra-dev@googlegroups.com
+Tephra User Group and Development Discussions: `tephra-dev@googlegroups.com 
+<https://groups.google.com/d/forum/tephra-dev>`__
 
 
 License
