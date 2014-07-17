@@ -26,12 +26,10 @@
     <version>0.1.0-SNAPSHOT</version>
   </parent>
   
-  <artifactId>distribution</artifactId>
-
+  <artifactId>tephra-distribution</artifactId>
+  <name>Tephra Distribution</name>
   <packaging>pom</packaging>
 
-  <name>Distribution</name>
-  
   <!-- NOTE: These dependency declarations are only required to sort this project to the 
        end of the line in the multimodule build. 
        
@@ -41,23 +39,23 @@
   <dependencies>
     <dependency>
       <groupId>com.continuuity</groupId>
-      <artifactId>tx-api</artifactId>
-      <version>0.1.0-SNAPSHOT</version>
+      <artifactId>tephra-api</artifactId>
+      <version>${project.version}</version>
     </dependency>
     <dependency>
       <groupId>com.continuuity</groupId>
-      <artifactId>tx-core</artifactId>
-      <version>0.1.0-SNAPSHOT</version>
+      <artifactId>tephra-core</artifactId>
+      <version>${project.version}</version>
     </dependency>
     <dependency>
       <groupId>com.continuuity</groupId>
-      <artifactId>tx-hbase-compat-0.94</artifactId>
-      <version>0.1.0-SNAPSHOT</version>
+      <artifactId>tephra-hbase-compat-0.94</artifactId>
+      <version>${project.version}</version>
     </dependency>
     <dependency>
       <groupId>com.continuuity</groupId>
-      <artifactId>tx-hbase-compat-0.96</artifactId>
-      <version>0.1.0-SNAPSHOT</version>
+      <artifactId>tephra-hbase-compat-0.96</artifactId>
+      <version>${project.version}</version>
     </dependency>
   </dependencies>
 

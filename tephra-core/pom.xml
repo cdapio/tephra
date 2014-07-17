@@ -25,13 +25,13 @@
   </parent>
   <modelVersion>4.0.0</modelVersion>
 
-  <artifactId>tx-core</artifactId>
+  <artifactId>tephra-core</artifactId>
   <name>Tephra Core</name>
 
   <dependencies>
     <dependency>
       <groupId>com.continuuity</groupId>
-      <artifactId>tx-api</artifactId>
+      <artifactId>tephra-api</artifactId>
       <version>${project.version}</version>
     </dependency>
     <dependency>

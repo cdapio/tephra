@@ -25,18 +25,18 @@
   </parent>
   <modelVersion>4.0.0</modelVersion>
 
-  <artifactId>tx-hbase-compat-0.96</artifactId>
-  <name>Tephra HBase 0.96 Compatibility</name>
+  <artifactId>tephra-hbase-compat-0.94</artifactId>
+  <name>Tephra HBase 0.94 Compatibility</name>
 
   <dependencies>
     <dependency>
       <groupId>com.continuuity</groupId>
-      <artifactId>tx-api</artifactId>
+      <artifactId>tephra-api</artifactId>
       <version>${project.version}</version>
     </dependency>
     <dependency>
       <groupId>com.continuuity</groupId>
-      <artifactId>tx-core</artifactId>
+      <artifactId>tephra-core</artifactId>
       <version>${project.version}</version>
       <exclusions>
         <exclusion>
@@ -46,37 +46,34 @@
       </exclusions>
     </dependency>
     <dependency>
-      <groupId>org.apache.hbase</groupId>
-      <artifactId>hbase-client</artifactId>
+      <groupId>org.apache.hadoop</groupId>
+      <artifactId>hadoop-common</artifactId>
     </dependency>
     <dependency>
       <groupId>org.apache.hbase</groupId>
-      <artifactId>hbase-protocol</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.hbase</groupId>
-      <artifactId>hbase-server</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.hbase</groupId>
-      <artifactId>hbase-common</artifactId>
+      <artifactId>hbase</artifactId>
     </dependency>
 
     <!-- Test dependencies -->
-    <dependency>
-      <groupId>com.continuuity</groupId>
-      <artifactId>tx-core</artifactId>
-      <version>${project.version}</version>
-      <type>test-jar</type>
-      <scope>test</scope>
-    </dependency>
     <dependency>
       <groupId>junit</groupId>
       <artifactId>junit</artifactId>
     </dependency>
     <dependency>
+      <groupId>com.continuuity</groupId>
+      <artifactId>tephra-core</artifactId>
+      <version>${project.version}</version>
+      <type>test-jar</type>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
       <groupId>org.apache.hbase</groupId>
-      <artifactId>hbase-testing-util</artifactId>
+      <artifactId>hbase</artifactId>
+      <classifier>tests</classifier>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.hadoop</groupId>
+      <artifactId>hadoop-minicluster</artifactId>
     </dependency>
   </dependencies>
 
