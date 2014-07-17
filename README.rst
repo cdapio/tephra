@@ -2,6 +2,9 @@
 Continuuity Tephra
 ==================
 
+-----------------------------
+Transactions for Apache HBase
+-----------------------------
 
 Continuuity Tephra provides globally consistent transactions on top of Apache HBase.  While HBase
 provides strong consistency with row- or region-level ACID operations, it sacrifices
@@ -25,8 +28,7 @@ Tephra consists of three main components:
   and performs conflict detection;
 - **Transaction Client** - coordinates start, commit, and rollback of transactions; and
 - **TransactionDataJanitor Coprocessor** - applies filtering to the data read (based on a 
-  given transaction's data snapshot) and cleans up any data from old (no longer visible) 
-  transaction versions.
+  given transaction's state) and cleans up any data from old (no longer visible) transactions.
 
 Transaction Server
 ..................
@@ -49,7 +51,7 @@ writes for the transaction), as well as a list of transaction IDs to exclude for
 in-progress or invalidated transactions).  When performing writes, the client overrides the
 timestamp for all modified HBase cells with the transaction ID.  When reading data from HBase, the
 client skips cells associated with any of the excluded transaction IDs.  The read exclusions are
-applied through a server-side filter injected by the ``TransactionsDataJanitor`` coprocessor.
+applied through a server-side filter injected by the ``TransactionDataJanitor`` coprocessor.
 
 TransactionDataJanitor Coprocessor
 ..................................
@@ -122,9 +124,9 @@ simultaneously, providing automatic failover if the active server becomes unreac
 Transaction Server Configuration
 ................................
 
-The Tephra transaction server can be deployed on master nodes for the cluster, for example,
-colocating the transaction server on any nodes running the HBase HMaster process.  The transaction
-server requires that the HBase libraries be available on the server's Java ``CLASSPATH``.  
+The Tephra transaction server can be deployed on the same cluster nodes running the HBase HMaster
+process. The transaction server requires that the HBase libraries be available on the server's 
+Java ``CLASSPATH``.  
 
 The transaction server supports the following configuration properties.  All configuration
 properties can be added to the ``hbase-site.xml`` file on the server's ``CLASSPATH``:
