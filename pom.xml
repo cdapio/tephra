@@ -33,6 +33,13 @@
     <module>tx-hbase-compat-0.96</module>
   </modules>
 
+  <repositories>
+    <repository>
+      <id>apache.snapshots</id>
+      <url>https://repository.apache.org/content/repositories/snapshots</url>
+    </repository>
+  </repositories>
+
   <distributionManagement>
     <repository>
       <id>continuuity-release</id>
@@ -49,18 +56,151 @@
     <surefire.redirectTestOutputToFile>true</surefire.redirectTestOutputToFile>
 
     <!-- Dependencies versions -->
+    <fastutil.version>6.5.6</fastutil.version>
+    <gson.version>2.2.4</gson.version>
     <guava.version>13.0.1</guava.version>
+    <guice.version>3.0</guice.version>
+    <logback.version>1.0.9</logback.version>
+    <hadoop.version>2.2.0</hadoop.version>
     <hbase94.version>0.94.21</hbase94.version>
+
     <hbase96.version>0.96.2-hadoop2</hbase96.version>
     <junit.version>4.11</junit.version>
+    <slf4j.version>1.7.5</slf4j.version>
+    <thrift.version>0.9.0</thrift.version>
+    <twill.version>0.4.0-incubating-SNAPSHOT</twill.version>
   </properties>
 
   <dependencyManagement>
     <dependencies>
       <dependency>
+        <groupId>com.google.code.gson</groupId>
+        <artifactId>gson</artifactId>
+        <version>${gson.version}</version>
+      </dependency>
+      <dependency>
         <groupId>com.google.guava</groupId>
         <artifactId>guava</artifactId>
         <version>${guava.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.google.inject</groupId>
+        <artifactId>guice</artifactId>
+        <version>${guice.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.google.inject.extensions</groupId>
+        <artifactId>guice-assistedinject</artifactId>
+        <version>${guice.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.slf4j</groupId>
+        <artifactId>slf4j-api</artifactId>
+        <version>${slf4j.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>ch.qos.logback</groupId>
+        <artifactId>logback-classic</artifactId>
+        <version>${logback.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>ch.qos.logback</groupId>
+        <artifactId>logback-core</artifactId>
+        <version>${logback.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>it.unimi.dsi</groupId>
+        <artifactId>fastutil</artifactId>
+        <version>${fastutil.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.thrift</groupId>
+        <artifactId>libthrift</artifactId>
+        <version>${thrift.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.twill</groupId>
+        <artifactId>twill-common</artifactId>
+        <version>${twill.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.twill</groupId>
+        <artifactId>twill-core</artifactId>
+        <version>${twill.version}</version>
+        <exclusions>
+          <exclusion>
+            <groupId>org.apache.kafka</groupId>
+            <artifactId>kafka_2.10</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>io.netty</groupId>
+            <artifactId>netty</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>org.xerial.snappy</groupId>
+            <artifactId>snappy-java</artifactId>
+          </exclusion>
+        </exclusions>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.twill</groupId>
+        <artifactId>twill-discovery-api</artifactId>
+        <version>${twill.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.twill</groupId>
+        <artifactId>twill-discovery-core</artifactId>
+        <version>${twill.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.twill</groupId>
+        <artifactId>twill-yarn</artifactId>
+        <version>${twill.version}</version>
+        <exclusions>
+          <exclusion>
+            <groupId>org.apache.hadoop</groupId>
+            <artifactId>hadoop-yarn-api</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>org.apache.hadoop</groupId>
+            <artifactId>hadoop-yarn-common</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>org.apache.hadoop</groupId>
+            <artifactId>hadoop-yarn-client</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>org.apache.hadoop</groupId>
+            <artifactId>hadoop-common</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>org.apache.hadoop</groupId>
+            <artifactId>hadoop-hdfs</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>org.slf4j</groupId>
+            <artifactId>jcl-over-slf4j</artifactId>
+          </exclusion>
+        </exclusions>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.twill</groupId>
+        <artifactId>twill-zookeeper</artifactId>
+        <version>${twill.version}</version>
+      </dependency>
+
+      <!-- Hadoop dependencies -->
+      <dependency>
+        <groupId>org.apache.hadoop</groupId>
+        <artifactId>hadoop-common</artifactId>
+        <version>${hadoop.version}</version>
+        <scope>provided</scope>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.hadoop</groupId>
+        <artifactId>hadoop-hdfs</artifactId>
+        <version>${hadoop.version}</version>
+        <scope>provided</scope>
       </dependency>
 
       <!-- HBase 0.94 dependencies -->
@@ -103,6 +243,22 @@
         <artifactId>junit</artifactId>
         <version>${junit.version}</version>
         <scope>test</scope>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.hadoop</groupId>
+        <artifactId>hadoop-minicluster</artifactId>
+        <version>${hadoop.version}</version>
+        <scope>test</scope>
+        <exclusions>
+          <exclusion>
+            <groupId>asm</groupId>
+            <artifactId>asm</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-log4j12</artifactId>
+          </exclusion>
+        </exclusions>
       </dependency>
       <dependency>
         <groupId>org.apache.hbase</groupId>
