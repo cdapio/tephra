@@ -31,6 +31,7 @@
     <module>tx-core</module>
     <module>tx-hbase-compat-0.94</module>
     <module>tx-hbase-compat-0.96</module>
+    <module>distribution</module>
   </modules>
 
   <repositories>
@@ -332,6 +333,18 @@
             </execution>
           </executions>
         </plugin>
+
+        <!-- Maven assembly -->
+        <plugin>
+          <artifactId>maven-assembly-plugin</artifactId>
+          <version>2.4</version>
+          <configuration>
+            <descriptors>
+              <descriptor>src/assemble/bin.xml</descriptor>
+            </descriptors>
+          </configuration>
+        </plugin>
+
       </plugins>
     </pluginManagement>
 
