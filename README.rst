@@ -327,9 +327,11 @@ to a user:
     private static final byte[] secondaryIndexQualifier = Bytes.toBytes('r');
     private static final byte[] DELIMITER  = new byte[] {0};
 
-    public SecondaryIndexTable(TransactionServiceClient transactionServiceClient, HTable hTable, 
-                                                                          byte[] secondaryIndex) {
-      secondaryIndexTableName = TableName.valueOf(hTable.getName().getNameAsString() + ".idx");
+    public SecondaryIndexTable(TransactionServiceClient transactionServiceClient, 
+                                                                    HTable hTable, 
+                                                                    byte[] secondaryIndex) {
+      secondaryIndexTableName = TableName.valueOf(hTable.getName().getNameAsString()
+                                                                                + ".idx");
       HTable secondaryIndexHTable = null;
       HBaseAdmin hBaseAdmin = null;
       try {
@@ -337,7 +339,8 @@ to a user:
         if (!hBaseAdmin.tableExists(secondaryIndexTableName)) {
           hBaseAdmin.createTable(new HTableDescriptor(secondaryIndexTableName));
         }
-        secondaryIndexHTable = new HTable(hTable.getConfiguration(), secondaryIndexTableName);
+        secondaryIndexHTable = new HTable(hTable.getConfiguration(), 
+                                          secondaryIndexTableName);
       } catch (Exception e) {
         Throwables.propagate(e);
       } finally {
@@ -351,8 +354,9 @@ to a user:
       this.secondaryIndex = secondaryIndex;
       this.transactionAwareHTable = new TransactionAwareHTable(hTable);
       this.secondaryIndexTable = new TransactionAwareHTable(secondaryIndexHTable);
-      this.transactionContext = new TransactionContext(transactionServiceClient, transactionAwareHTable,
-                                                  secondaryIndexTable);
+      this.transactionContext = new TransactionContext(transactionServiceClient, 
+                                                       transactionAwareHTable,
+                                                       secondaryIndexTable);
     }
 
     public Result get(Get get) throws IOException {
