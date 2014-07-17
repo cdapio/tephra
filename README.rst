@@ -328,10 +328,9 @@ to a user:
     private static final byte[] DELIMITER  = new byte[] {0};
 
     public SecondaryIndexTable(TransactionServiceClient transactionServiceClient, 
-                                                                    HTable hTable, 
-                                                                    byte[] secondaryIndex) {
-      secondaryIndexTableName = TableName.valueOf(hTable.getName().getNameAsString()
-                                                                                + ".idx");
+                               HTable hTable, byte[] secondaryIndex) {
+      secondaryIndexTableName = 
+            TableName.valueOf(hTable.getName().getNameAsString() + ".idx");
       HTable secondaryIndexHTable = null;
       HBaseAdmin hBaseAdmin = null;
       try {
