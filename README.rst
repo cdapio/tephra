@@ -79,8 +79,8 @@ You can get started with Tephra by building directly from the latest source code
   mvn clean package
 
 After the build completes, you will have a full binary distribution of Tephra under the
-``distribution/target/`` directory.  Take the ``tephra-<version>.tar.gz`` file and install it on
-your systems.
+``tephra-distribution/target/`` directory.  Take the ``tephra-<version>.tar.gz`` file and install
+it on your systems.
 
 For any client applications, add the following dependencies to any Apache Maven POM files (or your
 build system's equivalent configuration), in order to make use of Tephra classes::
