@@ -1,11 +1,8 @@
-==================
-Continuuity Tephra
-==================
+=======================================
+Continuuity Tephra           |(Tephra)|
+=======================================
 
------------------------------
-Transactions for Apache HBase
------------------------------
-
+**Transactions for Apache HBase** |(TM)|:
 Continuuity Tephra provides globally consistent transactions on top of Apache HBase.  While HBase
 provides strong consistency with row- or region-level ACID operations, it sacrifices
 cross-region and cross-table consistency in favor of scalability.  This trade-off requires
@@ -271,8 +268,8 @@ Tephra User Group and Development Discussions: `tephra-dev@googlegroups.com
 <https://groups.google.com/d/forum/tephra-dev>`__
 
 
-License
--------
+License and Trademarks
+----------------------
 
 Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
 in compliance with the License. You may obtain a copy of the License at
@@ -283,3 +280,12 @@ Unless required by applicable law or agreed to in writing, software distributed 
 is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express
 or implied. See the License for the specific language governing permissions and limitations under
 the License.
+
+Continuuity, Continuuity Tephra and Tephra are trademarks of Continuuity, Inc. All rights reserved.
+
+Apache, Apache HBase, and HBase are trademarks of The Apache Software Foundation. Used with permission. No endorsement by The Apache Software Foundation is implied by the use of these marks.
+
+.. |(TM)| unicode:: U+2122 .. trademark sign
+   :trim:
+
+.. |(Tephra)| image:: docs/_images/tephra_logo_light_bkgnd_small.png
