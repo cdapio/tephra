@@ -214,7 +214,7 @@ For HBase 0.96 and 0.98::
   </property>
 
 
-You may configure the ``TransactionDataJanitor`` to be only on HBase tables that you will
+You may configure the ``TransactionDataJanitor`` to be loaded only on HBase tables that you will
 be using for transaction reads and writes.  However, you must ensure that the coprocessor is 
 available on all impacted tables in order for Tephra to function correctly.
 
