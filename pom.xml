@@ -28,9 +28,9 @@
 
   <modules>
     <module>tx-api</module>
+    <module>tx-core</module>
     <module>tx-hbase-compat-0.94</module>
     <module>tx-hbase-compat-0.96</module>
-    <module>tx-core</module>
   </modules>
 
   <distributionManagement>
