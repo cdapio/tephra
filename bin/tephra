@@ -249,9 +249,6 @@ run() {
     # sets the JAVA variable.
     set_java
 
-    # Adds the correct HBase support lib to the classpath
-    set_hbase
-
     echo "Running class $classname"
     "$JAVA" "$OPTS" -cp $CLASSPATH "$JAVA_HEAPMAX" $classname $@
 }
