@@ -73,10 +73,10 @@
               <goal>single</goal>
             </goals>
             <configuration>
-                <finalName>tephra-${project.version}</finalName>
-                <formats>
-                  <format>tar.gz</format>
-                </formats>
+              <finalName>tephra-${project.version}</finalName>
+              <formats>
+                <format>tar.gz</format>
+              </formats>
               <descriptors>
                 <descriptor>src/assemble/bin.xml</descriptor>
               </descriptors>

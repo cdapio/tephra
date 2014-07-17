@@ -446,29 +446,6 @@
                 </execution>
               </executions>
             </plugin>
-            <plugin>
-              <groupId>org.apache.maven.plugins</groupId>
-              <artifactId>maven-assembly-plugin</artifactId>
-              <version>2.4</version>
-              <configuration>
-                <finalName>tephra-${project.version}</finalName>
-                <formats>
-                  <format>tar.gz</format>
-                </formats>
-              </configuration>
-            </plugin>
-            <plugin>
-              <groupId>org.apache.rat</groupId>
-              <artifactId>apache-rat-plugin</artifactId>
-              <executions>
-                <execution>
-                  <phase>prepare-package</phase>
-                  <goals>
-                    <goal>check</goal>
-                  </goals>
-                </execution>
-              </executions>
-            </plugin>
           </plugins>
         </pluginManagement>
 

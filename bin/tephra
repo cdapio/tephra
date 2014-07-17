@@ -127,12 +127,12 @@ Please set the JAVA_HOME variable in your environment to match the
 location of your Java installation." >&2
         exit 1
     fi
-else
+  else
     export JAVA="java"
     which java >/dev/null 2>&1 || { echo "ERROR: JAVA_HOME is not set and no 'java' command could be found in your PATH.
 Please set the JAVA_HOME variable in your environment to match the
 location of your Java installation." >&2 ; exit 1; }
-fi
+  fi
 }
 
 # checks if there exists a PID that is already running. return 0 idempotently
