@@ -170,7 +170,7 @@ start() {
 
   export MAIN_CLASS="com.continuuity.data2.transaction.TransactionServiceMain"
   echo "Running class $MAIN_CLASS"
-  echo "Command: " "$JAVA" "$OPTS" -cp $CLASSPATH "$JAVA_HEAPMAX" $MAIN_CLASS >>$loglog
+  echo "Command: " "$JAVA" $OPTS -cp $CLASSPATH $JAVA_HEAPMAX $MAIN_CLASS >>$loglog
   nohup nice -n $NICENESS "$JAVA" $OPTS -cp $CLASSPATH $JAVA_HEAPMAX ${MAIN_CLASS} </dev/null >>$loglog 2>&1 &
   echo $! >$pid
 }
@@ -250,7 +250,7 @@ run() {
     set_java
 
     echo "Running class $classname"
-    "$JAVA" "$OPTS" -cp $CLASSPATH "$JAVA_HEAPMAX" $classname $@
+    "$JAVA" $OPTS -cp $CLASSPATH $JAVA_HEAPMAX $classname $@
 }
 
 case "$1" in
