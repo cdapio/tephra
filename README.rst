@@ -158,7 +158,7 @@ To run the Transaction server, execute the following command in your Tephra inst
 
   ./bin/tephra start
 
-Any environment-specific customizations can be made by editing ``bin/tephra-env.sh`` script.
+Any environment-specific customizations can be made by editing the ``bin/tephra-env.sh`` script.
 
 
 Client Configuration
@@ -227,9 +227,9 @@ available on all impacted tables in order for Tephra to function correctly.
 
 Client APIs
 -----------
-The ``TransactionAwareHTable`` class implements ``HTableInterface``, thus providing the same APIs
+The ``TransactionAwareHTable`` class implements HBase's ``HTableInterface``, thus providing the same APIs
 that a standard HBase ``HTable`` instance provides. Only certain operations are supported
-transactionally. They are: 
+transactionally. These are: 
 
 .. csv-table::
   :header: Methods
@@ -270,7 +270,7 @@ allows you to call the following methods non-transactionally:
     incrementColumnValue(byte[] row, byte[] family, byte[] qualifier, long amount, Durability durability)
     incrementColumnValue(byte[] row, byte[] family, byte[] qualifier, long amount, boolean writeToWAL)
 
-Note that for ``batch`` operations, only supported operations (``Get``, ``Put``, and ``Delete``)
+Note that for ``batch`` operations, only certain supported operations (``get``, ``put``, and ``delete``)
 are applied transactionally.
 
 Usage
@@ -291,9 +291,9 @@ Server in order to start, commit, and rollback transactions.  Basic usage of
     context.abort();
   }
 
-#. First a new transaction is started using ``TransactionContext.start()``.
-#. Next any data operations are performed within the context of the transaction.
-#. After data operations are complete ``TransactionContext.finish()`` is called to commit the
+#. First, a new transaction is started using ``TransactionContext.start()``.
+#. Next, any data operations are performed within the context of the transaction.
+#. After data operations are complete, ``TransactionContext.finish()`` is called to commit the
    transaction.
 #. If an exception occurs, ``TransactionContext.abort()`` can be called to rollback the
    transaction.
