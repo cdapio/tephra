@@ -175,7 +175,7 @@ properties can be added to the ``hbase-site.xml`` file on the client's ``CLASSPA
 |                                      |           | of clients; "thread-local" a client per       |
 |                                      |           | thread                                        |
 +--------------------------------------+-----------+-----------------------------------------------+
-| data.tx.client.count                 | 5         | Max num. of clients for "pool" provider       |
+| data.tx.client.count                 | 5         | Max number of clients for "pool" provider     |
 +--------------------------------------+-----------+-----------------------------------------------+
 | data.tx.client.retry.strategy        | backoff   | Client retry strategy: "backoff" for back off |
 |                                      |           | between attempts; "n-times" for fixed number  |
