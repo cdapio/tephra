@@ -28,6 +28,7 @@ import com.continuuity.tephra.runtime.DiscoveryModules;
 import com.continuuity.tephra.runtime.TransactionClientModule;
 import com.continuuity.tephra.runtime.TransactionModules;
 import com.continuuity.tephra.runtime.ZKModule;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Throwables;
 import com.google.inject.Guice;
 import com.google.inject.Inject;
@@ -71,8 +72,11 @@ public class TransactionServiceClient implements TransactionSystemClient {
     if (args.length == 1 && "-v".equals(args[0])) {
       verbose = true;
     }
+    doMain(verbose, HBaseConfiguration.create());
+  }
 
-    Configuration conf = HBaseConfiguration.create();
+  @VisibleForTesting
+  public static void doMain(boolean verbose, Configuration conf) throws Exception {
     LOG.info("Starting tx server client test.");
     Injector injector = Guice.createInjector(
       new ConfigModule(conf),
@@ -144,10 +148,16 @@ public class TransactionServiceClient implements TransactionSystemClient {
       throw new IllegalArgumentException(message);
     }
     this.retryStrategyProvider.configure(config);
-    LOG.info("Retry strategy is " + this.retryStrategyProvider);
+    LOG.debug("Retry strategy is " + this.retryStrategyProvider);
 
     this.clientProvider = clientProvider;
-    LOG.info("Tx client provider is " + this.clientProvider);
+    try {
+      this.clientProvider.initialize();
+      LOG.debug("Tx client provider is " + this.clientProvider);
+    } catch (Exception e) {
+      LOG.error("Failed to initialize Tx client provider", e);
+      throw Throwables.propagate(e);
+    }
   }
 
   /**

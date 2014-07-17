@@ -60,7 +60,7 @@ public class InMemoryTransactionService extends AbstractService {
     this.serviceName = conf.get(TxConstants.Service.CFG_DATA_TX_DISCOVERY_SERVICE_NAME,
                                 TxConstants.Service.DEFAULT_DATA_TX_DISCOVERY_SERVICE_NAME);
 
-    address = conf.get(TxConstants.Service.CFG_DATA_TX_BIND_ADDRESS);
+    address = conf.get(TxConstants.Service.CFG_DATA_TX_BIND_ADDRESS, TxConstants.Service.DEFAULT_DATA_TX_BIND_ADDRESS);
 
     // Retrieve the number of threads for the service
     threads = conf.getInt(TxConstants.Service.CFG_DATA_TX_SERVER_THREADS,
