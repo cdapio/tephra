@@ -1,8 +1,10 @@
-=======================================
-Continuuity Tephra           |(Tephra)|
-=======================================
+.. ==================
+.. Continuuity Tephra
+.. ==================
 
-**Transactions for Apache HBase** |(TM)|:
+|(Tephra)|
+
+**Transactions for Apache HBase** |(TM)| :
 Continuuity Tephra provides globally consistent transactions on top of Apache HBase.  While HBase
 provides strong consistency with row- or region-level ACID operations, it sacrifices
 cross-region and cross-table consistency in favor of scalability.  This trade-off requires
@@ -288,4 +290,4 @@ Apache, Apache HBase, and HBase are trademarks of The Apache Software Foundation
 .. |(TM)| unicode:: U+2122 .. trademark sign
    :trim:
 
-.. |(Tephra)| image:: docs/_images/tephra_logo_light_bkgnd_small.png
+.. |(Tephra)| image:: docs/_images/tephra_logo_light_bknd_continuuity.png
