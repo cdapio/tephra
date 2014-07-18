@@ -88,12 +88,12 @@ build system's equivalent configuration), in order to make use of Tephra classes
   <dependency>
     <groupId>com.continuuity.tephra</groupId>
     <artifactId>tephra-api</artifactId>
-    <version>0.1.0-SNAPSHOT</version>
+    <version>0.1.0</version>
   </dependency>
   <dependency>
     <groupId>com.continuuity.tephra</groupId>
     <artifactId>tephra-core</artifactId>
-    <version>0.1.0-SNAPSHOT</version>
+    <version>0.1.0</version>
   </dependency>
 
 Since the HBase APIs have changed between version 0.94.x and 0.96.x, you will need to select the
@@ -104,7 +104,7 @@ For HBase 0.94.x::
   <dependency>
     <groupId>com.continuuity.tephra</groupId>
     <artifactId>tephra-hbase-compat-0.94</artifactId>
-    <version>0.1.0-SNAPSHOT</version>
+    <version>0.1.0</version>
   </dependency>
 
 For HBase 0.96.x and 0.98.x::
@@ -112,7 +112,7 @@ For HBase 0.96.x and 0.98.x::
   <dependency>
     <groupId>com.continuuity.tephra</groupId>
     <artifactId>tephra-hbase-compat-0.96</artifactId>
-    <version>0.1.0-SNAPSHOT</version>
+    <version>0.1.0</version>
   </dependency>
 
 
