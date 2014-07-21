@@ -28,6 +28,7 @@
   
   <artifactId>tephra-distribution</artifactId>
   <name>Tephra Distribution</name>
+  <description>Tephra Transaction System Distribution Module</description>
   <packaging>pom</packaging>
 
   <!-- NOTE: These dependency declarations are only required to sort this project to the 

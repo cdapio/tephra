@@ -27,6 +27,7 @@
 
   <artifactId>tephra-hbase-compat-0.96</artifactId>
   <name>Tephra HBase 0.96 Compatibility</name>
+  <description>Tephra Transaction System HBase 0.94 Compatibility Module</description>
 
   <dependencies>
     <dependency>

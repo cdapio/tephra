@@ -27,6 +27,7 @@
 
   <artifactId>tephra-core</artifactId>
   <name>Tephra Core</name>
+  <description>Tephra Transaction System Core Module</description>
 
   <dependencies>
     <dependency>
