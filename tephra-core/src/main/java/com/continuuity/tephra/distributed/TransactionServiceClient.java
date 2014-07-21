@@ -151,13 +151,6 @@ public class TransactionServiceClient implements TransactionSystemClient {
     LOG.debug("Retry strategy is " + this.retryStrategyProvider);
 
     this.clientProvider = clientProvider;
-    try {
-      this.clientProvider.initialize();
-      LOG.debug("Tx client provider is " + this.clientProvider);
-    } catch (Exception e) {
-      LOG.error("Failed to initialize Tx client provider", e);
-      throw Throwables.propagate(e);
-    }
   }
 
   /**

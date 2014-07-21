@@ -17,6 +17,7 @@
 package com.continuuity.tephra.distributed;
 
 import com.continuuity.tephra.TxConstants;
+import com.google.common.base.Throwables;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.thrift.TException;
 import org.apache.twill.discovery.DiscoveryServiceClient;
@@ -49,10 +50,10 @@ public class PooledClientProvider extends AbstractClientProvider {
   }
 
   // we will use this as a pool of tx clients
-  TxClientPool clients;
+  private volatile TxClientPool clients;
 
   // the limit for the number of active clients
-  int maxClients;
+  private int maxClients;
 
   public PooledClientProvider(Configuration conf, DiscoveryServiceClient discoveryServiceClient) {
     super(conf, discoveryServiceClient);
@@ -77,22 +78,40 @@ public class PooledClientProvider extends AbstractClientProvider {
 
   @Override
   public TransactionServiceThriftClient getClient() throws TException {
-    return clients.obtain();
+    return getClientPool().obtain();
   }
 
   @Override
   public void returnClient(TransactionServiceThriftClient client) {
-    clients.release(client);
+    getClientPool().release(client);
   }
 
   @Override
   public void discardClient(TransactionServiceThriftClient client) {
-    clients.discard(client);
+    getClientPool().discard(client);
     client.close();
   }
 
   @Override
   public String toString() {
     return "Elastic pool of size " + this.maxClients;
+  }
+
+  private TxClientPool getClientPool() {
+    if (clients != null) {
+      return clients;
+    }
+
+    synchronized (this) {
+      if (clients == null) {
+        try {
+          initialize();
+        } catch (TException e) {
+          LOG.error("Failed to initialize Tx client provider", e);
+          throw Throwables.propagate(e);
+        }
+      }
+    }
+    return clients;
   }
 }
