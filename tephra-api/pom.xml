@@ -28,5 +28,6 @@
 
   <artifactId>tephra-api</artifactId>
   <name>Tephra API</name>
+  <description>Tephra Transaction System API Module</description>
 
 </project>
