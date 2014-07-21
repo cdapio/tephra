@@ -304,6 +304,13 @@
                 <excludes>
                   <exclude>build-number.txt</exclude>
                   <exclude>README.md</exclude>
+                  <exclude>**/target/**</exclude>
+                  <exclude>**/.git/**</exclude>
+                  <exclude>**/.idea/**</exclude>
+                  <exclude>**/*.iml</exclude>
+                  <exclude>**/.project</exclude>
+                  <exclude>**/.classpath</exclude>
+                  <exclude>**/.settings/**</exclude>
                 </excludes>
               </configuration>
             </execution>
