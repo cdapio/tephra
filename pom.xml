@@ -20,11 +20,13 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
 
-  <groupId>com.continuuity</groupId>
+  <groupId>com.continuuity.tephra</groupId>
   <artifactId>tephra</artifactId>
-  <version>0.1.0-SNAPSHOT</version>
+  <version>0.1.0</version>
   <packaging>pom</packaging>
   <name>Tephra Transaction System</name>
+  <description>Tephra Transaction System</description>
+  <url>https://github.com/continuuity/tephra</url>
 
   <modules>
     <module>tephra-api</module>
@@ -33,6 +35,28 @@
     <module>tephra-hbase-compat-0.96</module>
     <module>tephra-distribution</module>
   </modules>
+
+  <licenses>
+    <license>
+      <name>The Apache Software License, Version 2.0</name>
+      <url>http://www.apache.org/licenses/LICENSE-2.0.txt</url>
+    </license>
+  </licenses>
+
+  <developers>
+    <developer>
+      <name>Continuuity</name>
+      <email>tephra-dev@googlegroups.com</email>
+      <organization>Continuuity</organization>
+      <organizationUrl>https://github.com/continuuity/tephra</organizationUrl>
+    </developer>
+  </developers>
+
+  <scm>
+    <connection>scm:git:https://github.com/continuuity/tephra.git</connection>
+    <developerConnection>scm:git:https://github.com/continuuity/tephra.git</developerConnection>
+    <url>https://github.com/continuuity/tephra.git</url>
+  </scm>
 
   <repositories>
     <repository>
@@ -47,12 +71,12 @@
 
   <distributionManagement>
     <repository>
-      <id>continuuity-release</id>
-      <url>https://repository.continuuity.com/content/repositories/releases-public</url>
+      <id>sonatype.release</id>
+      <url>https://oss.sonatype.org/service/local/staging/deploy/maven2</url>
     </repository>
     <snapshotRepository>
-      <id>continuuity-snapshots</id>
-      <url>https://repository.continuuity.com/content/repositories/snapshots/</url>
+      <id>sonatype.snapshots</id>
+      <url>https://oss.sonatype.org/content/repositories/snapshots</url>
     </snapshotRepository>
   </distributionManagement>
 
@@ -346,6 +370,24 @@
           </configuration>
         </plugin>
 
+        <!-- GPG signature -->
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-gpg-plugin</artifactId>
+          <version>1.5</version>
+          <configuration>
+            <passphrase>${gpg.passphrase}</passphrase>
+            <useAgent>${gpg.useagent}</useAgent>
+          </configuration>
+          <executions>
+            <execution>
+              <goals>
+                <goal>sign</goal>
+              </goals>
+            </execution>
+          </executions>
+        </plugin>
+
         <!-- Deploy plugin -->
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
@@ -379,6 +421,11 @@
         <artifactId>maven-checkstyle-plugin</artifactId>
         <version>2.12.1</version>
       </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-gpg-plugin</artifactId>
+        <version>1.5</version>
+      </plugin>
     </plugins>
   </build>
 
@@ -407,6 +454,7 @@
                 </execution>
               </executions>
             </plugin>
+
             <!-- Javadoc jar -->
             <plugin>
               <groupId>org.apache.maven.plugins</groupId>
@@ -428,6 +476,19 @@
                 </execution>
               </executions>
             </plugin>
+
+            <!-- Nexus deploy plugin -->
+            <plugin>
+              <groupId>org.sonatype.plugins</groupId>
+              <artifactId>nexus-staging-maven-plugin</artifactId>
+              <version>1.6.2</version>
+              <extensions>true</extensions>
+              <configuration>
+                <nexusUrl>https://oss.sonatype.org</nexusUrl>
+                <serverId>sonatype.release</serverId>
+                <stagingProfileId>655dc88dc770c3</stagingProfileId>
+              </configuration>
+            </plugin>
           </plugins>
         </pluginManagement>
 
@@ -441,6 +502,11 @@
             <groupId>org.apache.maven.plugins</groupId>
             <artifactId>maven-javadoc-plugin</artifactId>
             <version>2.9</version>
+          </plugin>
+          <plugin>
+            <groupId>org.sonatype.plugins</groupId>
+            <artifactId>nexus-staging-maven-plugin</artifactId>
+            <version>1.6.2</version>
           </plugin>
         </plugins>
       </build>

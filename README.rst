@@ -86,12 +86,12 @@ For any client applications, add the following dependencies to any Apache Maven 
 build system's equivalent configuration), in order to make use of Tephra classes::
 
   <dependency>
-    <groupId>com.continuuity</groupId>
+    <groupId>com.continuuity.tephra</groupId>
     <artifactId>tephra-api</artifactId>
     <version>0.1.0-SNAPSHOT</version>
   </dependency>
   <dependency>
-    <groupId>com.continuuity</groupId>
+    <groupId>com.continuuity.tephra</groupId>
     <artifactId>tephra-core</artifactId>
     <version>0.1.0-SNAPSHOT</version>
   </dependency>
@@ -102,7 +102,7 @@ appropriate HBase compatibility library.
 For HBase 0.94.x::
 
   <dependency>
-    <groupId>com.continuuity</groupId>
+    <groupId>com.continuuity.tephra</groupId>
     <artifactId>tephra-hbase-compat-0.94</artifactId>
     <version>0.1.0-SNAPSHOT</version>
   </dependency>
@@ -110,7 +110,7 @@ For HBase 0.94.x::
 For HBase 0.96.x and 0.98.x::
 
   <dependency>
-    <groupId>com.continuuity</groupId>
+    <groupId>com.continuuity.tephra</groupId>
     <artifactId>tephra-hbase-compat-0.96</artifactId>
     <version>0.1.0-SNAPSHOT</version>
   </dependency>
