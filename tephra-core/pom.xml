@@ -102,6 +102,7 @@
     <dependency>
       <groupId>org.apache.hbase</groupId>
       <artifactId>hbase</artifactId>
+      <version>${hbase94.version}</version>
     </dependency>
 
     <!-- Test dependencies -->
