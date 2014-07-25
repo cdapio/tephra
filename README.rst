@@ -1,3 +1,5 @@
+!(https://api.travis-ci.org/continuuity/tephra.svg)
+
 .. ==================
 .. Continuuity Tephra
 .. ==================
