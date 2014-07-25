@@ -1,5 +1,3 @@
-|(BuildStatus)|
-
 .. ==================
 .. Continuuity Tephra
 .. ==================
@@ -14,6 +12,11 @@ application developers to handle the complexity of ensuring consistency when the
 span region boundaries.  By providing support for global transactions that span regions, tables, or
 multiple RPCs, Tephra simplifies application development on top of HBase, without a significant
 impact on performance or scalability for many workloads.
+
+Does it work ?
+----------------
+
+|(BuildStatus)|
 
 How It Works
 ------------
