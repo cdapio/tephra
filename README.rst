@@ -1,3 +1,5 @@
+|(BuildStatus)|
+
 .. ==================
 .. Continuuity Tephra
 .. ==================
@@ -517,3 +519,4 @@ Apache, Apache HBase, and HBase are trademarks of The Apache Software Foundation
    :trim:
 
 .. |(Tephra)| image:: docs/_images/tephra_logo_light_bknd_continuuity.png
+.. |(BuildStatus)| image:: https://api.travis-ci.org/continuuity/tephra.png
