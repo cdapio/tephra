@@ -16,7 +16,8 @@ impact on performance or scalability for many workloads.
 Does it work ?
 ----------------
 
-|(BuildStatus)|
+.. image:: https://travis-ci.org/continuuity/tephra.svg?branch=develop
+      :target: https://travis-ci.org/continuuity/tephra
 
 How It Works
 ------------
