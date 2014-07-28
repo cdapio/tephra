@@ -13,12 +13,6 @@ span region boundaries.  By providing support for global transactions that span 
 multiple RPCs, Tephra simplifies application development on top of HBase, without a significant
 impact on performance or scalability for many workloads.
 
-Does it work ?
-----------------
-
-.. image:: https://travis-ci.org/continuuity/tephra.svg?branch=develop
-      :target: https://travis-ci.org/continuuity/tephra
-
 How It Works
 ------------
 
@@ -73,6 +67,11 @@ successfully committed to the same column.
 More details on how Tephra transactions work and the interactions between these components can be
 found in our `Transactions over HBase
 <http://www.slideshare.net/alexbaranau/transactions-over-hbase>`_ presentation.
+
+
+Is It Building?
+----------------
+Status of continuous integration build at `Travis CI <https://travis-ci.org/continuuity/tephra>`__: |(BuildStatus)|
 
 
 Getting Started
@@ -240,7 +239,7 @@ that a standard HBase ``HTable`` instance provides. Only certain operations are 
 transactionally. These are: 
 
 .. csv-table::
-  :header: Methods
+  :header: Methods Supported In Transactions
   :widths: 100
   :delim: 0x9
 
@@ -264,7 +263,7 @@ To allow use of these non-transactional operations, call ``setAllowNonTransactio
 allows you to call the following methods non-transactionally:
 
 .. csv-table::
-  :header: Methods
+  :header: Methods Supported Outside of Transactions
   :widths: 100
   :delim: 0x9
 
@@ -329,7 +328,8 @@ to a user:
     private TransactionAwareHTable secondaryIndexTable;
     private TransactionContext transactionContext;
     private final TableName secondaryIndexTableName;
-    private static final byte[] secondaryIndexFamily = Bytes.toBytes("secondaryIndexFamily");
+    private static final byte[] secondaryIndexFamily = 
+      Bytes.toBytes("secondaryIndexFamily");
     private static final byte[] secondaryIndexQualifier = Bytes.toBytes('r');
     private static final byte[] DELIMITER  = new byte[] {0};
 
@@ -425,9 +425,11 @@ to a user:
           for (Map.Entry<byte [], List<KeyValue>> family : familyMap) {
             for (KeyValue value : family.getValue()) {
               if (value.getQualifier().equals(secondaryIndex)) {
-                byte[] secondaryRow = Bytes.add(value.getQualifier(), DELIMITER,
-                                                      Bytes.add(value.getValue(), DELIMITER,
-                                                                value.getRow()));
+                byte[] secondaryRow = Bytes.add(value.getQualifier(),
+                                                DELIMITER,
+                                                Bytes.add(value.getValue(),
+                                                DELIMITER,
+                                                value.getRow()));
                 Put indexPut = new Put(secondaryRow);
                 indexPut.add(secondaryIndexFamily, secondaryIndexQualifier, put.getRow());
                 indexPuts.add(indexPut);
@@ -517,10 +519,13 @@ the License.
 
 Continuuity, Continuuity Tephra and Tephra are trademarks of Continuuity, Inc. All rights reserved.
 
-Apache, Apache HBase, and HBase are trademarks of The Apache Software Foundation. Used with permission. No endorsement by The Apache Software Foundation is implied by the use of these marks.
+Apache, Apache HBase, and HBase are trademarks of The Apache Software Foundation. Used with permission. 
+No endorsement by The Apache Software Foundation is implied by the use of these marks.
 
 .. |(TM)| unicode:: U+2122 .. trademark sign
    :trim:
 
 .. |(Tephra)| image:: docs/_images/tephra_logo_light_bknd_continuuity.png
-.. |(BuildStatus)| image:: https://api.travis-ci.org/continuuity/tephra.png
+
+.. |(BuildStatus)| image:: https://travis-ci.org/continuuity/tephra.svg?branch=develop
+   :target: https://travis-ci.org/continuuity/tephra
