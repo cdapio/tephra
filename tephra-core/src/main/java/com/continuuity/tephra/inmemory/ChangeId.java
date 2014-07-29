@@ -16,7 +16,7 @@
 
 package com.continuuity.tephra.inmemory;
 
-import org.apache.hadoop.hbase.util.Bytes;
+import java.util.Arrays;
 
 /**
  * Represents a row key from a data set changed as part of a transaction.
@@ -27,7 +27,7 @@ public final class ChangeId {
 
   public ChangeId(byte[] bytes) {
     key = bytes;
-    hash = Bytes.hashCode(key);
+    hash = Arrays.hashCode(bytes);
   }
 
   public byte[] getKey() {
@@ -43,7 +43,7 @@ public final class ChangeId {
       return false;
     }
     ChangeId other = (ChangeId) o;
-    return hash == other.hash && Bytes.equals(key, other.key);
+    return hash == other.hash && Arrays.equals(key, other.key);
   }
 
   @Override
@@ -53,6 +53,23 @@ public final class ChangeId {
 
   @Override
   public String toString() {
-    return Bytes.toStringBinary(key);
+    return toStringBinary(key, 0, key.length);
+  }
+
+  // Copy from Bytes.toStringBinary so that we don't need direct dependencies on Bytes.
+  private String toStringBinary(byte [] b, int off, int len) {
+    StringBuilder result = new StringBuilder();
+    for (int i = off; i < off + len; ++i) {
+      int ch = b[i] & 0xFF;
+      if ((ch >= '0' && ch <= '9')
+       || (ch >= 'A' && ch <= 'Z')
+       || (ch >= 'a' && ch <= 'z')
+       || " `~!@#$%^&*()-_=+[]{}|;:'\",.<>/?".indexOf(ch) >= 0) {
+        result.append((char) ch);
+      } else {
+        result.append(String.format("\\x%02X", ch));
+      }
+    }
+    return result.toString();
   }
 }
