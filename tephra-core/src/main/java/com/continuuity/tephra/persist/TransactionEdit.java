@@ -52,7 +52,7 @@ public class TransactionEdit implements Writable {
    * .InMemoryTransactionManager.InProgressTx#getVisibilityUpperBound()}) for edit of {@link State#INPROGRESS} only
    */
   private long visibilityUpperBound;
-  private long nextWritePointer;
+  private long commitPointer;
   private long expirationDate;
   private State state;
   private Set<ChangeId> changes = Sets.newHashSet();
@@ -64,7 +64,7 @@ public class TransactionEdit implements Writable {
   }
 
   private TransactionEdit(long writePointer, long visibilityUpperBound, State state, long expirationDate,
-                          Set<ChangeId> changes, long nextWritePointer, boolean canCommit) {
+                          Set<ChangeId> changes, long commitPointer, boolean canCommit) {
     this.writePointer = writePointer;
     this.visibilityUpperBound = visibilityUpperBound;
     this.state = state;
@@ -72,7 +72,7 @@ public class TransactionEdit implements Writable {
     if (changes != null) {
       this.changes = changes;
     }
-    this.nextWritePointer = nextWritePointer;
+    this.commitPointer = commitPointer;
     this.canCommit = canCommit;
   }
 
@@ -111,11 +111,11 @@ public class TransactionEdit implements Writable {
   }
 
   /**
-   * Returns the next write pointer used to commit the row key change set.  This is only populated for edits of type
+   * Returns the write pointer used to commit the row key change set.  This is only populated for edits of type
    * {@link State#COMMITTED}.
    */
-  public long getNextWritePointer() {
-    return nextWritePointer;
+  public long getCommitPointer() {
+    return commitPointer;
   }
 
   /**
@@ -130,9 +130,9 @@ public class TransactionEdit implements Writable {
    * Creates a new instance in the {@link State#INPROGRESS} state.
    */
   public static TransactionEdit createStarted(long writePointer, long visibilityUpperBound,
-                                              long expirationDate, long nextWritePointer) {
+                                              long expirationDate) {
     return new TransactionEdit(writePointer, visibilityUpperBound, State.INPROGRESS,
-                               expirationDate, null, nextWritePointer, false);
+                               expirationDate, null, 0L, false);
   }
 
   /**
@@ -195,7 +195,7 @@ public class TransactionEdit implements Writable {
     }
     TransactionEdit other = (TransactionEdit) obj;
     return Objects.equal(writePointer, other.writePointer) &&
-      Objects.equal(nextWritePointer, other.nextWritePointer) &&
+      Objects.equal(commitPointer, other.commitPointer) &&
       Objects.equal(expirationDate, other.expirationDate) &&
       Objects.equal(visibilityUpperBound, other.visibilityUpperBound) &&
       Objects.equal(state, other.state) &&
@@ -208,7 +208,7 @@ public class TransactionEdit implements Writable {
     return Objects.toStringHelper(this)
       .add("writePointer", writePointer)
       .add("visibilityUpperBound", visibilityUpperBound)
-      .add("nextWritePointer", nextWritePointer)
+      .add("commitPointer", commitPointer)
       .add("expiration", expirationDate)
       .add("state", state)
       .add("changesSize", changes != null ? changes.size() : 0)
@@ -245,7 +245,7 @@ public class TransactionEdit implements Writable {
         throw new IOException("State enum ordinal value is out of range: " + stateIdx);
       }
       src.expirationDate = in.readLong();
-      src.nextWritePointer = in.readLong();
+      src.commitPointer = in.readLong();
       src.canCommit = in.readBoolean();
       int changeSize = in.readInt();
       for (int i = 0; i < changeSize; i++) {
@@ -265,7 +265,7 @@ public class TransactionEdit implements Writable {
       // use ordinal for predictable size, though this does not support evolution
       out.writeInt(src.state.ordinal());
       out.writeLong(src.expirationDate);
-      out.writeLong(src.nextWritePointer);
+      out.writeLong(src.commitPointer);
       out.writeBoolean(src.canCommit);
       if (src.changes == null) {
         out.writeInt(0);
@@ -299,7 +299,7 @@ public class TransactionEdit implements Writable {
         throw new IOException("State enum ordinal value is out of range: " + stateIdx);
       }
       dest.expirationDate = in.readLong();
-      dest.nextWritePointer = in.readLong();
+      dest.commitPointer = in.readLong();
       dest.canCommit = in.readBoolean();
       int changeSize = in.readInt();
       for (int i = 0; i < changeSize; i++) {
@@ -318,7 +318,7 @@ public class TransactionEdit implements Writable {
       // use ordinal for predictable size, though this does not support evolution
       out.writeInt(src.state.ordinal());
       out.writeLong(src.expirationDate);
-      out.writeLong(src.nextWritePointer);
+      out.writeLong(src.commitPointer);
       out.writeBoolean(src.canCommit);
       if (src.changes == null) {
         out.writeInt(0);

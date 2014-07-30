@@ -284,7 +284,7 @@ public abstract class AbstractTransactionStateStorageTest {
       Map<Long, Set<ChangeId>> committed = Maps.newHashMap();
       TransactionSnapshot snapshot = new TransactionSnapshot(now, 0, writePointer++, invalid,
                                                              inprogress, committing, committed);
-      TransactionEdit dummyEdit = TransactionEdit.createStarted(1, 0, Long.MAX_VALUE, 2);
+      TransactionEdit dummyEdit = TransactionEdit.createStarted(1, 0, Long.MAX_VALUE);
 
       // write snapshot 1
       storage.writeSnapshot(snapshot);
@@ -437,7 +437,7 @@ public abstract class AbstractTransactionStateStorageTest {
         case INPROGRESS:
           edits.add(
             TransactionEdit.createStarted(writePointer, writePointer - 1,
-                                          System.currentTimeMillis() + 300000L, writePointer + 1));
+                                          System.currentTimeMillis() + 300000L));
           break;
         case COMMITTING:
           edits.add(TransactionEdit.createCommitting(writePointer, generateChangeSet(10)));
