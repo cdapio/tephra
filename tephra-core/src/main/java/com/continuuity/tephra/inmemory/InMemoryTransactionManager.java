@@ -125,14 +125,14 @@ public class InMemoryTransactionManager extends AbstractService {
 
   // todo: use moving array instead (use Long2ObjectMap<byte[]> in fastutil)
   // todo: should this be consolidated with inProgress?
-  // commit time nextWritePointer -> changes made by this tx
+  // commit time next writePointer -> changes made by this tx
   private final NavigableMap<Long, Set<ChangeId>> committedChangeSets =
     new ConcurrentSkipListMap<Long, Set<ChangeId>>();
   // not committed yet
   private final Map<Long, Set<ChangeId>> committingChangeSets = Maps.newConcurrentMap();
 
   private long readPointer;
-  private long nextWritePointer;
+  private long lastWritePointer;
   private TxMetricsCollector txMetricsCollector;
 
   private final TransactionStateStorage persistor;
@@ -185,7 +185,7 @@ public class InMemoryTransactionManager extends AbstractService {
     inProgress.clear();
     committedChangeSets.clear();
     committingChangeSets.clear();
-    nextWritePointer = 1;
+    lastWritePointer = 0;
     readPointer = 0;
     lastSnapshotTime = 0;
   }
@@ -210,9 +210,9 @@ public class InMemoryTransactionManager extends AbstractService {
     // initialize the WAL if we did not force a snapshot in recoverState()
     initLog();
     // initialize next write pointer if needed
-    if (nextWritePointer == 1) {
-      nextWritePointer = getNextWritePointer();
-      readPointer = nextWritePointer - 1;
+    if (lastWritePointer == 0) {
+      lastWritePointer = getNextWritePointer();
+      readPointer = lastWritePointer;
     }
 
     notifyStarted();
@@ -434,7 +434,7 @@ public class InMemoryTransactionManager extends AbstractService {
   }
 
   public synchronized TransactionSnapshot getCurrentState() {
-    return TransactionSnapshot.copyFrom(System.currentTimeMillis(), readPointer, nextWritePointer,
+    return TransactionSnapshot.copyFrom(System.currentTimeMillis(), readPointer, lastWritePointer,
                                         invalid, inProgress, committingChangeSets, committedChangeSets);
   }
 
@@ -462,8 +462,8 @@ public class InMemoryTransactionManager extends AbstractService {
   private void restoreSnapshot(TransactionSnapshot snapshot) {
     LOG.info("Restoring transaction state from snapshot at " + snapshot.getTimestamp());
     Preconditions.checkState(lastSnapshotTime == 0, "lastSnapshotTime has been set!");
-    //Preconditions.checkState(readPointer == 0, "readPointer has been set!");
-    //Preconditions.checkState(nextWritePointer == 1, "nextWritePointer has been set!");
+    Preconditions.checkState(readPointer == 0, "readPointer has been set!");
+    Preconditions.checkState(lastWritePointer == 0, "lastWritePointer has been set!");
     Preconditions.checkState(invalid.isEmpty(), "invalid list should be empty!");
     Preconditions.checkState(inProgress.isEmpty(), "inProgress map should be empty!");
     Preconditions.checkState(committingChangeSets.isEmpty(), "committingChangeSets should be empty!");
@@ -472,7 +472,7 @@ public class InMemoryTransactionManager extends AbstractService {
 
     lastSnapshotTime = snapshot.getTimestamp();
     readPointer = snapshot.getReadPointer();
-    nextWritePointer = snapshot.getWritePointer();
+    lastWritePointer = snapshot.getWritePointer();
     invalid.addAll(snapshot.getInvalid());
     inProgress.putAll(snapshot.getInProgress());
     committingChangeSets.putAll(snapshot.getCommittingChangeSets());
@@ -521,14 +521,14 @@ public class InMemoryTransactionManager extends AbstractService {
           switch (edit.getState()) {
             case INPROGRESS:
               addInProgressAndAdvance(edit.getWritePointer(), edit.getVisibilityUpperBound(),
-                                      edit.getExpiration(), edit.getNextWritePointer());
+                                      edit.getExpiration());
               break;
             case COMMITTING:
               addCommittingChangeSet(edit.getWritePointer(), edit.getChanges());
               break;
             case COMMITTED:
               doCommit(edit.getWritePointer(), edit.getChanges(),
-                       edit.getNextWritePointer(), edit.getCanCommit());
+                       edit.getCommitPointer(), edit.getCanCommit());
               break;
             case INVALID:
               doInvalidate(edit.getWritePointer());
@@ -621,22 +621,7 @@ public class InMemoryTransactionManager extends AbstractService {
     Stopwatch timer = new Stopwatch().start();
     long currentTime = System.currentTimeMillis();
     long expiration = currentTime + 1000L * timeoutInSeconds;
-    Transaction tx = null;
-    // guard against changes to the transaction log while processing
-    this.logReadLock.lock();
-    try {
-      synchronized (this) {
-        ensureAvailable();
-        tx = createTransaction(nextWritePointer);
-        addInProgressAndAdvance(tx.getWritePointer(), tx.getVisibilityUpperBound(), expiration, getNextWritePointer());
-      }
-      // appending to WAL out of global lock for concurrent performance
-      // we should still be able to arrive at the same state even if log entries are out of order
-      appendToLog(TransactionEdit.createStarted(tx.getWritePointer(), tx.getVisibilityUpperBound(),
-                                                expiration, nextWritePointer));
-    } finally {
-      this.logReadLock.unlock();
-    }
+    Transaction tx = startTx(expiration);
     txMetricsCollector.gauge("start.short.latency", (int) timer.elapsedMillis());
     return tx;
   }
@@ -644,7 +629,7 @@ public class InMemoryTransactionManager extends AbstractService {
   private long getNextWritePointer() {
     // We want to align tx ids with current time. We assume that tx ids are sequential, but not less than
     // System.currentTimeMillis() * MAX_TX_PER_MS.
-    return Math.max(nextWritePointer + 1, System.currentTimeMillis() * TxConstants.MAX_TX_PER_MS);
+    return Math.max(lastWritePointer + 1, System.currentTimeMillis() * TxConstants.MAX_TX_PER_MS);
   }
 
   /**
@@ -654,32 +639,38 @@ public class InMemoryTransactionManager extends AbstractService {
   public Transaction startLong() {
     txMetricsCollector.gauge("start.long", 1);
     Stopwatch timer = new Stopwatch().start();
-    long currentTime = System.currentTimeMillis();
+    Transaction tx = startTx(-1);
+    txMetricsCollector.gauge("start.long.latency", (int) timer.elapsedMillis());
+    return tx;
+  }
+
+  private Transaction startTx(long expiration) {
     Transaction tx = null;
+    long txid;
     // guard against changes to the transaction log while processing
     this.logReadLock.lock();
     try {
       synchronized (this) {
         ensureAvailable();
-        tx = createTransaction(nextWritePointer);
-        addInProgressAndAdvance(tx.getWritePointer(), tx.getVisibilityUpperBound(),
-                                -currentTime, getNextWritePointer());
+        txid = getNextWritePointer();
+        tx = createTransaction(txid);
+        addInProgressAndAdvance(tx.getWritePointer(), tx.getVisibilityUpperBound(), expiration);
       }
-      appendToLog(TransactionEdit.createStarted(tx.getWritePointer(), tx.getVisibilityUpperBound(),
-                                                -currentTime, nextWritePointer));
+      // appending to WAL out of global lock for concurrent performance
+      // we should still be able to arrive at the same state even if log entries are out of order
+      appendToLog(TransactionEdit.createStarted(tx.getWritePointer(), tx.getVisibilityUpperBound(), expiration));
     } finally {
       this.logReadLock.unlock();
     }
-    txMetricsCollector.gauge("start.long.latency", (int) timer.elapsedMillis());
     return tx;
   }
 
   private void addInProgressAndAdvance(long writePointer, long visibilityUpperBound,
-                                       long expiration, long nextPointer) {
+                                       long expiration) {
     inProgress.put(writePointer, new InProgressTx(visibilityUpperBound, expiration));
     // don't move the write pointer back if we have out of order transaction log entries
-    if (nextPointer > nextWritePointer) {
-      nextWritePointer = nextPointer;
+    if (writePointer > lastWritePointer) {
+      lastWritePointer = writePointer;
     }
   }
 
@@ -730,11 +721,15 @@ public class InMemoryTransactionManager extends AbstractService {
     Stopwatch timer = new Stopwatch().start();
     Set<ChangeId> changeSet = null;
     boolean addToCommitted = true;
+    long commitPointer;
     // guard against changes to the transaction log while processing
     this.logReadLock.lock();
     try {
       synchronized (this) {
         ensureAvailable();
+        // we record commits at the first not-yet assigned transaction id to simplify clearing out change sets that
+        // are no longer visible by any in-progress transactions
+        commitPointer = lastWritePointer + 1;
         if (inProgress.get(tx.getWritePointer()) == null) {
           // invalid transaction, either this has timed out and moved to invalid, or something else is wrong.
           if (invalid.contains(tx.getWritePointer())) {
@@ -761,9 +756,9 @@ public class InMemoryTransactionManager extends AbstractService {
           // no changes
           addToCommitted = false;
         }
-        doCommit(tx.getWritePointer(), changeSet, nextWritePointer, addToCommitted);
+        doCommit(tx.getWritePointer(), changeSet, commitPointer, addToCommitted);
       }
-      appendToLog(TransactionEdit.createCommitted(tx.getWritePointer(), changeSet, nextWritePointer, addToCommitted));
+      appendToLog(TransactionEdit.createCommitted(tx.getWritePointer(), changeSet, commitPointer, addToCommitted));
     } finally {
       this.logReadLock.unlock();
     }
@@ -777,7 +772,7 @@ public class InMemoryTransactionManager extends AbstractService {
     if (addToCommitted && !changes.isEmpty()) {
       // No need to add empty changes to the committed change sets, they will never trigger any conflict
 
-      // Record the committed change set with the nextWritePointer as the commit time.
+      // Record the committed change set with the next writePointer as the commit time.
       // NOTE: we use current next writePointer as key for the map, hence we may have multiple txs changesets to be
       //       stored under one key
       Set<ChangeId> changeIds = committedChangeSets.get(commitPointer);
@@ -786,7 +781,7 @@ public class InMemoryTransactionManager extends AbstractService {
         // canCommit) use it unguarded
         changes.addAll(changeIds);
       }
-      committedChangeSets.put(nextWritePointer, changes);
+      committedChangeSets.put(commitPointer, changes);
     }
     // remove from in-progress set, so that it does not get excluded in the future
     InProgressTx previous = inProgress.remove(writePointer);
@@ -1002,7 +997,7 @@ public class InMemoryTransactionManager extends AbstractService {
    * This hack is needed because current metrics system is not flexible when it comes to adding new metrics.
    */
   public void logStatistics() {
-    LOG.info("Transaction Statistics: write pointer = " + nextWritePointer +
+    LOG.info("Transaction Statistics: write pointer = " + lastWritePointer +
                ", invalid = " + invalid.size() +
                ", in progress = " + inProgress.size() +
                ", committing = " + committingChangeSets.size() +

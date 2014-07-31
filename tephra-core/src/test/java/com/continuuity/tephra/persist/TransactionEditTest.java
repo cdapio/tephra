@@ -35,7 +35,7 @@ public class TransactionEditTest {
   public void testV1SerdeCompat() throws Exception {
     // start tx edit and committed tx edit cover all fields of tx edit
     // NOTE: set visibilityUpperBound to 0 as this is expected default for decoding older version that doesn't store it
-    verifyDecodingSupportsV1(TransactionEdit.createStarted(2L, 0L, 1000L, 3L));
+    verifyDecodingSupportsV1(TransactionEdit.createStarted(2L, 0L, 1000L));
     verifyDecodingSupportsV1(TransactionEdit.createCommitted(2L,
                                                                       Sets.newHashSet(new ChangeId(Bytes.toBytes("c"))),
                                                                       3L, true));

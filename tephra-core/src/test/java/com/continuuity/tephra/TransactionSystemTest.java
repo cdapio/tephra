@@ -221,6 +221,7 @@ public abstract class TransactionSystemTest {
     client.commit(tx1);
     client.canCommit(tx2, asList(C3, C4));
 
+    Transaction txPreReset = client.startShort();
     long currentTs = System.currentTimeMillis();
     client.resetState();
 
@@ -230,6 +231,11 @@ public abstract class TransactionSystemTest {
     Assert.assertEquals(0, snapshot.getInProgress().size());
     Assert.assertEquals(0, snapshot.getCommittingChangeSets().size());
     Assert.assertEquals(0, snapshot.getCommittedChangeSets().size());
+
+    // confirm that transaction IDs are not reset
+    Transaction txPostReset = client.startShort();
+    Assert.assertTrue("New tx ID should be greater than last ID before reset",
+                      txPostReset.getWritePointer() > txPreReset.getWritePointer());
   }
 
   private Collection<byte[]> asList(byte[]... val) {
