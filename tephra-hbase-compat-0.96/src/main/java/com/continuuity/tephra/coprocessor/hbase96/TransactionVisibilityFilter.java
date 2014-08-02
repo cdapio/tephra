@@ -21,11 +21,13 @@ import com.continuuity.tephra.TxConstants;
 import com.google.common.collect.Maps;
 import org.apache.hadoop.hbase.Cell;
 import org.apache.hadoop.hbase.CellUtil;
+import org.apache.hadoop.hbase.filter.Filter;
 import org.apache.hadoop.hbase.filter.FilterBase;
 import org.apache.hadoop.hbase.util.Bytes;
 
 import java.io.IOException;
 import java.util.Map;
+import javax.annotation.Nullable;
 
 /**
  * Applies filtering of data based on transactional visibility (HBase 0.96+ specific version).
@@ -38,12 +40,38 @@ public class TransactionVisibilityFilter extends FilterBase {
   private final Map<byte[], Long> oldestTsByFamily;
   // if false, empty values will be interpreted as deletes
   private final boolean allowEmptyValues;
+  // optional sub-filter to apply to visible cells
+  private final Filter cellFilter;
 
   // since we traverse KVs in order, cache the current oldest TS to avoid map lookups per KV
   private byte[] currentFamily = new byte[0];
   private long currentOldestTs;
 
+  /**
+   * Creates a new {@link Filter} for returning data only from visible transactions.
+   *
+   * @param tx The current transaction to apply.  Only data visible to this transaction will be returned.
+   * @param ttlByFamily Map of time-to-live (TTL) (in milliseconds) by column family name.
+   * @param allowEmptyValues If {@code true} cells with empty {@code byte[]} values will be returned, if {@code false}
+   *                         these will be interpreted as "delete" markers and the column will be filtered out.
+   */
   public TransactionVisibilityFilter(Transaction tx, Map<byte[], Long> ttlByFamily, boolean allowEmptyValues) {
+    this(tx, ttlByFamily, allowEmptyValues, null);
+  }
+
+  /**
+   * Creates a new {@link Filter} for returning data only from visible transactions.
+   *
+   * @param tx The current transaction to apply.  Only data visible to this transaction will be returned.
+   * @param ttlByFamily Map of time-to-live (TTL) (in milliseconds) by column family name.
+   * @param allowEmptyValues If {@code true} cells with empty {@code byte[]} values will be returned, if {@code false}
+   *                         these will be interpreted as "delete" markers and the column will be filtered out.
+   * @param cellFilter If non-null, this filter will be applied to all cells visible to the current transaction, by
+   *                   calling {@link Filter#filterKeyValue(org.apache.hadoop.hbase.Cell)}.  If null, then
+   *                   {@link Filter.ReturnCode#INCLUDE_AND_NEXT_COL} will be returned instead.
+   */
+  public TransactionVisibilityFilter(Transaction tx, Map<byte[], Long> ttlByFamily, boolean allowEmptyValues,
+                                     @Nullable Filter cellFilter) {
     this.tx = tx;
     this.oldestTsByFamily = Maps.newTreeMap(Bytes.BYTES_COMPARATOR);
     for (Map.Entry<byte[], Long> ttlEntry : ttlByFamily.entrySet()) {
@@ -52,10 +80,11 @@ public class TransactionVisibilityFilter extends FilterBase {
                            familyTTL <= 0 ? 0 : tx.getVisibilityUpperBound() - familyTTL * TxConstants.MAX_TX_PER_MS);
     }
     this.allowEmptyValues = allowEmptyValues;
+    this.cellFilter = cellFilter;
   }
 
   @Override
-  public ReturnCode filterKeyValue(Cell cell) {
+  public ReturnCode filterKeyValue(Cell cell) throws IOException {
     if (!CellUtil.matchingFamily(cell, currentFamily)) {
       // column family changed
       currentFamily = CellUtil.cloneFamily(cell);
@@ -72,8 +101,13 @@ public class TransactionVisibilityFilter extends FilterBase {
         // skip "deleted" cell
         return ReturnCode.NEXT_COL;
       }
-      // as soon as we find a KV to include we can move to the next column
-      return ReturnCode.INCLUDE_AND_NEXT_COL;
+      // cell is visible
+      if (cellFilter != null) {
+        return cellFilter.filterKeyValue(cell);
+      } else {
+        // as soon as we find a KV to include we can move to the next column
+        return ReturnCode.INCLUDE_AND_NEXT_COL;
+      }
     } else {
       return ReturnCode.SKIP;
     }

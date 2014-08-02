@@ -21,6 +21,7 @@ import com.continuuity.tephra.TransactionCodec;
 import com.continuuity.tephra.TxConstants;
 import com.continuuity.tephra.coprocessor.TransactionStateCache;
 import com.continuuity.tephra.coprocessor.TransactionStateCacheSupplier;
+import com.continuuity.tephra.hbase.Filters;
 import com.continuuity.tephra.persist.TransactionSnapshot;
 import com.continuuity.tephra.util.TxUtils;
 import com.google.common.base.Supplier;
@@ -86,8 +87,8 @@ public class TransactionDataJanitor extends BaseRegionObserver {
 
   private TransactionStateCache cache;
   private final TransactionCodec txCodec;
-  private Map<byte[], Long> ttlByFamily = Maps.newTreeMap(Bytes.BYTES_COMPARATOR);
-  private boolean allowEmptyValues = TxConstants.ALLOW_EMPTY_VALUES_DEFAULT;
+  protected Map<byte[], Long> ttlByFamily = Maps.newTreeMap(Bytes.BYTES_COMPARATOR);
+  protected boolean allowEmptyValues = TxConstants.ALLOW_EMPTY_VALUES_DEFAULT;
 
   public TransactionDataJanitor() {
     this.txCodec = new TransactionCodec();
@@ -141,8 +142,7 @@ public class TransactionDataJanitor extends BaseRegionObserver {
       }
       get.setMaxVersions(tx.excludesSize() + 1);
       get.setTimeRange(TxUtils.getOldestVisibleTimestamp(ttlByFamily, tx), TxUtils.getMaxVisibleTimestamp(tx));
-      Filter newFilter = combineFilters(new TransactionVisibilityFilter(tx, ttlByFamily, allowEmptyValues),
-                                        get.getFilter());
+      Filter newFilter = Filters.combine(getTransactionFilter(tx), get.getFilter());
       get.setFilter(newFilter);
     }
   }
@@ -157,8 +157,7 @@ public class TransactionDataJanitor extends BaseRegionObserver {
       }
       scan.setMaxVersions(tx.excludesSize() + 1);
       scan.setTimeRange(TxUtils.getOldestVisibleTimestamp(ttlByFamily, tx), TxUtils.getMaxVisibleTimestamp(tx));
-      Filter newFilter = combineFilters(new TransactionVisibilityFilter(tx, ttlByFamily, allowEmptyValues),
-                                        scan.getFilter());
+      Filter newFilter = Filters.combine(getTransactionFilter(tx), scan.getFilter());
       scan.setFilter(newFilter);
     }
     return s;
@@ -206,14 +205,13 @@ public class TransactionDataJanitor extends BaseRegionObserver {
     return scanner;
   }
 
-  private Filter combineFilters(Filter overrideFilter, Filter baseFilter) {
-    if (baseFilter != null) {
-      FilterList filterList = new FilterList(FilterList.Operator.MUST_PASS_ALL);
-      filterList.addFilter(baseFilter);
-      filterList.addFilter(overrideFilter);
-      return filterList;
-    }
-    return overrideFilter;
+  /**
+   * Derived classes can override this method to customize the filter used to return data visible for the current
+   * transaction.
+   * @param tx The current transaction to apply.
+   */
+  protected Filter getTransactionFilter(Transaction tx) {
+    return new TransactionVisibilityFilter(tx, ttlByFamily, allowEmptyValues);
   }
 
   private DataJanitorRegionScanner createDataJanitorRegionScanner(ObserverContext<RegionCoprocessorEnvironment> e,
