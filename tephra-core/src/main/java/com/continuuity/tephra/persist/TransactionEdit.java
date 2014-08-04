@@ -16,7 +16,7 @@
 
 package com.continuuity.tephra.persist;
 
-import com.continuuity.tephra.inmemory.ChangeId;
+import com.continuuity.tephra.ChangeId;
 import com.google.common.base.Objects;
 import com.google.common.collect.Sets;
 import org.apache.hadoop.io.Writable;

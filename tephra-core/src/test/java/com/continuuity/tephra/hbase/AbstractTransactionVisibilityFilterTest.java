@@ -17,8 +17,8 @@
 package com.continuuity.tephra.hbase;
 
 import com.continuuity.tephra.Transaction;
+import com.continuuity.tephra.TransactionManager;
 import com.continuuity.tephra.TxConstants;
-import com.continuuity.tephra.inmemory.InMemoryTransactionManager;
 import com.google.common.collect.Lists;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.HBaseConfiguration;
@@ -41,13 +41,13 @@ public abstract class AbstractTransactionVisibilityFilterTest {
   protected static final byte[] COL = Bytes.toBytes("c");
   protected static final List<byte[]> EMPTY_CHANGESET = Lists.newArrayListWithCapacity(0);
 
-  protected InMemoryTransactionManager txManager;
+  protected TransactionManager txManager;
 
   @Before
   public void setup() throws Exception {
     Configuration conf = HBaseConfiguration.create();
     conf.unset(TxConstants.Persist.CFG_TX_SNAPHOT_CODEC_CLASSES);
-    txManager = new InMemoryTransactionManager(conf);
+    txManager = new TransactionManager(conf);
     txManager.startAndWait();
   }
 

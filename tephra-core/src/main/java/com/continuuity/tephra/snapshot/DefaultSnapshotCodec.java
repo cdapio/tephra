@@ -16,8 +16,8 @@
 
 package com.continuuity.tephra.snapshot;
 
-import com.continuuity.tephra.inmemory.ChangeId;
-import com.continuuity.tephra.inmemory.InMemoryTransactionManager;
+import com.continuuity.tephra.ChangeId;
+import com.continuuity.tephra.TransactionManager;
 import com.continuuity.tephra.persist.TransactionSnapshot;
 import com.google.common.base.Throwables;
 import com.google.common.collect.Lists;
@@ -77,7 +77,7 @@ public class DefaultSnapshotCodec implements SnapshotCodec {
       long readPointer = decoder.readLong();
       long writePointer = decoder.readLong();
       Collection<Long> invalid = decodeInvalid(decoder);
-      NavigableMap<Long, InMemoryTransactionManager.InProgressTx> inProgress = decodeInProgress(decoder);
+      NavigableMap<Long, TransactionManager.InProgressTx> inProgress = decodeInProgress(decoder);
       NavigableMap<Long, Set<ChangeId>> committing = decodeChangeSets(decoder);
       NavigableMap<Long, Set<ChangeId>> committed = decodeChangeSets(decoder);
 
@@ -111,12 +111,12 @@ public class DefaultSnapshotCodec implements SnapshotCodec {
     return invalid;
   }
 
-  protected void encodeInProgress(BinaryEncoder encoder, Map<Long, InMemoryTransactionManager.InProgressTx> inProgress)
+  protected void encodeInProgress(BinaryEncoder encoder, Map<Long, TransactionManager.InProgressTx> inProgress)
     throws IOException {
 
     if (!inProgress.isEmpty()) {
       encoder.writeInt(inProgress.size());
-      for (Map.Entry<Long, InMemoryTransactionManager.InProgressTx> entry : inProgress.entrySet()) {
+      for (Map.Entry<Long, TransactionManager.InProgressTx> entry : inProgress.entrySet()) {
         encoder.writeLong(entry.getKey()); // tx id
         encoder.writeLong(entry.getValue().getExpiration());
         encoder.writeLong(entry.getValue().getVisibilityUpperBound());
@@ -125,18 +125,18 @@ public class DefaultSnapshotCodec implements SnapshotCodec {
     encoder.writeInt(0); // zero denotes end of list as per AVRO spec
   }
 
-  protected NavigableMap<Long, InMemoryTransactionManager.InProgressTx> decodeInProgress(BinaryDecoder decoder)
+  protected NavigableMap<Long, TransactionManager.InProgressTx> decodeInProgress(BinaryDecoder decoder)
     throws IOException {
 
     int size = decoder.readInt();
-    NavigableMap<Long, InMemoryTransactionManager.InProgressTx> inProgress = Maps.newTreeMap();
+    NavigableMap<Long, TransactionManager.InProgressTx> inProgress = Maps.newTreeMap();
     while (size != 0) { // zero denotes end of list as per AVRO spec
       for (int remaining = size; remaining > 0; --remaining) {
         long txId = decoder.readLong();
         long expiration = decoder.readLong();
         long visibilityUpperBound = decoder.readLong();
         inProgress.put(txId,
-                       new InMemoryTransactionManager.InProgressTx(visibilityUpperBound, expiration));
+                       new TransactionManager.InProgressTx(visibilityUpperBound, expiration));
       }
       size = decoder.readInt();
     }

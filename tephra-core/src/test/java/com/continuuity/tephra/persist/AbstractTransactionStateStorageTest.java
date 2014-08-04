@@ -16,10 +16,10 @@
 
 package com.continuuity.tephra.persist;
 
+import com.continuuity.tephra.ChangeId;
 import com.continuuity.tephra.Transaction;
+import com.continuuity.tephra.TransactionManager;
 import com.continuuity.tephra.TxConstants;
-import com.continuuity.tephra.inmemory.ChangeId;
-import com.continuuity.tephra.inmemory.InMemoryTransactionManager;
 import com.continuuity.tephra.metrics.TxMetricsCollector;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
@@ -123,7 +123,7 @@ public abstract class AbstractTransactionStateStorageTest {
     TransactionStateStorage storage3 = null;
     try {
       storage = getStorage(conf);
-      InMemoryTransactionManager txManager = new InMemoryTransactionManager
+      TransactionManager txManager = new TransactionManager
         (conf, storage, new TxMetricsCollector());
       txManager.startAndWait();
 
@@ -147,7 +147,7 @@ public abstract class AbstractTransactionStateStorageTest {
       Thread.sleep(100);
       // starts a new tx manager
       storage2 = getStorage(conf);
-      txManager = new InMemoryTransactionManager(conf, storage2, new TxMetricsCollector());
+      txManager = new TransactionManager(conf, storage2, new TxMetricsCollector());
       txManager.startAndWait();
 
       // check that the reloaded state matches the old
@@ -191,7 +191,7 @@ public abstract class AbstractTransactionStateStorageTest {
       Thread.sleep(100);
       // simulate crash by starting a new tx manager without a stopAndWait
       storage3 = getStorage(conf);
-      txManager = new InMemoryTransactionManager(conf, storage3, new TxMetricsCollector());
+      txManager = new TransactionManager(conf, storage3, new TxMetricsCollector());
       txManager.startAndWait();
 
       // verify state again matches (this time should include WAL replay)
@@ -227,7 +227,7 @@ public abstract class AbstractTransactionStateStorageTest {
     TransactionStateStorage storage2 = null;
     try {
       storage1 = getStorage(conf);
-      InMemoryTransactionManager txManager = new InMemoryTransactionManager
+      TransactionManager txManager = new TransactionManager
         (conf, storage1, new TxMetricsCollector());
       txManager.startAndWait();
 
@@ -248,7 +248,7 @@ public abstract class AbstractTransactionStateStorageTest {
 
       // simulate a failure by starting a new tx manager without stopping first
       storage2 = getStorage(conf);
-      txManager = new InMemoryTransactionManager(conf, storage2, new TxMetricsCollector());
+      txManager = new TransactionManager(conf, storage2, new TxMetricsCollector());
       txManager.startAndWait();
 
       // check that the reloaded state matches the old
@@ -279,7 +279,7 @@ public abstract class AbstractTransactionStateStorageTest {
       long now = System.currentTimeMillis();
       long writePointer = 1;
       Collection<Long> invalid = Lists.newArrayList();
-      NavigableMap<Long, InMemoryTransactionManager.InProgressTx> inprogress = Maps.newTreeMap();
+      NavigableMap<Long, TransactionManager.InProgressTx> inprogress = Maps.newTreeMap();
       Map<Long, Set<ChangeId>> committing = Maps.newHashMap();
       Map<Long, Set<ChangeId>> committed = Maps.newHashMap();
       TransactionSnapshot snapshot = new TransactionSnapshot(now, 0, writePointer++, invalid,
@@ -373,17 +373,17 @@ public abstract class AbstractTransactionStateStorageTest {
     long writePointer = readPointer + 1000L;
 
     // generate in progress -- assume last 500 write pointer values
-    NavigableMap<Long, InMemoryTransactionManager.InProgressTx> inProgress = Maps.newTreeMap();
+    NavigableMap<Long, TransactionManager.InProgressTx> inProgress = Maps.newTreeMap();
     long startPointer = writePointer - 500L;
     for (int i = 0; i < 500; i++) {
       long currentTime = System.currentTimeMillis();
       // make some "long" transactions
       if (i % 20 == 0) {
         inProgress.put(startPointer + i,
-                       new InMemoryTransactionManager.InProgressTx(startPointer - 1, -currentTime));
+                       new TransactionManager.InProgressTx(startPointer - 1, -currentTime));
       } else {
         inProgress.put(startPointer + i,
-                       new InMemoryTransactionManager.InProgressTx(startPointer - 1, currentTime + 300000L));
+                       new TransactionManager.InProgressTx(startPointer - 1, currentTime + 300000L));
       }
     }
 

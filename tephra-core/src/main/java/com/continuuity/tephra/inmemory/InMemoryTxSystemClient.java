@@ -18,6 +18,7 @@ package com.continuuity.tephra.inmemory;
 
 import com.continuuity.tephra.Transaction;
 import com.continuuity.tephra.TransactionCouldNotTakeSnapshotException;
+import com.continuuity.tephra.TransactionManager;
 import com.continuuity.tephra.TransactionNotInProgressException;
 import com.continuuity.tephra.TransactionSystemClient;
 import com.continuuity.tephra.TxConstants;
@@ -38,10 +39,10 @@ public class InMemoryTxSystemClient implements TransactionSystemClient {
 
   private static final Logger LOG = LoggerFactory.getLogger(InMemoryTxSystemClient.class);
 
-  InMemoryTransactionManager txManager;
+  TransactionManager txManager;
 
   @Inject
-  public InMemoryTxSystemClient(InMemoryTransactionManager txmgr) {
+  public InMemoryTxSystemClient(TransactionManager txmgr) {
     txManager = txmgr;
   }
 

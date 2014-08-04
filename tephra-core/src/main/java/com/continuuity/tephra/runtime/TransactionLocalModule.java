@@ -19,8 +19,8 @@ package com.continuuity.tephra.runtime;
 import com.continuuity.tephra.DefaultTransactionExecutor;
 import com.continuuity.tephra.TransactionExecutor;
 import com.continuuity.tephra.TransactionExecutorFactory;
+import com.continuuity.tephra.TransactionManager;
 import com.continuuity.tephra.TransactionSystemClient;
-import com.continuuity.tephra.inmemory.InMemoryTransactionManager;
 import com.continuuity.tephra.inmemory.InMemoryTxSystemClient;
 import com.continuuity.tephra.persist.LocalFileTransactionStateStorage;
 import com.continuuity.tephra.persist.TransactionStateStorage;
@@ -43,7 +43,7 @@ final class TransactionLocalModule extends AbstractModule {
       .to(LocalFileTransactionStateStorage.class).in(Singleton.class);
     bind(TransactionStateStorage.class).toProvider(TransactionStateStorageProvider.class).in(Singleton.class);
 
-    bind(InMemoryTransactionManager.class).in(Singleton.class);
+    bind(TransactionManager.class).in(Singleton.class);
     bind(TransactionSystemClient.class).to(InMemoryTxSystemClient.class).in(Singleton.class);
 
     install(new FactoryModuleBuilder()
