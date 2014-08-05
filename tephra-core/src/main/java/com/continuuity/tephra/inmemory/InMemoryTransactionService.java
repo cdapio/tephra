@@ -15,6 +15,7 @@
  */
 package com.continuuity.tephra.inmemory;
 
+import com.continuuity.tephra.TransactionManager;
 import com.continuuity.tephra.TxConstants;
 import com.google.common.util.concurrent.AbstractService;
 import com.google.inject.Inject;
@@ -40,9 +41,9 @@ public class InMemoryTransactionService extends AbstractService {
 
   private final DiscoveryService discoveryService;
   private final String serviceName;
-  protected final Provider<InMemoryTransactionManager> txManagerProvider;
+  protected final Provider<TransactionManager> txManagerProvider;
   private Cancellable cancelDiscovery;
-  protected InMemoryTransactionManager txManager;
+  protected TransactionManager txManager;
 
   // thrift server config
   protected final String address;
@@ -53,7 +54,7 @@ public class InMemoryTransactionService extends AbstractService {
   @Inject
   public InMemoryTransactionService(Configuration conf,
                             DiscoveryService discoveryService,
-                            Provider<InMemoryTransactionManager> txManagerProvider) {
+                            Provider<TransactionManager> txManagerProvider) {
 
     this.discoveryService = discoveryService;
     this.txManagerProvider = txManagerProvider;

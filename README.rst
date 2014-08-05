@@ -26,7 +26,7 @@ Tephra consists of three main components:
 - **Transaction Server** - maintains global view of transaction state, assigns new transaction IDs
   and performs conflict detection;
 - **Transaction Client** - coordinates start, commit, and rollback of transactions; and
-- **TransactionDataJanitor Coprocessor** - applies filtering to the data read (based on a 
+- **TransactionProcessor Coprocessor** - applies filtering to the data read (based on a 
   given transaction's state) and cleans up any data from old (no longer visible) transactions.
 
 Transaction Server
@@ -50,16 +50,16 @@ writes for the transaction), as well as a list of transaction IDs to exclude for
 in-progress or invalidated transactions).  When performing writes, the client overrides the
 timestamp for all modified HBase cells with the transaction ID.  When reading data from HBase, the
 client skips cells associated with any of the excluded transaction IDs.  The read exclusions are
-applied through a server-side filter injected by the ``TransactionDataJanitor`` coprocessor.
+applied through a server-side filter injected by the ``TransactionProcessor`` coprocessor.
 
-TransactionDataJanitor Coprocessor
+TransactionProcessor Coprocessor
 ..................................
 
-The ``TransactionDataJanitor`` coprocessor is loaded on all HBase tables where transactional reads
+The ``TransactionProcessor`` coprocessor is loaded on all HBase tables where transactional reads
 and writes are performed.  When clients read data, it coordinates the server-side filtering
 performed based on the client transaction's snapshot. Data cells from any transactions that are
 currently in-progress or those that have failed and could not be rolled back ("invalid" 
-transactions) will be skipped on these reads.  In addition, the ``TransactionDataJanitor`` cleans 
+transactions) will be skipped on these reads.  In addition, the ``TransactionProcessor`` cleans 
 up any data versions that are no longer visible to any running transactions, either because the 
 transaction that the cell is associated with failed or a write from a newer transaction was 
 successfully committed to the same column.
@@ -112,11 +112,19 @@ For HBase 0.94.x::
     <version>0.1.0</version>
   </dependency>
 
-For HBase 0.96.x and 0.98.x::
+For HBase 0.96.x::
 
   <dependency>
     <groupId>com.continuuity.tephra</groupId>
     <artifactId>tephra-hbase-compat-0.96</artifactId>
+    <version>0.1.0</version>
+  </dependency>
+
+For HBase 0.98.x::
+
+  <dependency>
+    <groupId>com.continuuity.tephra</groupId>
+    <artifactId>tephra-hbase-compat-0.98</artifactId>
     <version>0.1.0</version>
   </dependency>
 
@@ -216,18 +224,24 @@ For HBase 0.94::
 
   <property>
     <name>hbase.coprocessor.region.classes</name>
-    <value>com.continuuity.tephra.coprocessor.hbase94.TransactionDataJanitor</value>
+    <value>com.continuuity.tephra.hbase94.coprocessor.TransactionProcessor</value>
   </property>
 
-For HBase 0.96 and 0.98::
+For HBase 0.96::
 
   <property>
     <name>hbase.coprocessor.region.classes</name>
-    <value>com.continuuity.tephra.coprocessor.hbase96.TransactionDataJanitor</value>
+    <value>com.continuuity.tephra.hbase96.coprocessor.TransactionProcessor</value>
   </property>
 
+For HBase 0.98::
 
-You may configure the ``TransactionDataJanitor`` to be loaded only on HBase tables that you will
+  <property>
+    <name>hbase.coprocessor.region.classes</name>
+    <value>com.continuuity.tephra.hbase98.coprocessor.TransactionProcessor</value>
+  </property>
+
+You may configure the ``TransactionProcessor`` to be loaded only on HBase tables that you will
 be using for transaction reads and writes.  However, you must ensure that the coprocessor is 
 available on all impacted tables in order for Tephra to function correctly.
 
@@ -461,7 +475,7 @@ Known Issues and Limitations
 - Invalid transactions are not cleared from the exclusion list.  When a transaction is
   invalidated, either from timing out or being invalidated by the client due to a failure to rollback
   changes, its transaction ID is added to a list of excluded transactions.  Data from invalidated
-  transactions will be dropped by the ``TransactionDataJanitor`` coprocessor on HBase region flush
+  transactions will be dropped by the ``TransactionProcessor`` coprocessor on HBase region flush
   and compaction operations.  Currently, however, the transaction ID is not removed from the list
   of excluded transaction IDs.
 

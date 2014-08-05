@@ -19,8 +19,8 @@ package com.continuuity.tephra.runtime;
 import com.continuuity.tephra.DefaultTransactionExecutor;
 import com.continuuity.tephra.TransactionExecutor;
 import com.continuuity.tephra.TransactionExecutorFactory;
+import com.continuuity.tephra.TransactionManager;
 import com.continuuity.tephra.TransactionSystemClient;
-import com.continuuity.tephra.inmemory.InMemoryTransactionManager;
 import com.continuuity.tephra.inmemory.InMemoryTxSystemClient;
 import com.continuuity.tephra.persist.NoOpTransactionStateStorage;
 import com.continuuity.tephra.persist.TransactionStateStorage;
@@ -42,7 +42,7 @@ public class TransactionInMemoryModule extends AbstractModule {
   protected void configure() {
     bind(SnapshotCodecProvider.class).in(Singleton.class);
     bind(TransactionStateStorage.class).to(NoOpTransactionStateStorage.class).in(Singleton.class);
-    bind(InMemoryTransactionManager.class).in(Singleton.class);
+    bind(TransactionManager.class).in(Singleton.class);
     bind(TransactionSystemClient.class).to(InMemoryTxSystemClient.class).in(Singleton.class);
 
     install(new FactoryModuleBuilder()

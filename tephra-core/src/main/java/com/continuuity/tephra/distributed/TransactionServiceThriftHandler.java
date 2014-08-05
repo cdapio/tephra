@@ -16,6 +16,7 @@
 
 package com.continuuity.tephra.distributed;
 
+import com.continuuity.tephra.TransactionManager;
 import com.continuuity.tephra.TransactionNotInProgressException;
 import com.continuuity.tephra.TxConstants;
 import com.continuuity.tephra.distributed.thrift.TBoolean;
@@ -23,7 +24,6 @@ import com.continuuity.tephra.distributed.thrift.TTransaction;
 import com.continuuity.tephra.distributed.thrift.TTransactionCouldNotTakeSnapshotException;
 import com.continuuity.tephra.distributed.thrift.TTransactionNotInProgressException;
 import com.continuuity.tephra.distributed.thrift.TTransactionServer;
-import com.continuuity.tephra.inmemory.InMemoryTransactionManager;
 import com.continuuity.tephra.rpc.RPCServiceHandler;
 import com.google.common.collect.Sets;
 import org.apache.thrift.TException;
@@ -51,9 +51,9 @@ import java.util.Set;
  */
 public class TransactionServiceThriftHandler implements TTransactionServer.Iface, RPCServiceHandler {
 
-  private final InMemoryTransactionManager txManager;
+  private final TransactionManager txManager;
 
-  public TransactionServiceThriftHandler(InMemoryTransactionManager txManager) {
+  public TransactionServiceThriftHandler(TransactionManager txManager) {
     this.txManager = txManager;
   }
 

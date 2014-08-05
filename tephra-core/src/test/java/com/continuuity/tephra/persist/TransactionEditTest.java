@@ -16,7 +16,7 @@
 
 package com.continuuity.tephra.persist;
 
-import com.continuuity.tephra.inmemory.ChangeId;
+import com.continuuity.tephra.ChangeId;
 import com.google.common.collect.Sets;
 import com.google.common.io.ByteArrayDataOutput;
 import com.google.common.io.ByteStreams;

@@ -16,8 +16,8 @@
 
 package com.continuuity.tephra.persist;
 
-import com.continuuity.tephra.inmemory.ChangeId;
-import com.continuuity.tephra.inmemory.InMemoryTransactionManager;
+import com.continuuity.tephra.ChangeId;
+import com.continuuity.tephra.TransactionManager;
 import com.google.common.base.Objects;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
@@ -37,12 +37,12 @@ public class TransactionSnapshot {
   private long readPointer;
   private long writePointer;
   private Collection<Long> invalid;
-  private NavigableMap<Long, InMemoryTransactionManager.InProgressTx> inProgress;
+  private NavigableMap<Long, TransactionManager.InProgressTx> inProgress;
   private Map<Long, Set<ChangeId>> committingChangeSets;
   private Map<Long, Set<ChangeId>> committedChangeSets;
 
   public TransactionSnapshot(long timestamp, long readPointer, long writePointer, Collection<Long> invalid,
-                             NavigableMap<Long, InMemoryTransactionManager.InProgressTx> inProgress,
+                             NavigableMap<Long, TransactionManager.InProgressTx> inProgress,
                              Map<Long, Set<ChangeId>> committing, Map<Long, Set<ChangeId>> committed) {
     this.timestamp = timestamp;
     this.readPointer = readPointer;
@@ -85,7 +85,7 @@ public class TransactionSnapshot {
    * Returns the map of in-progress transaction write pointers at the time of the snapshot.
    * @return a map of write pointer to expiration timestamp (in milliseconds) for all transactions in-progress.
    */
-  public Map<Long, InMemoryTransactionManager.InProgressTx> getInProgress() {
+  public Map<Long, TransactionManager.InProgressTx> getInProgress() {
     return inProgress;
   }
 
@@ -118,7 +118,7 @@ public class TransactionSnapshot {
   public long getVisibilityUpperBound() {
     // the readPointer of the oldest in-progress tx is the oldest in use
     // todo: potential problem with not moving visibility upper bound for the whole duration of long-running tx
-    Map.Entry<Long, InMemoryTransactionManager.InProgressTx> firstInProgress = inProgress.firstEntry();
+    Map.Entry<Long, TransactionManager.InProgressTx> firstInProgress = inProgress.firstEntry();
     if (firstInProgress == null) {
       // using readPointer as smallest visible when non txs are there
       return readPointer;
@@ -178,13 +178,13 @@ public class TransactionSnapshot {
    */
   public static TransactionSnapshot copyFrom(long snapshotTime, long readPointer,
                                              long writePointer, Collection<Long> invalid,
-                                             NavigableMap<Long, InMemoryTransactionManager.InProgressTx> inProgress,
+                                             NavigableMap<Long, TransactionManager.InProgressTx> inProgress,
                                              Map<Long, Set<ChangeId>> committing,
                                              NavigableMap<Long, Set<ChangeId>> committed) {
     // copy invalid IDs
     Collection<Long> invalidCopy = Lists.newArrayList(invalid);
     // copy in-progress IDs and expirations
-    NavigableMap<Long, InMemoryTransactionManager.InProgressTx> inProgressCopy = Maps.newTreeMap(inProgress);
+    NavigableMap<Long, TransactionManager.InProgressTx> inProgressCopy = Maps.newTreeMap(inProgress);
 
     // for committing and committed maps, we need to copy each individual Set as well to prevent modification
     Map<Long, Set<ChangeId>> committingCopy = Maps.newHashMap();

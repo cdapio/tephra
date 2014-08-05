@@ -16,7 +16,6 @@
 
 package com.continuuity.tephra;
 
-import com.continuuity.tephra.inmemory.InMemoryTransactionManager;
 import com.continuuity.tephra.inmemory.InMemoryTxSystemClient;
 import com.continuuity.tephra.runtime.ConfigModule;
 import com.continuuity.tephra.runtime.DiscoveryModules;
@@ -66,9 +65,9 @@ public class TransactionExecutorTest {
         new TransactionModules().getInMemoryModules()).with(new AbstractModule() {
         @Override
         protected void configure() {
-          InMemoryTransactionManager txManager = new InMemoryTransactionManager(conf);
+          TransactionManager txManager = new TransactionManager(conf);
           txManager.startAndWait();
-          bind(InMemoryTransactionManager.class).toInstance(txManager);
+          bind(TransactionManager.class).toInstance(txManager);
           bind(TransactionSystemClient.class).to(DummyTxClient.class).in(Singleton.class);
         }
       }));
@@ -528,7 +527,7 @@ public class TransactionExecutorTest {
     CommitState state = CommitState.Started;
 
     @Inject
-    DummyTxClient(InMemoryTransactionManager txmgr) {
+    DummyTxClient(TransactionManager txmgr) {
       super(txmgr);
     }
 

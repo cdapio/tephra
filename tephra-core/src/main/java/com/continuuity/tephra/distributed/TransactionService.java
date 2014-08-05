@@ -16,8 +16,8 @@
 
 package com.continuuity.tephra.distributed;
 
+import com.continuuity.tephra.TransactionManager;
 import com.continuuity.tephra.distributed.thrift.TTransactionServer;
-import com.continuuity.tephra.inmemory.InMemoryTransactionManager;
 import com.continuuity.tephra.inmemory.InMemoryTransactionService;
 import com.continuuity.tephra.rpc.ThriftRPCServer;
 import com.google.common.util.concurrent.MoreExecutors;
@@ -52,7 +52,7 @@ public final class TransactionService extends InMemoryTransactionService {
   public TransactionService(Configuration conf,
                             ZKClient zkClient,
                             DiscoveryService discoveryService,
-                            Provider<InMemoryTransactionManager> txManagerProvider) {
+                            Provider<TransactionManager> txManagerProvider) {
     super(conf, discoveryService, txManagerProvider);
     this.zkClient = zkClient;
   }
