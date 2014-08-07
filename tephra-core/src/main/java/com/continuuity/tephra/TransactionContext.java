@@ -42,8 +42,19 @@ public class TransactionContext {
   }
 
   public TransactionContext(TransactionSystemClient txClient, Iterable<TransactionAware> txAwares) {
-    this.txAwares = ImmutableList.copyOf(txAwares);
+    this.txAwares = Lists.newArrayList(txAwares);
     this.txClient = txClient;
+  }
+
+  /**
+   * Adds a new transaction-aware to participate in the transaction.
+   * @param txAware the new transaction-aware
+   */
+  public void addTransactionAware(TransactionAware txAware) {
+    this.txAwares.add(txAware);
+    if (currentTx != null) {
+      txAware.startTx(currentTx);
+    }
   }
 
   public void start() throws TransactionFailureException {
