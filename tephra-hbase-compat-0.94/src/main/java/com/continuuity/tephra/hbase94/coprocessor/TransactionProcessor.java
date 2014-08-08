@@ -31,6 +31,7 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.hbase.CoprocessorEnvironment;
 import org.apache.hadoop.hbase.HColumnDescriptor;
+import org.apache.hadoop.hbase.HConstants;
 import org.apache.hadoop.hbase.HTableDescriptor;
 import org.apache.hadoop.hbase.KeyValue;
 import org.apache.hadoop.hbase.client.Get;
@@ -39,15 +40,24 @@ import org.apache.hadoop.hbase.coprocessor.BaseRegionObserver;
 import org.apache.hadoop.hbase.coprocessor.ObserverContext;
 import org.apache.hadoop.hbase.coprocessor.RegionCoprocessorEnvironment;
 import org.apache.hadoop.hbase.filter.Filter;
+import org.apache.hadoop.hbase.filter.FilterBase;
+import org.apache.hadoop.hbase.filter.FilterList;
+import org.apache.hadoop.hbase.regionserver.HRegion;
 import org.apache.hadoop.hbase.regionserver.InternalScanner;
+import org.apache.hadoop.hbase.regionserver.KeyValueScanner;
 import org.apache.hadoop.hbase.regionserver.RegionScanner;
+import org.apache.hadoop.hbase.regionserver.ScanType;
 import org.apache.hadoop.hbase.regionserver.Store;
+import org.apache.hadoop.hbase.regionserver.StoreScanner;
 import org.apache.hadoop.hbase.regionserver.compactions.CompactionRequest;
 import org.apache.hadoop.hbase.util.Bytes;
 
+import java.io.DataInput;
+import java.io.DataOutput;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -66,7 +76,7 @@ import java.util.Set;
  * {@code
  * <property>
  *   <name>hbase.coprocessor.region.classes</name>
- *   <value>com.continuuity.tephra.coprocessor.hbase94.TransactionDataJanitor</value>
+ *   <value>com.continuuity.tephra.hbase94.coprocessor.TransactionProcessor</value>
  * </property>
  * }
  * </p>
@@ -109,6 +119,7 @@ public class TransactionProcessor extends BaseRegionObserver {
         if (columnTTL != null) {
           try {
             ttl = Long.parseLong(columnTTL);
+            LOG.info("Family " + columnDesc.getNameAsString() + " has TTL of " + columnTTL);
           } catch (NumberFormatException nfe) {
             LOG.warn("Invalid TTL value configured for column family " + columnDesc.getNameAsString() +
                        ", value = " + columnTTL);
@@ -163,45 +174,48 @@ public class TransactionProcessor extends BaseRegionObserver {
   }
 
   @Override
-  public InternalScanner preFlush(ObserverContext<RegionCoprocessorEnvironment> e, Store store,
-      InternalScanner scanner) throws IOException {
-    TransactionSnapshot snapshot = cache.getLatestState();
-    if (snapshot != null) {
-      return createDataJanitorRegionScanner(e, store, scanner, snapshot);
-    }
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("Region " + e.getEnvironment().getRegion().getRegionNameAsString() +
-                  ", no current transaction state found, defaulting to normal flush scanner");
-    }
-    return scanner;
+  public InternalScanner preFlushScannerOpen(ObserverContext<RegionCoprocessorEnvironment> c, Store store,
+                                             KeyValueScanner memstoreScanner, InternalScanner s)
+      throws IOException {
+    return createStoreScanner(c.getEnvironment(), "flush", cache.getLatestState(), store,
+                              Collections.singletonList(memstoreScanner), ScanType.MINOR_COMPACT,
+                              HConstants.OLDEST_TIMESTAMP);
   }
 
   @Override
-  public InternalScanner preCompact(ObserverContext<RegionCoprocessorEnvironment> e, Store store,
-      InternalScanner scanner) throws IOException {
-    TransactionSnapshot snapshot = cache.getLatestState();
-    if (snapshot != null) {
-      return createDataJanitorRegionScanner(e, store, scanner, snapshot);
-    }
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("Region " + e.getEnvironment().getRegion().getRegionNameAsString() +
-                  ", no current transaction state found, defaulting to normal compaction scanner");
-    }
-    return scanner;
+  public InternalScanner preCompactScannerOpen(ObserverContext<RegionCoprocessorEnvironment> c, Store store,
+      List<? extends KeyValueScanner> scanners, ScanType scanType, long earliestPutTs, InternalScanner s,
+      CompactionRequest request)
+    throws IOException {
+    return createStoreScanner(c.getEnvironment(), "compaction", cache.getLatestState(), store, scanners, scanType,
+                              earliestPutTs);
   }
 
-  @Override
-  public InternalScanner preCompact(ObserverContext<RegionCoprocessorEnvironment> e, Store store,
-      InternalScanner scanner, CompactionRequest request) throws IOException {
-    TransactionSnapshot snapshot = cache.getLatestState();
-    if (snapshot != null) {
-      return createDataJanitorRegionScanner(e, store, scanner, snapshot);
+  protected InternalScanner createStoreScanner(RegionCoprocessorEnvironment env, String action,
+                                               TransactionSnapshot snapshot, Store store,
+                                               List<? extends KeyValueScanner> scanners, ScanType type,
+                                               long earliestPutTs) throws IOException {
+    if (snapshot == null) {
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Region " + env.getRegion().getRegionNameAsString() +
+                    ", no current transaction state found, defaulting to normal compaction scanner");
+      }
+      return null;
     }
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("Region " + e.getEnvironment().getRegion().getRegionNameAsString() +
-                  ", no current transaction state found, defaulting to normal compaction scanner");
-    }
-    return scanner;
+
+    // construct a dummy transaction from the latest snapshot
+    Transaction dummyTx = TxUtils.createDummyTransaction(snapshot);
+    Scan scan = new Scan();
+    // does not current support max versions setting per family
+    scan.setMaxVersions(dummyTx.excludesSize() + 1);
+    FilterList filterList = new FilterList(FilterList.Operator.MUST_PASS_ONE);
+    filterList.addFilter(getTransactionFilter(dummyTx));
+    filterList.addFilter(new IncludeInProgressFilter(dummyTx.getVisibilityUpperBound(),
+                                                     snapshot.getInvalid()));
+    scan.setFilter(filterList);
+
+    return new StoreScanner(store, store.getScanInfo(), scan, scanners, type,
+                            env.getRegion().getSmallestReadPoint(), earliestPutTs);
   }
 
   /**
@@ -213,126 +227,36 @@ public class TransactionProcessor extends BaseRegionObserver {
     return new TransactionVisibilityFilter(tx, ttlByFamily, allowEmptyValues);
   }
 
-  private DataJanitorRegionScanner createDataJanitorRegionScanner(ObserverContext<RegionCoprocessorEnvironment> e,
-                                                                  Store store,
-                                                                  InternalScanner scanner,
-                                                                  TransactionSnapshot snapshot) {
-    long visibilityUpperBound = snapshot.getVisibilityUpperBound();
-    String ttlProp = store.getFamily().getValue(TxConstants.PROPERTY_TTL);
-    int ttl = ttlProp == null ? -1 : Integer.valueOf(ttlProp);
-    // NOTE: to make sure we do not cleanup smth visible to tx in between its reads,
-    // we use visibilityUpperBound as current ts
-    long oldestToKeep = ttl <= 0 ? -1 : visibilityUpperBound - ttl * TxConstants.MAX_TX_PER_MS;
-
-    return new DataJanitorRegionScanner(visibilityUpperBound, oldestToKeep,
-                                        snapshot.getInvalid(), scanner,
-                                        e.getEnvironment().getRegion().getRegionName());
-  }
-
   /**
-   * Wraps the {@link org.apache.hadoop.hbase.regionserver.InternalScanner} instance used during compaction
-   * to filter out any {@link org.apache.hadoop.hbase.KeyValue} entries associated with invalid transactions.
+   * Filter used to include cells visible to in-progress transactions on flush and commit.
    */
-  static class DataJanitorRegionScanner implements InternalScanner {
+  static class IncludeInProgressFilter extends FilterBase {
     private final long visibilityUpperBound;
-    // oldest tx to keep based on ttl
-    private final long oldestToKeep;
     private final Set<Long> invalidIds;
-    private final InternalScanner internalScanner;
-    private final List<KeyValue> internalResults = new ArrayList<KeyValue>();
-    private final byte[] regionName;
-    private long expiredFilteredCount = 0L;
-    private long invalidFilteredCount = 0L;
-    // old and redundant: no tx will ever read them
-    private long oldFilteredCount = 0L;
 
-    public DataJanitorRegionScanner(long visibilityUpperBound, long oldestToKeep, Collection<Long> invalidSet,
-                                    InternalScanner scanner, byte[] regionName) {
-      this.visibilityUpperBound = visibilityUpperBound;
-      this.oldestToKeep = oldestToKeep;
-      this.invalidIds = Sets.newHashSet(invalidSet);
-      this.internalScanner = scanner;
-      this.regionName = regionName;
-      LOG.info("Created new scanner with visibilityUpperBound: " + visibilityUpperBound +
-                 ", invalid set: " + invalidIds + ", oldestToKeep: " + oldestToKeep);
+    public IncludeInProgressFilter(long upperBound, Collection<Long> invalids) {
+      this.visibilityUpperBound = upperBound;
+      this.invalidIds = Sets.newHashSet(invalids);
     }
 
     @Override
-    public boolean next(List<KeyValue> results) throws IOException {
-      return next(results, -1, null);
-    }
-
-    @Override
-    public boolean next(List<KeyValue> results, String metric) throws IOException {
-      return next(results, -1, metric);
-    }
-
-    @Override
-    public boolean next(List<KeyValue> results, int limit) throws IOException {
-      return next(results, limit, null);
-    }
-
-    @Override
-    public boolean next(List<KeyValue> results, int limit, String metric) throws IOException {
-      internalResults.clear();
-
-      boolean hasMore = internalScanner.next(internalResults, limit, metric);
-      // TODO: due to filtering our own results may be smaller than limit, so we should retry if needed to hit it
-
-      KeyValue previousKv = null;
-      // tells to skip those equal to current cell in case when we met one that is not newer than the oldest of
-      // currently used readPointers
-      boolean skipSameCells = false;
-
-      for (KeyValue kv : internalResults) {
-        // filter out by ttl
-        if (kv.getTimestamp() < oldestToKeep) {
-          expiredFilteredCount++;
-          continue;
-        }
-
-        // filter out any KeyValue with a timestamp matching an invalid write pointer
-        if (invalidIds.contains(kv.getTimestamp())) {
-          invalidFilteredCount++;
-          continue;
-        }
-
-        boolean sameAsPreviousCell = previousKv != null && sameCell(kv, previousKv);
-        // TODO: should check if this is a delete (empty byte[]) and !allowEmptyValues, then drop and skip to next col
-        // skip same as previous if told so
-        if (sameAsPreviousCell && skipSameCells) {
-          oldFilteredCount++;
-          continue;
-        }
-
-        // at this point we know we want to include it
-        results.add(kv);
-
-        if (!sameAsPreviousCell) {
-          // this cell is different from previous, resetting state
-          previousKv = kv;
-        }
-
-        // we met at least one version that is not newer than the oldest of currently used readPointers hence we
-        // can skip older ones
-        skipSameCells = kv.getTimestamp() <= visibilityUpperBound;
+    public ReturnCode filterKeyValue(KeyValue cell) {
+      // include all cells visible to in-progress transactions, except for those already marked as invalid
+      long ts = cell.getTimestamp();
+      if (ts > visibilityUpperBound && !invalidIds.contains(ts)) {
+        return ReturnCode.INCLUDE;
       }
-
-      return hasMore;
-    }
-
-    private boolean sameCell(KeyValue first, KeyValue second) {
-      return first.matchingRow(second) &&
-        first.matchingFamily(second) &&
-        first.matchingQualifier(second);
+      return ReturnCode.SKIP;
     }
 
     @Override
-    public void close() throws IOException {
-      LOG.info("Region " + Bytes.toStringBinary(regionName) +
-                 " filtered out invalid/old/expired "
-                 + invalidFilteredCount + "/" + oldFilteredCount + "/" + expiredFilteredCount + " KeyValues");
-      this.internalScanner.close();
+    public void write(DataOutput dataOutput) throws IOException {
+      throw new UnsupportedOperationException("IncludeInProgressFilter only intended for server-side use.");
+    }
+
+    @Override
+    public void readFields(DataInput dataInput) throws IOException {
+      throw new UnsupportedOperationException("IncludeInProgressFilter only intended for server-side use.");
     }
   }
 }
