@@ -106,9 +106,9 @@ public class TransactionProcessorTest {
     // write an initial transaction snapshot
     TransactionSnapshot snapshot =
       TransactionSnapshot.copyFrom(
-        System.currentTimeMillis(), V[6], V[7], invalidSet,
+        System.currentTimeMillis(), V[6] - 1, V[7], invalidSet,
         // this will set visibility upper bound to V[6]
-        Maps.newTreeMap(ImmutableSortedMap.of(5L, new TransactionManager.InProgressTx(V[6], Long.MAX_VALUE))),
+        Maps.newTreeMap(ImmutableSortedMap.of(V[6], new TransactionManager.InProgressTx(V[6] - 1, Long.MAX_VALUE))),
         new HashMap<Long, Set<ChangeId>>(), new TreeMap<Long, Set<ChangeId>>());
     HDFSTransactionStateStorage tmpStorage =
       new HDFSTransactionStateStorage(conf, new SnapshotCodecProvider(conf));
@@ -158,53 +158,13 @@ public class TransactionProcessorTest {
 
       List<KeyValue> results = Lists.newArrayList();
 
-      // use the custom scanner to filter out results with timestamps in the invalid set
-      Scan scan = new Scan();
-      scan.setMaxVersions(10);
-      // NOTE: v1 and v2 are expired based on ttl: they are older than visibilityUpperBound - 3 hour
-      //       v3, v5, v7 are invalid
-      TransactionProcessor.DataJanitorRegionScanner scanner =
-          new TransactionProcessor.DataJanitorRegionScanner(V[6], V[3], invalidSet, region.getScanner(scan),
-                                                              region.getRegionName());
-      results.clear();
-      // row "1" should be empty
-      assertTrue(scanner.next(results));
-      assertEquals(0, results.size());
-      // row "2" should be empty
-      assertTrue(scanner.next(results));
-      assertEquals(0, results.size());
-      // row "3" should be empty
-      assertTrue(scanner.next(results));
-      assertEquals(0, results.size());
-
-      // first returned value should be "4" with version "4"
-      results.clear();
-      assertTrue(scanner.next(results));
-      assertKeyValueMatches(results, 4, new long[] {V[4]});
-
-      results.clear();
-      assertTrue(scanner.next(results));
-      assertKeyValueMatches(results, 5, new long[] {V[4]});
-
-      results.clear();
-      assertTrue(scanner.next(results));
-      assertKeyValueMatches(results, 6, new long[] {V[6]});
-
-      results.clear();
-      assertTrue(scanner.next(results));
-      assertKeyValueMatches(results, 7, new long[] {V[6]});
-
-      results.clear();
-      assertFalse(scanner.next(results));
-      assertKeyValueMatches(results, 8, new long[] {V[8], V[6]});
-
       // force a flush to clear the data
       // during flush, the coprocessor should drop all KeyValues with timestamps in the invalid set
       LOG.info("Flushing region " + region.getRegionNameAsString());
       region.flushcache();
 
       // now a normal scan should only return the valid rows - testing that cleanup works on flush
-      scan = new Scan();
+      Scan scan = new Scan();
       scan.setMaxVersions(10);
       RegionScanner regionScanner = region.getScanner(scan);
 
@@ -219,15 +179,15 @@ public class TransactionProcessorTest {
 
       results.clear();
       assertTrue(regionScanner.next(results));
-      assertKeyValueMatches(results, 6, new long[] {V[6]});
+      assertKeyValueMatches(results, 6, new long[] {V[6], V[4]});
 
       results.clear();
       assertTrue(regionScanner.next(results));
-      assertKeyValueMatches(results, 7, new long[] {V[6]});
+      assertKeyValueMatches(results, 7, new long[] {V[6], V[4]});
 
       results.clear();
       assertFalse(regionScanner.next(results));
-      assertKeyValueMatches(results, 8, new long[] {V[8], V[6]});
+      assertKeyValueMatches(results, 8, new long[] {V[8], V[6], V[4]});
     } finally {
       region.close();
     }

@@ -17,9 +17,13 @@
 package com.continuuity.tephra.util;
 
 import com.continuuity.tephra.Transaction;
+import com.continuuity.tephra.TransactionManager;
 import com.continuuity.tephra.TxConstants;
+import com.continuuity.tephra.persist.TransactionSnapshot;
+import com.google.common.primitives.Longs;
 
 import java.util.Map;
+import java.util.NavigableMap;
 
 /**
  * Utility methods supporting transaction operations.
@@ -52,5 +56,34 @@ public class TxUtils {
   public static long getMaxVisibleTimestamp(Transaction tx) {
     // NOTE: +1 here because we want read up to readpointer inclusive, but timerange's end is exclusive
     return tx.getReadPointer() + 1;
+  }
+
+  /**
+   * Creates a "dummy" transaction based on the given snapshot's state.  This is not a "real" transaction in the
+   * sense that it has not been started, data should not be written with it, and it cannot be committed.  However,
+   * this can still be useful for filtering data according to the snapshot's state.  Instead of the actual
+   * write pointer from the snapshot, however, we use {@code Long.MAX_VALUE} to avoid mis-identifying any cells as
+   * being written by this transaction (and therefore visible).
+   */
+  public static Transaction createDummyTransaction(TransactionSnapshot snapshot) {
+    return new Transaction(snapshot.getReadPointer(), Long.MAX_VALUE,
+                           Longs.toArray(snapshot.getInvalid()),
+                           Longs.toArray(snapshot.getInProgress().keySet()),
+                           TxUtils.getFirstShortInProgress(snapshot.getInProgress()));
+  }
+
+  /**
+   * Returns the write pointer for the first "short" transaction that in the in-progress set, or
+   * {@link Transaction#NO_TX_IN_PROGRESS} if none.
+   */
+  public static long getFirstShortInProgress(Map<Long, TransactionManager.InProgressTx> inProgress) {
+    long firstShort = Transaction.NO_TX_IN_PROGRESS;
+    for (Map.Entry<Long, TransactionManager.InProgressTx> entry : inProgress.entrySet()) {
+      if (!entry.getValue().isLongRunning()) {
+        firstShort = entry.getKey();
+        break;
+      }
+    }
+    return firstShort;
   }
 }
