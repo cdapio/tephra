@@ -44,7 +44,7 @@ public class TransactionStateCacheSupplier implements Supplier<TransactionStateC
         if (instance == null) {
           instance = new TransactionStateCache();
           instance.setConf(conf);
-          instance.startAndWait();
+          instance.start();
         }
       }
     }

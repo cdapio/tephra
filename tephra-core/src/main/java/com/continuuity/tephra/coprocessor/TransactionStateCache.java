@@ -85,7 +85,7 @@ public class TransactionStateCache extends AbstractIdleService implements Config
     try {
       Configuration conf = getSnapshotConfiguration();
       if (conf != null) {
-        this.storage = new HDFSTransactionStateStorage(hConf, new SnapshotCodecProvider(conf));
+        this.storage = new HDFSTransactionStateStorage(conf, new SnapshotCodecProvider(conf));
         this.storage.startAndWait();
         this.snapshotRefreshFrequency = conf.getLong(TxConstants.Manager.CFG_TX_SNAPSHOT_INTERVAL,
                                                      TxConstants.Manager.DEFAULT_TX_SNAPSHOT_INTERVAL) * 1000;
@@ -99,7 +99,7 @@ public class TransactionStateCache extends AbstractIdleService implements Config
   }
 
   protected Configuration getSnapshotConfiguration() throws IOException {
-    Configuration conf = HBaseConfiguration.create();
+    Configuration conf = HBaseConfiguration.create(hConf);
     conf.unset(TxConstants.Persist.CFG_TX_SNAPHOT_CODEC_CLASSES);
     return conf;
   }
