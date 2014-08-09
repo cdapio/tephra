@@ -99,7 +99,7 @@ public class TransactionStateCache extends AbstractIdleService implements Config
   }
 
   protected Configuration getSnapshotConfiguration() throws IOException {
-    Configuration conf = HBaseConfiguration.create();
+    Configuration conf = HBaseConfiguration.create(hConf);
     conf.unset(TxConstants.Persist.CFG_TX_SNAPHOT_CODEC_CLASSES);
     return conf;
   }
