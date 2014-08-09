@@ -22,7 +22,7 @@
 
   <groupId>com.continuuity.tephra</groupId>
   <artifactId>tephra</artifactId>
-  <version>0.2.0-SNAPSHOT</version>
+  <version>0.2.0</version>
   <packaging>pom</packaging>
   <name>Tephra Transaction System</name>
   <description>Tephra Transaction System</description>
