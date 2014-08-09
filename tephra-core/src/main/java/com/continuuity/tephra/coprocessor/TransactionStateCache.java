@@ -85,7 +85,7 @@ public class TransactionStateCache extends AbstractIdleService implements Config
     try {
       Configuration conf = getSnapshotConfiguration();
       if (conf != null) {
-        this.storage = new HDFSTransactionStateStorage(hConf, new SnapshotCodecProvider(conf));
+        this.storage = new HDFSTransactionStateStorage(conf, new SnapshotCodecProvider(conf));
         this.storage.startAndWait();
         this.snapshotRefreshFrequency = conf.getLong(TxConstants.Manager.CFG_TX_SNAPSHOT_INTERVAL,
                                                      TxConstants.Manager.DEFAULT_TX_SNAPSHOT_INTERVAL) * 1000;
