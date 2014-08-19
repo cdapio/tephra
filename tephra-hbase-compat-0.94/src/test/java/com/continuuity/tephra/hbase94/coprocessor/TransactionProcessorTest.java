@@ -37,6 +37,7 @@ import org.apache.hadoop.hbase.HColumnDescriptor;
 import org.apache.hadoop.hbase.HRegionInfo;
 import org.apache.hadoop.hbase.HTableDescriptor;
 import org.apache.hadoop.hbase.KeyValue;
+import org.apache.hadoop.hbase.client.Delete;
 import org.apache.hadoop.hbase.client.Put;
 import org.apache.hadoop.hbase.client.Scan;
 import org.apache.hadoop.hbase.regionserver.HRegion;
@@ -141,8 +142,8 @@ public class TransactionProcessorTest {
     FileSystem fs = FileSystem.get(hConf);
     assertTrue(fs.mkdirs(tablePath));
     HLog hlog = new HLog(fs, hlogPath, oldPath, hConf);
-    HRegion region = new HRegion(tablePath, hlog, fs, hConf,
-        new HRegionInfo(Bytes.toBytes(tableName)), htd, new MockRegionServerServices());
+    HRegion region = new HRegion(tablePath, hlog, fs, hConf, new HRegionInfo(Bytes.toBytes(tableName)), htd,
+                                 new MockRegionServerServices());
     try {
       region.initialize();
       TransactionStateCache cache = new TransactionStateCacheSupplier(hConf).get();
@@ -171,23 +172,80 @@ public class TransactionProcessorTest {
       // first returned value should be "4" with version "4"
       results.clear();
       assertTrue(regionScanner.next(results));
-      assertKeyValueMatches(results, 4, new long[] {V[4]});
+      assertKeyValueMatches(results, 4, new long[]{V[4]});
 
       results.clear();
       assertTrue(regionScanner.next(results));
-      assertKeyValueMatches(results, 5, new long[] {V[4]});
+      assertKeyValueMatches(results, 5, new long[]{V[4]});
 
       results.clear();
       assertTrue(regionScanner.next(results));
-      assertKeyValueMatches(results, 6, new long[] {V[6], V[4]});
+      assertKeyValueMatches(results, 6, new long[]{V[6], V[4]});
 
       results.clear();
       assertTrue(regionScanner.next(results));
-      assertKeyValueMatches(results, 7, new long[] {V[6], V[4]});
+      assertKeyValueMatches(results, 7, new long[]{V[6], V[4]});
 
       results.clear();
       assertFalse(regionScanner.next(results));
-      assertKeyValueMatches(results, 8, new long[] {V[8], V[6], V[4]});
+      assertKeyValueMatches(results, 8, new long[]{V[8], V[6], V[4]});
+    } finally {
+      region.close();
+    }
+  }
+
+  @Test
+  public void testDeleteFiltering() throws Exception {
+    String tableName = "TestDeleteFiltering";
+    byte[] familyBytes = Bytes.toBytes("f");
+    byte[] columnBytes = Bytes.toBytes("c");
+    HTableDescriptor htd = new HTableDescriptor(tableName);
+    HColumnDescriptor cfd = new HColumnDescriptor(familyBytes);
+    cfd.setMaxVersions(10);
+    htd.addFamily(cfd);
+    htd.addCoprocessor(TransactionProcessor.class.getName());
+    Path tablePath = new Path("/tmp/" + tableName);
+    Path hlogPath = new Path("/tmp/hlog-" + tableName);
+    Path oldPath = new Path("/tmp/.oldLogs-" + tableName);
+    Configuration hConf = conf;
+    FileSystem fs = FileSystem.get(hConf);
+    assertTrue(fs.mkdirs(tablePath));
+    HLog hlog = new HLog(fs, hlogPath, oldPath, hConf);
+    HRegion region = new HRegion(tablePath, hlog, fs, hConf, new HRegionInfo(Bytes.toBytes(tableName)), htd,
+                                 new MockRegionServerServices());
+    try {
+      region.initialize();
+      TransactionStateCache cache = new TransactionStateCacheSupplier(hConf).get();
+      LOG.info("Coprocessor is using transaction state: " + cache.getLatestState());
+
+      byte[] row = Bytes.toBytes(1);
+      for (int i = 4; i < V.length; i++) {
+        if (i != 5) {
+          Put p = new Put(row);
+          p.add(familyBytes, columnBytes, V[i], Bytes.toBytes(V[i]));
+          region.put(p);
+        }
+      }
+
+      // delete from the third entry back
+      Delete d = new Delete(row, V[5]);
+      region.delete(d, false);
+
+      List<KeyValue> results = Lists.newArrayList();
+
+      // force a flush to clear the data
+      // during flush, we should drop the deleted version, but not the others
+      LOG.info("Flushing region " + region.getRegionNameAsString());
+      region.flushcache();
+
+      // now a normal scan should return row with versions at: V[8], V[6].
+      // V[7] is invalid and V[5] and prior are deleted.
+      Scan scan = new Scan();
+      scan.setMaxVersions(10);
+      RegionScanner regionScanner = region.getScanner(scan);
+      // should be only one row
+      assertFalse(regionScanner.next(results));
+      assertKeyValueMatches(results, 1, new long[]{ V[8], V[6] });
     } finally {
       region.close();
     }

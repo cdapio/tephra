@@ -41,6 +41,7 @@ import org.apache.hadoop.hbase.HTableDescriptor;
 import org.apache.hadoop.hbase.ServerName;
 import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.catalog.CatalogTracker;
+import org.apache.hadoop.hbase.client.Delete;
 import org.apache.hadoop.hbase.client.Put;
 import org.apache.hadoop.hbase.client.Scan;
 import org.apache.hadoop.hbase.executor.ExecutorService;
@@ -213,6 +214,63 @@ public class TransactionProcessorTest {
       results.clear();
       assertFalse(regionScanner.next(results));
       assertKeyValueMatches(results, 8, new long[] {V[8], V[6], V[4]});
+    } finally {
+      region.close();
+    }
+  }
+
+  @Test
+  public void testDeleteFiltering() throws Exception {
+    String tableName = "TestDeleteFiltering";
+    byte[] familyBytes = Bytes.toBytes("f");
+    byte[] columnBytes = Bytes.toBytes("c");
+    HTableDescriptor htd = new HTableDescriptor(TableName.valueOf(tableName));
+    HColumnDescriptor cfd = new HColumnDescriptor(familyBytes);
+    cfd.setMaxVersions(10);
+    htd.addFamily(cfd);
+    htd.addCoprocessor(TransactionProcessor.class.getName());
+    Path tablePath = new Path("/tmp/" + tableName);
+    Path hlogPath = new Path("/tmp/hlog");
+    Configuration hConf = conf;
+    FileSystem fs = FileSystem.get(hConf);
+    assertTrue(fs.mkdirs(tablePath));
+    HLog hLog = HLogFactory.createHLog(fs, hlogPath, "testDeleteFiltering", hConf);
+    HRegionInfo regionInfo = new HRegionInfo(TableName.valueOf(tableName));
+    HRegionFileSystem regionFS = HRegionFileSystem.createRegionOnFileSystem(hConf, fs, tablePath, regionInfo);
+    HRegion region = new HRegion(regionFS, hLog, hConf, htd, new MockRegionServerServices(hConf, null));
+    try {
+      region.initialize();
+      TransactionStateCache cache = new TransactionStateCacheSupplier(hConf).get();
+      LOG.info("Coprocessor is using transaction state: " + cache.getLatestState());
+
+      byte[] row = Bytes.toBytes(1);
+      for (int i = 4; i < V.length; i++) {
+        if (i != 5) {
+          Put p = new Put(row);
+          p.add(familyBytes, columnBytes, V[i], Bytes.toBytes(V[i]));
+          region.put(p);
+        }
+      }
+
+      // delete from the third entry back
+      Delete d = new Delete(row, V[5]);
+      region.delete(d);
+
+      List<Cell> results = Lists.newArrayList();
+
+      // force a flush to clear the data
+      // during flush, we should drop the deleted version, but not the others
+      LOG.info("Flushing region " + region.getRegionNameAsString());
+      region.flushcache();
+
+      // now a normal scan should return row with versions at: V[8], V[6].
+      // V[7] is invalid and V[5] and prior are deleted.
+      Scan scan = new Scan();
+      scan.setMaxVersions(10);
+      RegionScanner regionScanner = region.getScanner(scan);
+      // should be only one row
+      assertFalse(regionScanner.next(results));
+      assertKeyValueMatches(results, 1, new long[]{ V[8], V[6] });
     } finally {
       region.close();
     }

@@ -27,11 +27,9 @@ import com.continuuity.tephra.util.TxUtils;
 import com.google.common.base.Supplier;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
-import com.google.common.primitives.Longs;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.hbase.Cell;
-import org.apache.hadoop.hbase.CellComparator;
 import org.apache.hadoop.hbase.CoprocessorEnvironment;
 import org.apache.hadoop.hbase.HColumnDescriptor;
 import org.apache.hadoop.hbase.HConstants;
@@ -43,7 +41,6 @@ import org.apache.hadoop.hbase.coprocessor.ObserverContext;
 import org.apache.hadoop.hbase.coprocessor.RegionCoprocessorEnvironment;
 import org.apache.hadoop.hbase.filter.Filter;
 import org.apache.hadoop.hbase.filter.FilterBase;
-import org.apache.hadoop.hbase.filter.FilterList;
 import org.apache.hadoop.hbase.regionserver.InternalScanner;
 import org.apache.hadoop.hbase.regionserver.KeyValueScanner;
 import org.apache.hadoop.hbase.regionserver.RegionScanner;
@@ -54,7 +51,6 @@ import org.apache.hadoop.hbase.regionserver.compactions.CompactionRequest;
 import org.apache.hadoop.hbase.util.Bytes;
 
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
@@ -201,11 +197,9 @@ public class TransactionProcessor extends BaseRegionObserver {
     Scan scan = new Scan();
     // does not current support max versions setting per family
     scan.setMaxVersions(dummyTx.excludesSize() + 1);
-    FilterList filterList = new FilterList(FilterList.Operator.MUST_PASS_ONE);
-    filterList.addFilter(getTransactionFilter(dummyTx));
-    filterList.addFilter(new IncludeInProgressFilter(dummyTx.getVisibilityUpperBound(),
-                                                     snapshot.getInvalid()));
-    scan.setFilter(filterList);
+    scan.setFilter(new IncludeInProgressFilter(dummyTx.getVisibilityUpperBound(),
+                                               snapshot.getInvalid(),
+                                               getTransactionFilter(dummyTx)));
 
     return new StoreScanner(store, store.getScanInfo(), scan, scanners,
                             type, store.getSmallestReadPoint(), earliestPutTs);
@@ -226,20 +220,26 @@ public class TransactionProcessor extends BaseRegionObserver {
   static class IncludeInProgressFilter extends FilterBase {
     private final long visibilityUpperBound;
     private final Set<Long> invalidIds;
+    private final Filter txFilter;
 
-    public IncludeInProgressFilter(long upperBound, Collection<Long> invalids) {
+    public IncludeInProgressFilter(long upperBound, Collection<Long> invalids, Filter transactionFilter) {
       this.visibilityUpperBound = upperBound;
       this.invalidIds = Sets.newHashSet(invalids);
+      this.txFilter = transactionFilter;
     }
 
     @Override
     public ReturnCode filterKeyValue(Cell cell) throws IOException {
       // include all cells visible to in-progress transactions, except for those already marked as invalid
       long ts = cell.getTimestamp();
-      if (ts > visibilityUpperBound && !invalidIds.contains(ts)) {
+      if (ts > visibilityUpperBound) {
+        // include everything that could still be in-progress except invalids
+        if (invalidIds.contains(ts)) {
+          return ReturnCode.SKIP;
+        }
         return ReturnCode.INCLUDE;
       }
-      return ReturnCode.SKIP;
+      return txFilter.filterKeyValue(cell);
     }
   }
 }
