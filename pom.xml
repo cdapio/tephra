@@ -55,7 +55,7 @@
 
   <scm>
     <connection>scm:git:https://github.com/continuuity/tephra.git</connection>
-    <developerConnection>scm:git:https://github.com/continuuity/tephra.git</developerConnection>
+    <developerConnection>scm:git:git@github.com:continuuity/tephra.git</developerConnection>
     <url>https://github.com/continuuity/tephra.git</url>
   </scm>
 
