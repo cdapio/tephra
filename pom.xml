@@ -341,6 +341,18 @@
             <deployAtEnd>true</deployAtEnd>
           </configuration>
         </plugin>
+
+        <!-- Release plugin -->
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-release-plugin</artifactId>
+          <version>2.5</version>
+          <configuration>
+            <tagNameFormat>v@{project.version}</tagNameFormat>
+            <allowTimestampedSnapshots>true</allowTimestampedSnapshots>
+            <autoVersionSubmodules>true</autoVersionSubmodules>
+          </configuration>
+        </plugin>
       </plugins>
     </pluginManagement>
 
