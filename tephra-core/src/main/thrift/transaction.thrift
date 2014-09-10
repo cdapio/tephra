@@ -1,4 +1,4 @@
-# Copyright 2012-2014 Continuuity, Inc.
+# Copyright 2012-2014 Cask Data, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License"); you may not
 # use this file except in compliance with the License. You may obtain a copy of
@@ -12,7 +12,7 @@
 # License for the specific language governing permissions and limitations under
 # the License.
 
-namespace java com.continuuity.tephra.distributed.thrift
+namespace java co.cask.tephra.distributed.thrift
 
 struct TTransaction {
   1: i64 writePointer,

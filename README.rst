@@ -1,11 +1,11 @@
 .. ==================
-.. Continuuity Tephra
+.. Cask Tephra
 .. ==================
 
 |(Tephra)|
 
 **Transactions for Apache HBase** |(TM)|:
-Continuuity Tephra provides globally consistent transactions on top of Apache HBase.  While HBase
+Cask Tephra provides globally consistent transactions on top of Apache HBase.  While HBase
 provides strong consistency with row- or region-level ACID operations, it sacrifices
 cross-region and cross-table consistency in favor of scalability.  This trade-off requires
 application developers to handle the complexity of ensuring consistency when their modifications
@@ -79,7 +79,7 @@ Getting Started
 
 You can get started with Tephra by building directly from the latest source code::
 
-  git clone https://github.com/continuuity/tephra.git
+  git clone https://github.com/caskco/tephra.git
   cd tephra
   mvn clean package
 
@@ -91,12 +91,12 @@ For any client applications, add the following dependencies to any Apache Maven 
 build system's equivalent configuration), in order to make use of Tephra classes::
 
   <dependency>
-    <groupId>com.continuuity.tephra</groupId>
+    <groupId>co.cask.tephra</groupId>
     <artifactId>tephra-api</artifactId>
     <version>0.1.0</version>
   </dependency>
   <dependency>
-    <groupId>com.continuuity.tephra</groupId>
+    <groupId>co.cask.tephra</groupId>
     <artifactId>tephra-core</artifactId>
     <version>0.1.0</version>
   </dependency>
@@ -107,7 +107,7 @@ appropriate HBase compatibility library.
 For HBase 0.94.x::
 
   <dependency>
-    <groupId>com.continuuity.tephra</groupId>
+    <groupId>co.cask.tephra</groupId>
     <artifactId>tephra-hbase-compat-0.94</artifactId>
     <version>0.1.0</version>
   </dependency>
@@ -115,7 +115,7 @@ For HBase 0.94.x::
 For HBase 0.96.x::
 
   <dependency>
-    <groupId>com.continuuity.tephra</groupId>
+    <groupId>co.cask.tephra</groupId>
     <artifactId>tephra-hbase-compat-0.96</artifactId>
     <version>0.1.0</version>
   </dependency>
@@ -123,7 +123,7 @@ For HBase 0.96.x::
 For HBase 0.98.x::
 
   <dependency>
-    <groupId>com.continuuity.tephra</groupId>
+    <groupId>co.cask.tephra</groupId>
     <artifactId>tephra-hbase-compat-0.98</artifactId>
     <version>0.1.0</version>
   </dependency>
@@ -224,21 +224,21 @@ For HBase 0.94::
 
   <property>
     <name>hbase.coprocessor.region.classes</name>
-    <value>com.continuuity.tephra.hbase94.coprocessor.TransactionProcessor</value>
+    <value>co.cask.tephra.hbase94.coprocessor.TransactionProcessor</value>
   </property>
 
 For HBase 0.96::
 
   <property>
     <name>hbase.coprocessor.region.classes</name>
-    <value>com.continuuity.tephra.hbase96.coprocessor.TransactionProcessor</value>
+    <value>co.cask.tephra.hbase96.coprocessor.TransactionProcessor</value>
   </property>
 
 For HBase 0.98::
 
   <property>
     <name>hbase.coprocessor.region.classes</name>
-    <value>com.continuuity.tephra.hbase98.coprocessor.TransactionProcessor</value>
+    <value>co.cask.tephra.hbase98.coprocessor.TransactionProcessor</value>
   </property>
 
 You may configure the ``TransactionProcessor`` to be loaded only on HBase tables that you will
@@ -506,7 +506,7 @@ features, or fixing bugs, here's how to do it:
 #. Work on the code to your heart's content.
 #. Once you’re satisfied, create a pull request from your GitHub repo (it’s helpful if you fill in
    all of the description fields).
-#. After we review and accept your request, we’ll commit your code to the continuuity/tephra
+#. After we review and accept your request, we’ll commit your code to the caskco/tephra
    repository.
 
 Thanks for helping to improve Tephra!
@@ -531,7 +531,7 @@ is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND
 or implied. See the License for the specific language governing permissions and limitations under
 the License.
 
-Continuuity, Continuuity Tephra and Tephra are trademarks of Continuuity, Inc. All rights reserved.
+Cask, Cask Tephra and Tephra are trademarks of Cask Data, Inc. All rights reserved.
 
 Apache, Apache HBase, and HBase are trademarks of The Apache Software Foundation. Used with permission. 
 No endorsement by The Apache Software Foundation is implied by the use of these marks.
