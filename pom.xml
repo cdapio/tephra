@@ -24,7 +24,7 @@
   <packaging>pom</packaging>
   <name>Tephra Transaction System</name>
   <description>Tephra Transaction System</description>
-  <url>https://github.com/caskco/tephra</url>
+  <url>https://github.com/caskdata/tephra</url>
 
   <modules>
     <module>tephra-api</module>
@@ -47,14 +47,14 @@
       <name>Cask Data</name>
       <email>tephra-dev@googlegroups.com</email>
       <organization>Cask Data</organization>
-      <organizationUrl>https://github.com/caskco/tephra</organizationUrl>
+      <organizationUrl>https://github.com/caskdata/tephra</organizationUrl>
     </developer>
   </developers>
 
   <scm>
-    <connection>scm:git:https://github.com/caskco/tephra.git</connection>
-    <developerConnection>scm:git:git@github.com:caskco/tephra.git</developerConnection>
-    <url>https://github.com/caskco/tephra.git</url>
+    <connection>scm:git:https://github.com/caskdata/tephra.git</connection>
+    <developerConnection>scm:git:git@github.com:caskdata/tephra.git</developerConnection>
+    <url>https://github.com/caskdata/tephra.git</url>
     <tag>HEAD</tag>
   </scm>
 

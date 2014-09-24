@@ -79,7 +79,7 @@ Getting Started
 
 You can get started with Tephra by building directly from the latest source code::
 
-  git clone https://github.com/caskco/tephra.git
+  git clone https://github.com/caskdata/tephra.git
   cd tephra
   mvn clean package
 
@@ -506,7 +506,7 @@ features, or fixing bugs, here's how to do it:
 #. Work on the code to your heart's content.
 #. Once you’re satisfied, create a pull request from your GitHub repo (it’s helpful if you fill in
    all of the description fields).
-#. After we review and accept your request, we’ll commit your code to the caskco/tephra
+#. After we review and accept your request, we’ll commit your code to the caskdata/tephra
    repository.
 
 Thanks for helping to improve Tephra!
