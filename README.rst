@@ -71,7 +71,7 @@ found in our `Transactions over HBase
 
 Is It Building?
 ----------------
-Status of continuous integration build at `Travis CI <https://travis-ci.org/continuuity/tephra>`__: |(BuildStatus)|
+Status of continuous integration build at `Travis CI <https://travis-ci.org/caskdata/tephra>`__: |(BuildStatus)|
 
 
 Getting Started
@@ -93,12 +93,12 @@ build system's equivalent configuration), in order to make use of Tephra classes
   <dependency>
     <groupId>co.cask.tephra</groupId>
     <artifactId>tephra-api</artifactId>
-    <version>0.1.0</version>
+    <version>0.3.0</version>
   </dependency>
   <dependency>
     <groupId>co.cask.tephra</groupId>
     <artifactId>tephra-core</artifactId>
-    <version>0.1.0</version>
+    <version>0.3.0</version>
   </dependency>
 
 Since the HBase APIs have changed between version 0.94.x and 0.96.x, you will need to select the
@@ -109,7 +109,7 @@ For HBase 0.94.x::
   <dependency>
     <groupId>co.cask.tephra</groupId>
     <artifactId>tephra-hbase-compat-0.94</artifactId>
-    <version>0.1.0</version>
+    <version>0.3.0</version>
   </dependency>
 
 For HBase 0.96.x::
@@ -117,7 +117,7 @@ For HBase 0.96.x::
   <dependency>
     <groupId>co.cask.tephra</groupId>
     <artifactId>tephra-hbase-compat-0.96</artifactId>
-    <version>0.1.0</version>
+    <version>0.3.0</version>
   </dependency>
 
 For HBase 0.98.x::
@@ -125,7 +125,7 @@ For HBase 0.98.x::
   <dependency>
     <groupId>co.cask.tephra</groupId>
     <artifactId>tephra-hbase-compat-0.98</artifactId>
-    <version>0.1.0</version>
+    <version>0.3.0</version>
   </dependency>
 
 
@@ -541,5 +541,5 @@ No endorsement by The Apache Software Foundation is implied by the use of these 
 
 .. |(Tephra)| image:: docs/_images/tephra_logo_light_bknd_cask.png
 
-.. |(BuildStatus)| image:: https://travis-ci.org/continuuity/tephra.svg?branch=develop
-   :target: https://travis-ci.org/continuuity/tephra
+.. |(BuildStatus)| image:: https://travis-ci.org/caskdata/tephra.svg?branch=develop
+   :target: https://travis-ci.org/caskdata/tephra
