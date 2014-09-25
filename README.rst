@@ -539,7 +539,7 @@ No endorsement by The Apache Software Foundation is implied by the use of these 
 .. |(TM)| unicode:: U+2122 .. trademark sign
    :trim:
 
-.. |(Tephra)| image:: docs/_images/tephra_logo_light_bknd_continuuity.png
+.. |(Tephra)| image:: docs/_images/tephra_logo_light_bknd_cask.png
 
 .. |(BuildStatus)| image:: https://travis-ci.org/continuuity/tephra.svg?branch=develop
    :target: https://travis-ci.org/continuuity/tephra
