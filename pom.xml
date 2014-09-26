@@ -58,6 +58,11 @@
     <tag>HEAD</tag>
   </scm>
 
+  <issueManagement>
+    <system>JIRA</system>
+    <url>https://issues.cask.co/browse/TEPHRA</url>
+  </issueManagement>
+
   <repositories>
     <repository>
       <id>apache.snapshots</id>
