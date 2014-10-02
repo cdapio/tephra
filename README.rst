@@ -490,10 +490,23 @@ assisting others on the mailing list.
 Bug Reports & Feature Requests
 ..............................
 
-Bugs and tasks are tracked in a public JIRA issue tracker.  Details on access will be forthcoming.
+Bugs and tasks are tracked in a public JIRA `issue tracker <https://issues.cask.co/browse/TEPHRA>`__.
+
+Mailing List
+............
+
+Tephra User Group and Development Discussions: `tephra-dev@googlegroups.com 
+<https://groups.google.com/d/forum/tephra-dev>`__
+
+IRC
+...
+
+Have questions about how Tephra works, or need help using it?  Drop by the ``#tephra``
+chat room on ``irc.freenode.net``.
 
 Pull Requests
 .............
+
 We have a simple pull-based development model with a consensus-building phase, similar to Apache's
 voting process. If you’d like to help make Tephra better by adding new features, enhancing existing
 features, or fixing bugs, here's how to do it:
@@ -510,12 +523,6 @@ features, or fixing bugs, here's how to do it:
    repository.
 
 Thanks for helping to improve Tephra!
-
-Mailing List
-............
-
-Tephra User Group and Development Discussions: `tephra-dev@googlegroups.com 
-<https://groups.google.com/d/forum/tephra-dev>`__
 
 
 License and Trademarks
