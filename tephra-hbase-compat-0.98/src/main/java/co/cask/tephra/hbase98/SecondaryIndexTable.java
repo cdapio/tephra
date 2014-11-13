@@ -26,6 +26,7 @@ import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.client.Get;
 import org.apache.hadoop.hbase.client.HBaseAdmin;
 import org.apache.hadoop.hbase.client.HTable;
+import org.apache.hadoop.hbase.client.HTableInterface;
 import org.apache.hadoop.hbase.client.Put;
 import org.apache.hadoop.hbase.client.Result;
 import org.apache.hadoop.hbase.client.ResultScanner;
@@ -52,7 +53,8 @@ public class SecondaryIndexTable {
   private static final byte[] secondaryIndexQualifier = Bytes.toBytes('r');
   private static final byte[] DELIMITER  = new byte[] {0};
 
-  public SecondaryIndexTable(TransactionServiceClient transactionServiceClient, HTable hTable, byte[] secondaryIndex) {
+  public SecondaryIndexTable(TransactionServiceClient transactionServiceClient, HTableInterface hTable,
+                             byte[] secondaryIndex) {
     secondaryIndexTableName = TableName.valueOf(hTable.getName().getNameAsString() + ".idx");
     HTable secondaryIndexHTable = null;
     HBaseAdmin hBaseAdmin = null;
@@ -139,7 +141,8 @@ public class SecondaryIndexTable {
         Set<Map.Entry<byte[], List<KeyValue>>> familyMap = put.getFamilyMap().entrySet();
         for (Map.Entry<byte [], List<KeyValue>> family : familyMap) {
           for (KeyValue value : family.getValue()) {
-            if (value.getQualifier().equals(secondaryIndex)) {
+            if (Bytes.equals(value.getQualifierArray(), value.getQualifierOffset(), value.getQualifierLength(),
+                             secondaryIndex, 0, secondaryIndex.length)) {
               byte[] secondaryRow = Bytes.add(value.getQualifier(), DELIMITER,
                                                     Bytes.add(value.getValue(), DELIMITER,
                                                               value.getRow()));
