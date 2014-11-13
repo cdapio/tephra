@@ -28,7 +28,6 @@ import org.apache.hadoop.hbase.client.Append;
 import org.apache.hadoop.hbase.client.Delete;
 import org.apache.hadoop.hbase.client.Durability;
 import org.apache.hadoop.hbase.client.Get;
-import org.apache.hadoop.hbase.client.HTable;
 import org.apache.hadoop.hbase.client.HTableInterface;
 import org.apache.hadoop.hbase.client.Increment;
 import org.apache.hadoop.hbase.client.Mutation;
@@ -60,7 +59,7 @@ import java.util.Set;
 public class TransactionAwareHTable implements HTableInterface, TransactionAware {
   private static final Logger LOG = LoggerFactory.getLogger(TransactionAwareHTable.class);
   private Transaction tx;
-  private final HTable hTable;
+  private final HTableInterface hTable;
   private final TransactionCodec txCodec;
   private final List<ActionChange> changeSet;
   private boolean allowNonTransactional;
@@ -69,7 +68,7 @@ public class TransactionAwareHTable implements HTableInterface, TransactionAware
    * Create a transactional aware instance of the passed HTable
    * @param hTable
    */
-  public TransactionAwareHTable(HTable hTable) {
+  public TransactionAwareHTable(HTableInterface hTable) {
     this(hTable, false);
   }
 
@@ -79,7 +78,7 @@ public class TransactionAwareHTable implements HTableInterface, TransactionAware
    * @param hTable
    * @param allowNonTransactional
    */
-  public TransactionAwareHTable(HTable hTable, boolean allowNonTransactional) {
+  public TransactionAwareHTable(HTableInterface hTable, boolean allowNonTransactional) {
     this.hTable = hTable;
     this.changeSet = new ArrayList<ActionChange>();
     this.txCodec = new TransactionCodec();
