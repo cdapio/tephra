@@ -125,7 +125,7 @@ public class TransactionVisibilityFilterTest extends AbstractTransactionVisibili
 
   @Override
   protected Filter createFilter(Transaction tx, Map<byte[], Long> familyTTLs) {
-    return new TransactionVisibilityFilter(tx, familyTTLs, false);
+    return new TransactionVisibilityFilter(tx, familyTTLs, false, true);
   }
 
   protected KeyValue newKeyValue(String rowkey, String value, long timestamp) {

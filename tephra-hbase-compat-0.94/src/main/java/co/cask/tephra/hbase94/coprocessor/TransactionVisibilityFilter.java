@@ -41,6 +41,9 @@ public class TransactionVisibilityFilter extends FilterBase {
   private final Map<byte[], Long> oldestTsByFamily;
   // if false, empty values will be interpreted as deletes
   private final boolean allowEmptyValues;
+  // whether or not we can remove delete markers
+  // these can only be safely removed when we are traversing all storefiles
+  private final boolean clearDeletes;
   // optional sub-filter to apply to visible cells
   private final Filter cellFilter;
 
@@ -51,28 +54,33 @@ public class TransactionVisibilityFilter extends FilterBase {
   /**
    * Creates a new {@link org.apache.hadoop.hbase.filter.Filter} for returning data only from visible transactions.
    *
-   * @param tx The current transaction to apply.  Only data visible to this transaction will be returned.
-   * @param ttlByFamily Map of time-to-live (TTL) (in milliseconds) by column family name.
-   * @param allowEmptyValues If {@code true} cells with empty {@code byte[]} values will be returned, if {@code false}
-   *                         these will be interpreted as "delete" markers and the column will be filtered out.
+   * @param tx the current transaction to apply.  Only data visible to this transaction will be returned.
+   * @param ttlByFamily map of time-to-live (TTL) (in milliseconds) by column family name
+   * @param allowEmptyValues if {@code true} cells with empty {@code byte[]} values will be returned, if {@code false}
+   *                         these will be interpreted as "delete" markers and the column will be filtered out
+   * @param clearDeletes whether this filter should drop "delete" markers (only safe when reading all store files,
+   *                     such as during a major compaction)
    */
-  public TransactionVisibilityFilter(Transaction tx, Map<byte[], Long> ttlByFamily, boolean allowEmptyValues) {
-    this(tx, ttlByFamily, allowEmptyValues, null);
+  public TransactionVisibilityFilter(Transaction tx, Map<byte[], Long> ttlByFamily, boolean allowEmptyValues,
+                                     boolean clearDeletes) {
+    this(tx, ttlByFamily, allowEmptyValues, clearDeletes, null);
   }
 
   /**
    * Creates a new {@link org.apache.hadoop.hbase.filter.Filter} for returning data only from visible transactions.
    *
-   * @param tx The current transaction to apply.  Only data visible to this transaction will be returned.
-   * @param ttlByFamily Map of time-to-live (TTL) (in milliseconds) by column family name.
-   * @param allowEmptyValues If {@code true} cells with empty {@code byte[]} values will be returned, if {@code false}
-   *                         these will be interpreted as "delete" markers and the column will be filtered out.
-   * @param cellFilter If non-null, this filter will be applied to all cells visible to the current transaction, by
+   * @param tx the current transaction to apply.  Only data visible to this transaction will be returned.
+   * @param ttlByFamily map of time-to-live (TTL) (in milliseconds) by column family name
+   * @param allowEmptyValues if {@code true} cells with empty {@code byte[]} values will be returned, if {@code false}
+   *                         these will be interpreted as "delete" markers and the column will be filtered out
+   * @param clearDeletes whether this filter should drop "delete" markers (only safe when reading all store files,
+   *                     such as during a major compaction)
+   * @param cellFilter if non-null, this filter will be applied to all cells visible to the current transaction, by
    *                   calling {@link Filter#filterKeyValue(org.apache.hadoop.hbase.KeyValue)}.  If null, then
    *                   {@link Filter.ReturnCode#INCLUDE_AND_NEXT_COL} will be returned instead.
    */
   public TransactionVisibilityFilter(Transaction tx, Map<byte[], Long> ttlByFamily, boolean allowEmptyValues,
-                                     @Nullable Filter cellFilter) {
+                                     boolean clearDeletes, @Nullable Filter cellFilter) {
     this.tx = tx;
     this.oldestTsByFamily = Maps.newTreeMap(Bytes.BYTES_COMPARATOR);
     for (Map.Entry<byte[], Long> ttlEntry : ttlByFamily.entrySet()) {
@@ -81,6 +89,7 @@ public class TransactionVisibilityFilter extends FilterBase {
                            familyTTL <= 0 ? 0 : tx.getVisibilityUpperBound() - familyTTL * TxConstants.MAX_TX_PER_MS);
     }
     this.allowEmptyValues = allowEmptyValues;
+    this.clearDeletes = clearDeletes;
     this.cellFilter = cellFilter;
   }
 
@@ -100,8 +109,13 @@ public class TransactionVisibilityFilter extends FilterBase {
       return ReturnCode.NEXT_COL;
     } else if (tx.isVisible(kvTimestamp)) {
       if (kv.getValueLength() == 0 && !allowEmptyValues) {
-        // skip "deleted" cell
-        return ReturnCode.NEXT_COL;
+        if (clearDeletes) {
+          // skip "deleted" cell
+          return ReturnCode.NEXT_COL;
+        } else {
+          // keep the marker but skip any remaining versions
+          return ReturnCode.INCLUDE_AND_NEXT_COL;
+        }
       }
       // cell is visible
       if (cellFilter != null) {

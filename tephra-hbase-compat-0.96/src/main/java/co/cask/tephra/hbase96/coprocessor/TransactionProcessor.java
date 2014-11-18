@@ -144,7 +144,7 @@ public class TransactionProcessor extends BaseRegionObserver {
     if (tx != null) {
       get.setMaxVersions(tx.excludesSize() + 1);
       get.setTimeRange(TxUtils.getOldestVisibleTimestamp(ttlByFamily, tx), TxUtils.getMaxVisibleTimestamp(tx));
-      Filter newFilter = Filters.combine(getTransactionFilter(tx), get.getFilter());
+      Filter newFilter = Filters.combine(getTransactionFilter(tx, true), get.getFilter());
       get.setFilter(newFilter);
     }
   }
@@ -156,7 +156,7 @@ public class TransactionProcessor extends BaseRegionObserver {
     if (tx != null) {
       scan.setMaxVersions(tx.excludesSize() + 1);
       scan.setTimeRange(TxUtils.getOldestVisibleTimestamp(ttlByFamily, tx), TxUtils.getMaxVisibleTimestamp(tx));
-      Filter newFilter = Filters.combine(getTransactionFilter(tx), scan.getFilter());
+      Filter newFilter = Filters.combine(getTransactionFilter(tx, true), scan.getFilter());
       scan.setFilter(newFilter);
     }
     return s;
@@ -197,9 +197,11 @@ public class TransactionProcessor extends BaseRegionObserver {
     Scan scan = new Scan();
     // does not current support max versions setting per family
     scan.setMaxVersions(dummyTx.excludesSize() + 1);
-    scan.setFilter(new IncludeInProgressFilter(dummyTx.getVisibilityUpperBound(),
-                                               snapshot.getInvalid(),
-                                               getTransactionFilter(dummyTx)));
+    scan.setFilter(
+        new IncludeInProgressFilter(dummyTx.getVisibilityUpperBound(),
+            snapshot.getInvalid(),
+            getTransactionFilter(dummyTx,
+                (type == ScanType.USER_SCAN || type == ScanType.COMPACT_DROP_DELETES))));
 
     return new StoreScanner(store, store.getScanInfo(), scan, scanners,
                             type, store.getSmallestReadPoint(), earliestPutTs);
@@ -208,10 +210,12 @@ public class TransactionProcessor extends BaseRegionObserver {
   /**
    * Derived classes can override this method to customize the filter used to return data visible for the current
    * transaction.
-   * @param tx The current transaction to apply.
+   *
+   * @param tx the current transaction to apply
+   * @param clearDeletes whether delete markers can be dropped
    */
-  protected Filter getTransactionFilter(Transaction tx) {
-    return new TransactionVisibilityFilter(tx, ttlByFamily, allowEmptyValues);
+  protected Filter getTransactionFilter(Transaction tx, boolean clearDeletes) {
+    return new TransactionVisibilityFilter(tx, ttlByFamily, allowEmptyValues, clearDeletes);
   }
 
   /**
