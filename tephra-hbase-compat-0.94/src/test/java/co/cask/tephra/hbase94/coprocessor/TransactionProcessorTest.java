@@ -25,6 +25,7 @@ import co.cask.tephra.persist.HDFSTransactionStateStorage;
 import co.cask.tephra.persist.TransactionSnapshot;
 import co.cask.tephra.snapshot.DefaultSnapshotCodec;
 import co.cask.tephra.snapshot.SnapshotCodecProvider;
+import co.cask.tephra.util.TxUtils;
 import com.google.common.collect.ImmutableSortedMap;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
@@ -42,6 +43,7 @@ import org.apache.hadoop.hbase.client.Put;
 import org.apache.hadoop.hbase.client.Scan;
 import org.apache.hadoop.hbase.regionserver.HRegion;
 import org.apache.hadoop.hbase.regionserver.RegionScanner;
+import org.apache.hadoop.hbase.regionserver.ScanType;
 import org.apache.hadoop.hbase.regionserver.wal.HLog;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.hbase.util.MockRegionServerServices;
@@ -54,6 +56,7 @@ import org.junit.rules.TemporaryFolder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Set;
@@ -88,6 +91,7 @@ public class TransactionProcessorTest {
   private static MiniDFSCluster dfsCluster;
   private static Configuration conf;
   private static LongArrayList invalidSet = new LongArrayList(new long[]{V[3], V[5], V[7]});
+  private static TransactionSnapshot txSnapshot;
 
   @BeforeClass
   public static void setupBeforeClass() throws Exception {
@@ -105,7 +109,7 @@ public class TransactionProcessorTest {
     conf.set(TxConstants.Persist.CFG_TX_SNAPHOT_CODEC_CLASSES, DefaultSnapshotCodec.class.getName());
 
     // write an initial transaction snapshot
-    TransactionSnapshot snapshot =
+    txSnapshot =
       TransactionSnapshot.copyFrom(
         System.currentTimeMillis(), V[6] - 1, V[7], invalidSet,
         // this will set visibility upper bound to V[6]
@@ -114,7 +118,7 @@ public class TransactionProcessorTest {
     HDFSTransactionStateStorage tmpStorage =
       new HDFSTransactionStateStorage(conf, new SnapshotCodecProvider(conf));
     tmpStorage.startAndWait();
-    tmpStorage.writeSnapshot(snapshot);
+    tmpStorage.writeSnapshot(txSnapshot);
     tmpStorage.stopAndWait();
   }
 
@@ -249,6 +253,137 @@ public class TransactionProcessorTest {
     } finally {
       region.close();
     }
+  }
+
+  @Test
+  public void testDeleteMarkerCleanup() throws Exception {
+    String tableName = "TestDeleteMarkerCleanup";
+    byte[] familyBytes = Bytes.toBytes("f");
+    HRegion region = createRegion(tableName, familyBytes, 0);
+    try {
+      region.initialize();
+
+      // all puts use a timestamp before the tx snapshot's visibility upper bound, making them eligible for removal
+      long writeTs = txSnapshot.getVisibilityUpperBound() - 10;
+      // deletes are performed after the writes, but still before the visibility upper bound
+      long deleteTs = writeTs + 1;
+      // write separate columns to confirm that delete markers survive across flushes
+      byte[] row = Bytes.toBytes(100);
+      Put p = new Put(row);
+      // all puts use V[4] timestamp, since it is visible according to transaction state
+      LOG.info("Writing columns at timestamp " + V[4]);
+      for (int i = 0; i < 5; i++) {
+        byte[] iBytes = Bytes.toBytes(i);
+        p.add(familyBytes, iBytes, writeTs, iBytes);
+      }
+      region.put(p);
+      // read all back
+      Scan scan = new Scan(row);
+      RegionScanner regionScanner = region.getScanner(scan);
+      List<KeyValue> results = Lists.newArrayList();
+      assertFalse(regionScanner.next(results));
+      for (int i = 0; i < 5; i++) {
+        KeyValue cell = results.get(i);
+        assertArrayEquals(row, cell.getRow());
+        byte[] idxBytes = Bytes.toBytes(i);
+        assertArrayEquals(idxBytes, cell.getQualifier());
+        assertArrayEquals(idxBytes, cell.getValue());
+      }
+
+      // force a flush to clear the memstore
+      LOG.info("Before delete, flushing region " + region.getRegionNameAsString());
+      region.flushcache();
+
+      // delete the odd entries
+      for (int i = 0; i < 5; i++) {
+        if (i % 2 == 1) {
+          // deletes are performed as puts with empty values
+          Put deletePut = new Put(row);
+          deletePut.add(familyBytes, Bytes.toBytes(i), deleteTs, new byte[0]);
+          region.put(deletePut);
+        }
+      }
+
+      // read all back
+      scan = new Scan(row);
+      scan.setFilter(new TransactionVisibilityFilter(
+          TxUtils.createDummyTransaction(txSnapshot), new TreeMap<byte[], Long>(), false, ScanType.USER_SCAN));
+      regionScanner = region.getScanner(scan);
+      results = Lists.newArrayList();
+      assertFalse(regionScanner.next(results));
+      assertEquals(3, results.size());
+      // only even columns should exist
+      for (int i = 0; i < 3; i++) {
+        KeyValue cell = results.get(i);
+        LOG.info("Got cell " + cell);
+        assertArrayEquals(row, cell.getRow());
+        byte[] idxBytes = Bytes.toBytes(i * 2);
+        assertArrayEquals(idxBytes, cell.getQualifier());
+        assertArrayEquals(idxBytes, cell.getValue());
+      }
+
+      // force another flush on the delete markers
+      // during flush, we should retain the delete markers, since they can only safely be dropped by a major compaction
+      LOG.info("After delete, flushing region " + region.getRegionNameAsString());
+      region.flushcache();
+
+      scan = new Scan(row);
+      scan.setFilter(new TransactionVisibilityFilter(
+          TxUtils.createDummyTransaction(txSnapshot), new TreeMap<byte[], Long>(), false, ScanType.USER_SCAN));
+      regionScanner = region.getScanner(scan);
+      results = Lists.newArrayList();
+      assertFalse(regionScanner.next(results));
+      assertEquals(3, results.size());
+      // only even columns should exist
+      for (int i = 0; i < 3; i++) {
+        KeyValue cell = results.get(i);
+        assertArrayEquals(row, cell.getRow());
+        byte[] idxBytes = Bytes.toBytes(i * 2);
+        assertArrayEquals(idxBytes, cell.getQualifier());
+        assertArrayEquals(idxBytes, cell.getValue());
+      }
+
+      // force a major compaction
+      LOG.info("Forcing major compaction of region " + region.getRegionNameAsString());
+      region.compactStores(true);
+
+      // perform a raw scan (no filter) to confirm that the delete markers are now gone
+      scan = new Scan(row);
+      regionScanner = region.getScanner(scan);
+      results = Lists.newArrayList();
+      assertFalse(regionScanner.next(results));
+      assertEquals(3, results.size());
+      // only even columns should exist
+      for (int i = 0; i < 3; i++) {
+        KeyValue cell = results.get(i);
+        assertArrayEquals(row, cell.getRow());
+        byte[] idxBytes = Bytes.toBytes(i * 2);
+        assertArrayEquals(idxBytes, cell.getQualifier());
+        assertArrayEquals(idxBytes, cell.getValue());
+      }
+    } finally {
+      region.close();
+    }
+  }
+
+  private HRegion createRegion(String tableName, byte[] family, long ttl) throws IOException {
+    HTableDescriptor htd = new HTableDescriptor(tableName);
+    HColumnDescriptor cfd = new HColumnDescriptor(family);
+    if (ttl > 0) {
+      cfd.setValue(TxConstants.PROPERTY_TTL, String.valueOf(ttl));
+    }
+    cfd.setMaxVersions(10);
+    htd.addFamily(cfd);
+    htd.addCoprocessor(TransactionProcessor.class.getName());
+    Path tablePath = new Path("/tmp/" + tableName);
+    Path hlogPath = new Path("/tmp/hlog-" + tableName);
+    Path oldPath = new Path("/tmp/.oldLogs-" + tableName);
+    Configuration hConf = conf;
+    FileSystem fs = FileSystem.get(hConf);
+    assertTrue(fs.mkdirs(tablePath));
+    HLog hlog = new HLog(fs, hlogPath, oldPath, hConf);
+    return new HRegion(tablePath, hlog, fs, hConf, new HRegionInfo(Bytes.toBytes(tableName)), htd,
+        new MockRegionServerServices());
   }
 
   private void assertKeyValueMatches(List<KeyValue> results, int index, long[] versions) {

@@ -22,6 +22,7 @@ import co.cask.tephra.hbase.AbstractTransactionVisibilityFilterTest;
 import com.google.common.collect.Maps;
 import org.apache.hadoop.hbase.KeyValue;
 import org.apache.hadoop.hbase.filter.Filter;
+import org.apache.hadoop.hbase.regionserver.ScanType;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.junit.Test;
 
@@ -125,7 +126,7 @@ public class TransactionVisibilityFilterTest extends AbstractTransactionVisibili
 
   @Override
   protected Filter createFilter(Transaction tx, Map<byte[], Long> familyTTLs) {
-    return new TransactionVisibilityFilter(tx, familyTTLs, false);
+    return new TransactionVisibilityFilter(tx, familyTTLs, false, ScanType.USER_SCAN);
   }
 
   protected KeyValue newKeyValue(String rowkey, String value, long timestamp) {
