@@ -22,6 +22,7 @@ import co.cask.tephra.hbase.AbstractTransactionVisibilityFilterTest;
 import com.google.common.collect.Maps;
 import org.apache.hadoop.hbase.KeyValue;
 import org.apache.hadoop.hbase.filter.Filter;
+import org.apache.hadoop.hbase.regionserver.ScanType;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.junit.Test;
 
@@ -34,11 +35,6 @@ import static org.junit.Assert.assertTrue;
  * HBase 0.94 specific test for filtering logic applied when reading data transactionally.
  */
 public class TransactionVisibilityFilterTest extends AbstractTransactionVisibilityFilterTest {
-  @Override
-  protected Filter createFilter(Transaction tx, Map<byte[], Long> familyTTLs) {
-    return new TransactionVisibilityFilter(tx, familyTTLs, false, true);
-  }
-
   /**
    * Test filtering of KeyValues for in-progress and invalid transactions.
    * @throws Exception
@@ -126,6 +122,11 @@ public class TransactionVisibilityFilterTest extends AbstractTransactionVisibili
                  filter.filterKeyValue(newKeyValue("row2", FAM, "val1", now)));
     assertEquals(Filter.ReturnCode.INCLUDE_AND_NEXT_COL,
                  filter.filterKeyValue(newKeyValue("row2", FAM, "val1", now - 1 * TxConstants.MAX_TX_PER_MS)));
+  }
+
+  @Override
+  protected Filter createFilter(Transaction tx, Map<byte[], Long> familyTTLs) {
+    return new TransactionVisibilityFilter(tx, familyTTLs, false, ScanType.USER_SCAN);
   }
 
   protected KeyValue newKeyValue(String rowkey, String value, long timestamp) {

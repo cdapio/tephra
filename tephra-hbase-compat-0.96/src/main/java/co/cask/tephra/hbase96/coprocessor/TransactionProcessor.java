@@ -144,7 +144,7 @@ public class TransactionProcessor extends BaseRegionObserver {
     if (tx != null) {
       get.setMaxVersions(tx.excludesSize() + 1);
       get.setTimeRange(TxUtils.getOldestVisibleTimestamp(ttlByFamily, tx), TxUtils.getMaxVisibleTimestamp(tx));
-      Filter newFilter = Filters.combine(getTransactionFilter(tx, true), get.getFilter());
+      Filter newFilter = Filters.combine(getTransactionFilter(tx, ScanType.USER_SCAN), get.getFilter());
       get.setFilter(newFilter);
     }
   }
@@ -156,7 +156,7 @@ public class TransactionProcessor extends BaseRegionObserver {
     if (tx != null) {
       scan.setMaxVersions(tx.excludesSize() + 1);
       scan.setTimeRange(TxUtils.getOldestVisibleTimestamp(ttlByFamily, tx), TxUtils.getMaxVisibleTimestamp(tx));
-      Filter newFilter = Filters.combine(getTransactionFilter(tx, true), scan.getFilter());
+      Filter newFilter = Filters.combine(getTransactionFilter(tx, ScanType.USER_SCAN), scan.getFilter());
       scan.setFilter(newFilter);
     }
     return s;
@@ -200,8 +200,7 @@ public class TransactionProcessor extends BaseRegionObserver {
     scan.setFilter(
         new IncludeInProgressFilter(dummyTx.getVisibilityUpperBound(),
             snapshot.getInvalid(),
-            getTransactionFilter(dummyTx,
-                (type == ScanType.USER_SCAN || type == ScanType.COMPACT_DROP_DELETES))));
+            getTransactionFilter(dummyTx, type)));
 
     return new StoreScanner(store, store.getScanInfo(), scan, scanners,
                             type, store.getSmallestReadPoint(), earliestPutTs);
@@ -212,10 +211,10 @@ public class TransactionProcessor extends BaseRegionObserver {
    * transaction.
    *
    * @param tx the current transaction to apply
-   * @param clearDeletes whether delete markers can be dropped
+   * @param scanType the type of scan operation being performed
    */
-  protected Filter getTransactionFilter(Transaction tx, boolean clearDeletes) {
-    return new TransactionVisibilityFilter(tx, ttlByFamily, allowEmptyValues, clearDeletes);
+  protected Filter getTransactionFilter(Transaction tx, ScanType scanType) {
+    return new TransactionVisibilityFilter(tx, ttlByFamily, allowEmptyValues, scanType);
   }
 
   /**

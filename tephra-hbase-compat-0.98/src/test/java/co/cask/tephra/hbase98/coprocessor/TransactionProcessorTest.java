@@ -59,6 +59,7 @@ import org.apache.hadoop.hbase.regionserver.Leases;
 import org.apache.hadoop.hbase.regionserver.RegionScanner;
 import org.apache.hadoop.hbase.regionserver.RegionServerAccounting;
 import org.apache.hadoop.hbase.regionserver.RegionServerServices;
+import org.apache.hadoop.hbase.regionserver.ScanType;
 import org.apache.hadoop.hbase.regionserver.ServerNonceManager;
 import org.apache.hadoop.hbase.regionserver.wal.HLog;
 import org.apache.hadoop.hbase.regionserver.wal.HLogFactory;
@@ -301,7 +302,7 @@ public class TransactionProcessorTest {
       // read all back
       scan = new Scan(row);
       scan.setFilter(new TransactionVisibilityFilter(
-          TxUtils.createDummyTransaction(txSnapshot), new TreeMap<byte[], Long>(), false, true));
+          TxUtils.createDummyTransaction(txSnapshot), new TreeMap<byte[], Long>(), false, ScanType.USER_SCAN));
       regionScanner = region.getScanner(scan);
       results = Lists.newArrayList();
       assertFalse(regionScanner.next(results));
@@ -323,7 +324,7 @@ public class TransactionProcessorTest {
 
       scan = new Scan(row);
       scan.setFilter(new TransactionVisibilityFilter(
-          TxUtils.createDummyTransaction(txSnapshot), new TreeMap<byte[], Long>(), false, true));
+          TxUtils.createDummyTransaction(txSnapshot), new TreeMap<byte[], Long>(), false, ScanType.USER_SCAN));
       regionScanner = region.getScanner(scan);
       results = Lists.newArrayList();
       assertFalse(regionScanner.next(results));

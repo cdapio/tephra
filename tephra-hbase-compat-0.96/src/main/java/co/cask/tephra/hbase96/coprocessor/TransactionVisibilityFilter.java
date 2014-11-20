@@ -23,6 +23,7 @@ import org.apache.hadoop.hbase.Cell;
 import org.apache.hadoop.hbase.CellUtil;
 import org.apache.hadoop.hbase.filter.Filter;
 import org.apache.hadoop.hbase.filter.FilterBase;
+import org.apache.hadoop.hbase.regionserver.ScanType;
 import org.apache.hadoop.hbase.util.Bytes;
 
 import java.io.IOException;
@@ -57,12 +58,11 @@ public class TransactionVisibilityFilter extends FilterBase {
    * @param ttlByFamily map of time-to-live (TTL) (in milliseconds) by column family name
    * @param allowEmptyValues if {@code true} cells with empty {@code byte[]} values will be returned, if {@code false}
    *                         these will be interpreted as "delete" markers and the column will be filtered out
-   * @param clearDeletes whether this filter should drop "delete" markers (only safe when reading all store files,
-   *                     such as during a major compaction)
+   * @param scanType the type of scan operation being performed
    */
   public TransactionVisibilityFilter(Transaction tx, Map<byte[], Long> ttlByFamily, boolean allowEmptyValues,
-                                     boolean clearDeletes) {
-    this(tx, ttlByFamily, allowEmptyValues, clearDeletes, null);
+                                     ScanType scanType) {
+    this(tx, ttlByFamily, allowEmptyValues, scanType, null);
   }
 
   /**
@@ -72,14 +72,13 @@ public class TransactionVisibilityFilter extends FilterBase {
    * @param ttlByFamily map of time-to-live (TTL) (in milliseconds) by column family name
    * @param allowEmptyValues if {@code true} cells with empty {@code byte[]} values will be returned, if {@code false}
    *                         these will be interpreted as "delete" markers and the column will be filtered out
-   * @param clearDeletes whether this filter should drop "delete" markers (only safe when reading all store files,
-   *                     such as during a major compaction)
+   * @param scanType the type of scan operation being performed
    * @param cellFilter if non-null, this filter will be applied to all cells visible to the current transaction, by
    *                   calling {@link Filter#filterKeyValue(org.apache.hadoop.hbase.Cell)}.  If null, then
    *                   {@link Filter.ReturnCode#INCLUDE_AND_NEXT_COL} will be returned instead.
    */
   public TransactionVisibilityFilter(Transaction tx, Map<byte[], Long> ttlByFamily, boolean allowEmptyValues,
-                                     boolean clearDeletes, @Nullable Filter cellFilter) {
+                                     ScanType scanType, @Nullable Filter cellFilter) {
     this.tx = tx;
     this.oldestTsByFamily = Maps.newTreeMap(Bytes.BYTES_COMPARATOR);
     for (Map.Entry<byte[], Long> ttlEntry : ttlByFamily.entrySet()) {
@@ -88,7 +87,8 @@ public class TransactionVisibilityFilter extends FilterBase {
                            familyTTL <= 0 ? 0 : tx.getVisibilityUpperBound() - familyTTL * TxConstants.MAX_TX_PER_MS);
     }
     this.allowEmptyValues = allowEmptyValues;
-    this.clearDeletes = clearDeletes;
+    this.clearDeletes =
+        scanType == ScanType.COMPACT_DROP_DELETES || scanType == ScanType.USER_SCAN;
     this.cellFilter = cellFilter;
   }
 
