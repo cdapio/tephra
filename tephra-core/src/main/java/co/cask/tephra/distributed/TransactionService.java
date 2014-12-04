@@ -73,7 +73,7 @@ public final class TransactionService extends InMemoryTransactionService {
           @Override
           public void failed(State from, Throwable failure) {
             LOG.error("Transaction manager aborted, stopping transaction service");
-            stopAndWait();
+            TransactionService.this.abort(failure);
           }
         }, MoreExecutors.sameThreadExecutor());
 
@@ -109,6 +109,17 @@ public final class TransactionService extends InMemoryTransactionService {
 
   @Override
   protected void doStop() {
+    internalStop();
+    notifyStopped();
+  }
+
+  protected void abort(Throwable cause) {
+    // try to clear leader status and shutdown RPC
+    internalStop();
+    notifyFailed(cause);
+  }
+
+  protected void internalStop() {
     if (leaderElection != null) {
       // NOTE: if was a leader this will cause loosing of leadership which in callback above will
       //       de-register service in discovery service and stop the service if needed
@@ -120,7 +131,5 @@ public final class TransactionService extends InMemoryTransactionService {
         LOG.error("Exception when cancelling leader election.", e);
       }
     }
-
-    notifyStopped();
   }
 }
