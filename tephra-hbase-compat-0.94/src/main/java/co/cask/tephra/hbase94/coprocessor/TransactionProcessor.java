@@ -147,7 +147,7 @@ public class TransactionProcessor extends BaseRegionObserver {
       if (LOG.isTraceEnabled()) {
         LOG.trace("Applying filter to GET for transaction " + tx.getWritePointer());
       }
-      get.setMaxVersions(tx.excludesSize() + 1);
+      get.setMaxVersions();
       get.setTimeRange(TxUtils.getOldestVisibleTimestamp(ttlByFamily, tx), TxUtils.getMaxVisibleTimestamp(tx));
       Filter newFilter = Filters.combine(getTransactionFilter(tx, ScanType.USER_SCAN), get.getFilter());
       get.setFilter(newFilter);
@@ -162,7 +162,7 @@ public class TransactionProcessor extends BaseRegionObserver {
       if (LOG.isTraceEnabled()) {
         LOG.trace("Applying filter to SCAN for transaction " + tx.getWritePointer());
       }
-      scan.setMaxVersions(tx.excludesSize() + 1);
+      scan.setMaxVersions();
       scan.setTimeRange(TxUtils.getOldestVisibleTimestamp(ttlByFamily, tx), TxUtils.getMaxVisibleTimestamp(tx));
       Filter newFilter = Filters.combine(getTransactionFilter(tx, ScanType.USER_SCAN), scan.getFilter());
       scan.setFilter(newFilter);
@@ -203,8 +203,8 @@ public class TransactionProcessor extends BaseRegionObserver {
     // construct a dummy transaction from the latest snapshot
     Transaction dummyTx = TxUtils.createDummyTransaction(snapshot);
     Scan scan = new Scan();
-    // does not current support max versions setting per family
-    scan.setMaxVersions(dummyTx.excludesSize() + 1);
+    // need to see all versions, since we filter out excludes and applications may rely on multiple versions
+    scan.setMaxVersions();
     scan.setFilter(new IncludeInProgressFilter(dummyTx.getVisibilityUpperBound(),
                                                snapshot.getInvalid(),
                                                getTransactionFilter(dummyTx, type)));
