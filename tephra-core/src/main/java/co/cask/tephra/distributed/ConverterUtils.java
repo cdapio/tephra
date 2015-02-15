@@ -17,10 +17,10 @@
 package co.cask.tephra.distributed;
 
 import co.cask.tephra.Transaction;
+import co.cask.tephra.TransactionType;
 import co.cask.tephra.distributed.thrift.TTransaction;
-import com.google.common.collect.Lists;
-
-import java.util.List;
+import co.cask.tephra.distributed.thrift.TTransactionType;
+import com.google.common.primitives.Longs;
 
 /**
  * Utility methods to convert to thrift and back.
@@ -28,30 +28,22 @@ import java.util.List;
 final class ConverterUtils {
 
   public static TTransaction wrap(Transaction tx) {
-    List<Long> invalids = Lists.newArrayListWithCapacity(tx.getInvalids().length);
-    for (long txid : tx.getInvalids()) {
-      invalids.add(txid);
-    }
-    List<Long> inProgress = Lists.newArrayListWithCapacity(tx.getInProgress().length);
-    for (long txid : tx.getInProgress()) {
-      inProgress.add(txid);
-    }
     return new TTransaction(tx.getWritePointer(), tx.getReadPointer(),
-                             invalids, inProgress, tx.getFirstShortInProgress());
+                            Longs.asList(tx.getInvalids()), Longs.asList(tx.getInProgress()),
+                            tx.getFirstShortInProgress(), getTTransactionType(tx.getType()));
   }
 
-  public static Transaction unwrap(TTransaction tx) {
-    long[] invalids = new long[tx.invalids.size()];
-    int i = 0;
-    for (Long txid : tx.invalids) {
-      invalids[i++] = txid;
-    }
-    long[] inProgress = new long[tx.inProgress.size()];
-    i = 0;
-    for (Long txid : tx.inProgress) {
-      inProgress[i++] = txid;
-    }
-    return new Transaction(tx.readPointer, tx.writePointer,
-                                                             invalids, inProgress, tx.getFirstShort());
+  public static Transaction unwrap(TTransaction thriftTx) {
+    return new Transaction(thriftTx.getReadPointer(), thriftTx.getWritePointer(),
+                           Longs.toArray(thriftTx.getInvalids()), Longs.toArray(thriftTx.getInProgress()),
+                           thriftTx.getFirstShort(), getTransactionType(thriftTx.getType()));
+  }
+
+  private static TransactionType getTransactionType(TTransactionType tType) {
+    return tType == TTransactionType.SHORT ? TransactionType.SHORT : TransactionType.LONG;
+  }
+
+  private static TTransactionType getTTransactionType(TransactionType type) {
+    return type == TransactionType.SHORT ? TTransactionType.SHORT : TTransactionType.LONG;
   }
 }

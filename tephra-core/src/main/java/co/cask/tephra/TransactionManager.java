@@ -53,6 +53,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 
 /**
  * This is the central place to manage all active transactions in the system.
@@ -136,6 +137,7 @@ public class TransactionManager extends AbstractService {
 
   private final int cleanupInterval;
   private final int defaultTimeout;
+  private final int defaultLongTimeout;
   private DaemonThreadExecutor cleanupThread = null;
 
   private volatile TransactionLog currentLog;
@@ -167,6 +169,8 @@ public class TransactionManager extends AbstractService {
                                   TxConstants.Manager.DEFAULT_TX_CLEANUP_INTERVAL);
     defaultTimeout = conf.getInt(TxConstants.Manager.CFG_TX_TIMEOUT,
                                  TxConstants.Manager.DEFAULT_TX_TIMEOUT);
+    defaultLongTimeout = conf.getInt(TxConstants.Manager.CFG_TX_LONG_TIMEOUT,
+                                 TxConstants.Manager.DEFAULT_TX_LONG_TIMEOUT);
     snapshotFrequencyInSeconds = conf.getLong(TxConstants.Manager.CFG_TX_SNAPSHOT_INTERVAL,
                                               TxConstants.Manager.DEFAULT_TX_SNAPSHOT_INTERVAL);
     // must always keep at least 1 snapshot
@@ -326,6 +330,11 @@ public class TransactionManager extends AbstractService {
             // timed out, remember tx id (can't remove while iterating over entries)
             timedOut.add(tx.getKey());
             LOG.info("Tx invalid list: added tx {} because of timeout", tx.getKey());
+          } else if (expiration < 0) {
+            LOG.warn("Transaction {} has negative expiration time {}. Likely cause is the transaction was not " +
+                       "migrated correctly, this transaction will be expired immediately",
+                     tx.getKey(), expiration);
+            timedOut.add(tx.getKey());
           }
         }
         if (!timedOut.isEmpty()) {
@@ -471,9 +480,32 @@ public class TransactionManager extends AbstractService {
     readPointer = snapshot.getReadPointer();
     lastWritePointer = snapshot.getWritePointer();
     invalid.addAll(snapshot.getInvalid());
-    inProgress.putAll(snapshot.getInProgress());
+    inProgress.putAll(txnBackwardsCompatCheck(snapshot.getInProgress()));
     committingChangeSets.putAll(snapshot.getCommittingChangeSets());
     committedChangeSets.putAll(snapshot.getCommittedChangeSets());
+  }
+
+  /**
+   * Check if in-progress transactions need to be migrated to have expiration time and type, if so do the migration.
+   * This is required for backwards compatibility, when long running transactions were represented
+   * with expiration time -1. This can be removed when we stop supporting SnapshotCodec version 1.
+   */
+  private Map<Long, InProgressTx> txnBackwardsCompatCheck(Map<Long, InProgressTx> inProgress) {
+    for (Map.Entry<Long, InProgressTx> entry : inProgress.entrySet()) {
+      if (entry.getValue().getExpiration() < 0) {
+        long writePointer = entry.getKey();
+        long expiration = getTxExpirationFromWritePointer(writePointer, defaultLongTimeout);
+        InProgressTx compatTx =
+          new InProgressTx(entry.getValue().getVisibilityUpperBound(), expiration, TransactionType.LONG);
+        entry.setValue(compatTx);
+      } else if (entry.getValue().getType() == null) {
+        InProgressTx compatTx =
+          new InProgressTx(entry.getValue().getVisibilityUpperBound(), entry.getValue().getExpiration(),
+                           TransactionType.SHORT);
+        entry.setValue(compatTx);
+      }
+    }
+    return inProgress;
   }
 
   /**
@@ -517,8 +549,19 @@ public class TransactionManager extends AbstractService {
           editCnt++;
           switch (edit.getState()) {
             case INPROGRESS:
+              long expiration = edit.getExpiration();
+              TransactionType type = edit.getType();
+              // Check if transaction needs to be migrated to have expiration and type. Previous version of 
+              // long running transactions were represented with expiration time as -1.
+              // This can be removed when we stop supporting TransactionEditCodecV2.
+              if (expiration < 0) {
+                expiration = getTxExpirationFromWritePointer(edit.getWritePointer(), defaultLongTimeout);
+                type = TransactionType.LONG;
+              } else if (type == null) {
+                type = TransactionType.SHORT;
+              }
               addInProgressAndAdvance(edit.getWritePointer(), edit.getVisibilityUpperBound(),
-                                      edit.getExpiration());
+                                      expiration, type);
               break;
             case COMMITTING:
               addCommittingChangeSet(edit.getWritePointer(), edit.getChanges());
@@ -531,7 +574,24 @@ public class TransactionManager extends AbstractService {
               doInvalidate(edit.getWritePointer());
               break;
             case ABORTED:
-              doAbort(edit.getWritePointer());
+              type = edit.getType();
+              // Check if transaction edit needs to be migrated to have type. Previous versions of
+              // ABORTED edits did not contain type.
+              // This can be removed when we stop supporting TransactionEditCodecV2.
+              if (type == null) {
+                InProgressTx inProgressTx = inProgress.get(edit.getWritePointer());
+                if (inProgressTx != null) {
+                  type = inProgressTx.getType();
+                } else {
+                  // If transaction is not in-progress, then it has either been already aborted or invalidated.
+                  // We cannot determine the transaction's state based on current information, to be safe invalidate it.
+                  LOG.warn("Invalidating transaction {} as it's type cannot be determined during replay",
+                           edit.getWritePointer());
+                  doInvalidate(edit.getWritePointer());
+                  break;
+                }
+              }
+              doAbort(edit.getWritePointer(), type);
               break;
             default:
               // unknown type!
@@ -616,11 +676,19 @@ public class TransactionManager extends AbstractService {
     Preconditions.checkArgument(timeoutInSeconds > 0, "timeout must be positive but is %s", timeoutInSeconds);
     txMetricsCollector.gauge("start.short", 1);
     Stopwatch timer = new Stopwatch().start();
-    long currentTime = System.currentTimeMillis();
-    long expiration = currentTime + 1000L * timeoutInSeconds;
-    Transaction tx = startTx(expiration);
+    long expiration = getTxExpiration(timeoutInSeconds);
+    Transaction tx = startTx(expiration, TransactionType.SHORT);
     txMetricsCollector.gauge("start.short.latency", (int) timer.elapsedMillis());
     return tx;
+  }
+  
+  private static long getTxExpiration(long timeoutInSeconds) {
+    long currentTime = System.currentTimeMillis();
+    return currentTime + TimeUnit.SECONDS.toMillis(timeoutInSeconds);
+  }
+
+  private static long getTxExpirationFromWritePointer(long writePointer, long timeoutInSeconds) {
+    return writePointer / TxConstants.MAX_TX_PER_MS + TimeUnit.SECONDS.toMillis(timeoutInSeconds);
   }
 
   private long getNextWritePointer() {
@@ -636,12 +704,13 @@ public class TransactionManager extends AbstractService {
   public Transaction startLong() {
     txMetricsCollector.gauge("start.long", 1);
     Stopwatch timer = new Stopwatch().start();
-    Transaction tx = startTx(-1);
+    long expiration = getTxExpiration(defaultLongTimeout);
+    Transaction tx = startTx(expiration, TransactionType.LONG);
     txMetricsCollector.gauge("start.long.latency", (int) timer.elapsedMillis());
     return tx;
   }
 
-  private Transaction startTx(long expiration) {
+  private Transaction startTx(long expiration, TransactionType type) {
     Transaction tx = null;
     long txid;
     // guard against changes to the transaction log while processing
@@ -650,12 +719,12 @@ public class TransactionManager extends AbstractService {
       synchronized (this) {
         ensureAvailable();
         txid = getNextWritePointer();
-        tx = createTransaction(txid);
-        addInProgressAndAdvance(tx.getWritePointer(), tx.getVisibilityUpperBound(), expiration);
+        tx = createTransaction(txid, type);
+        addInProgressAndAdvance(tx.getWritePointer(), tx.getVisibilityUpperBound(), expiration, type);
       }
       // appending to WAL out of global lock for concurrent performance
       // we should still be able to arrive at the same state even if log entries are out of order
-      appendToLog(TransactionEdit.createStarted(tx.getWritePointer(), tx.getVisibilityUpperBound(), expiration));
+      appendToLog(TransactionEdit.createStarted(tx.getWritePointer(), tx.getVisibilityUpperBound(), expiration, type));
     } finally {
       this.logReadLock.unlock();
     }
@@ -663,8 +732,8 @@ public class TransactionManager extends AbstractService {
   }
 
   private void addInProgressAndAdvance(long writePointer, long visibilityUpperBound,
-                                       long expiration) {
-    inProgress.put(writePointer, new InProgressTx(visibilityUpperBound, expiration));
+                                       long expiration, TransactionType type) {
+    inProgress.put(writePointer, new InProgressTx(visibilityUpperBound, expiration, type));
     // don't move the write pointer back if we have out of order transaction log entries
     if (writePointer > lastWritePointer) {
       lastWritePointer = writePointer;
@@ -807,29 +876,29 @@ public class TransactionManager extends AbstractService {
     try {
       synchronized (this) {
         ensureAvailable();
-        doAbort(tx.getWritePointer());
+        doAbort(tx.getWritePointer(), tx.getType());
       }
-      appendToLog(TransactionEdit.createAborted(tx.getWritePointer()));
+      appendToLog(TransactionEdit.createAborted(tx.getWritePointer(), tx.getType()));
       txMetricsCollector.gauge("abort.latency", (int) timer.elapsedMillis());
     } finally {
       this.logReadLock.unlock();
     }
   }
 
-  private void doAbort(long writePointer) {
+  private void doAbort(long writePointer, TransactionType type) {
     committingChangeSets.remove(writePointer);
+    
+    if (type == TransactionType.LONG) {
+      // Long running transactions cannot be aborted as their change sets are not saved, 
+      // and hence the changes cannot be rolled back. Invalidate the long running transaction instead.
+      doInvalidate(writePointer);
+      return;
+    }
+    
     // makes tx visible (assumes that all operations were rolled back)
     // remove from in-progress set, so that it does not get excluded in the future
     InProgressTx removed = inProgress.remove(writePointer);
-    // TODO: this is bad/misleading/not clear logic. We should have special flags/tx attributes instead of it. Refactor!
-    if (removed != null && removed.isLongRunning()) {
-      // tx was long-running: it must be moved to invalid because its operations cannot be rolled back
-      invalid.add(writePointer);
-      // todo: find a more efficient way to keep this sorted. Could it just be an array?
-      Collections.sort(invalid);
-      invalidArray = invalid.toLongArray();
-      LOG.info("Tx invalid list: added long-running tx {} because of abort", writePointer);
-    } else if (removed == null) {
+    if (removed == null) {
       // tx was not in progress! perhaps it timed out and is invalid? try to remove it there.
       if (invalid.rem(writePointer)) {
         invalidArray = invalid.toLongArray();
@@ -877,7 +946,7 @@ public class TransactionManager extends AbstractService {
       // todo: find a more efficient way to keep this sorted. Could it just be an array?
       Collections.sort(invalid);
       invalidArray = invalid.toLongArray();
-      if (!previous.isLongRunning()) {
+      if (previous != null && !previous.isLongRunning()) {
         // tx was short-running: must move read pointer
         moveReadPointerIfNeeded(writePointer);
       }
@@ -943,7 +1012,7 @@ public class TransactionManager extends AbstractService {
    * Creates a new Transaction. This method only get called from start transaction, which is already
    * synchronized.
    */
-  private Transaction createTransaction(long writePointer) {
+  private Transaction createTransaction(long writePointer, TransactionType type) {
     // For holding the first in progress short transaction Id (with timeout >= 0).
     long firstShortTx = Transaction.NO_TX_IN_PROGRESS;
     long[] array = new long[inProgress.size()];
@@ -956,7 +1025,7 @@ public class TransactionManager extends AbstractService {
       }
     }
 
-    return new Transaction(readPointer, writePointer, invalidArray, array, firstShortTx);
+    return new Transaction(readPointer, writePointer, invalidArray, array, firstShortTx, type);
   }
 
   private void appendToLog(TransactionEdit edit) {
@@ -1037,12 +1106,19 @@ public class TransactionManager extends AbstractService {
   public static final class InProgressTx {
     /** the oldest in progress tx at the time of this tx start */
     private final long visibilityUpperBound;
-    /** negative means no expiration */
     private final long expiration;
+    private final TransactionType type;
 
-    public InProgressTx(long visibilityUpperBound, long expiration) {
+    public InProgressTx(long visibilityUpperBound, long expiration, TransactionType type) {
       this.visibilityUpperBound = visibilityUpperBound;
       this.expiration = expiration;
+      this.type = type;
+    }
+
+    // For backwards compatibility when long running txns were represented with -1 expiration
+    @Deprecated
+    public InProgressTx(long visibilityUpperBound, long expiration) {
+      this(visibilityUpperBound, expiration, null);
     }
 
     public long getVisibilityUpperBound() {
@@ -1053,8 +1129,17 @@ public class TransactionManager extends AbstractService {
       return expiration;
     }
 
+    @Nullable
+    public TransactionType getType() {
+      return type;
+    }
+
     public boolean isLongRunning() {
-      return expiration < 0;
+      if (type == null) {
+        // for backwards compatibility when long running txns were represented with -1 expiration
+        return expiration == -1;
+      }
+      return type == TransactionType.LONG;
     }
 
     @Override
@@ -1069,12 +1154,12 @@ public class TransactionManager extends AbstractService {
 
       InProgressTx other = (InProgressTx) o;
       return Objects.equal(visibilityUpperBound, other.getVisibilityUpperBound()) &&
-        Objects.equal(expiration, other.getExpiration());
+        Objects.equal(expiration, other.getExpiration()) && Objects.equal(type, other.type);
     }
 
     @Override
     public int hashCode() {
-      return Objects.hashCode(visibilityUpperBound, expiration);
+      return Objects.hashCode(visibilityUpperBound, expiration, type);
     }
   }
 }

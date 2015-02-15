@@ -17,6 +17,9 @@
 package co.cask.tephra;
 
 import co.cask.tephra.snapshot.DefaultSnapshotCodec;
+import co.cask.tephra.snapshot.SnapshotCodecV2;
+
+import java.util.concurrent.TimeUnit;
 
 /**
  * Transaction system constants
@@ -83,6 +86,13 @@ public class TxConstants {
     public static final String CFG_TX_TIMEOUT = "data.tx.timeout";
     /** Default value for transaction timeout, in seconds. */
     public static final int DEFAULT_TX_TIMEOUT = 30;
+    /**
+     * The timeout for a long running transaction, in seconds. If the transaction is not finished in that time,
+     * it is marked invalid.
+     */
+    public static final String CFG_TX_LONG_TIMEOUT = "data.tx.long.timeout";
+    /** Default value for long running transaction timeout, in seconds. */
+    public static final int DEFAULT_TX_LONG_TIMEOUT = (int) TimeUnit.DAYS.toSeconds(1);
     /** The frequency (in seconds) to perform periodic snapshots, or 0 for no periodic snapshots. */
     public static final String CFG_TX_SNAPSHOT_INTERVAL = "data.tx.snapshot.interval";
     /** Default value for frequency of periodic snapshots of transaction state. */
@@ -235,7 +245,8 @@ public class TxConstants {
      * The class names of all known transaction snapshot codecs.
      */
     public static final String CFG_TX_SNAPHOT_CODEC_CLASSES = "data.tx.snapshot.codecs";
-    public static final Class[] DEFAULT_TX_SNAPHOT_CODEC_CLASSES = { DefaultSnapshotCodec.class };
+    public static final Class[] DEFAULT_TX_SNAPHOT_CODEC_CLASSES = 
+      { DefaultSnapshotCodec.class, SnapshotCodecV2.class };
   }
 
 }

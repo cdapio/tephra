@@ -25,6 +25,8 @@ import org.junit.ClassRule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 
+import java.util.concurrent.CountDownLatch;
+
 /**
  * Test for verifying TransactionServiceMain works correctly.
  */
@@ -45,11 +47,13 @@ public class TransactionServiceMainTest {
       conf.set(TxConstants.Manager.CFG_TX_SNAPSHOT_DIR, tmpFolder.newFolder().getAbsolutePath());
 
       final TransactionServiceMain main = new TransactionServiceMain(conf);
+      final CountDownLatch latch = new CountDownLatch(1);
       Thread t = new Thread() {
         @Override
         public void run() {
           try {
             main.start();
+            latch.countDown();
           } catch (Exception e) {
             throw Throwables.propagate(e);
           }
@@ -58,6 +62,8 @@ public class TransactionServiceMainTest {
 
       try {
         t.start();
+        // Wait for service to startup
+        latch.await();
         TransactionServiceClient.doMain(true, conf);
       } finally {
         main.stop();

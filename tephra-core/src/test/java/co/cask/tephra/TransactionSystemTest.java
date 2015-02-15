@@ -18,7 +18,6 @@ package co.cask.tephra;
 
 import co.cask.tephra.persist.TransactionSnapshot;
 import co.cask.tephra.persist.TransactionStateStorage;
-
 import org.apache.hadoop.hbase.util.Bytes;
 import org.junit.Assert;
 import org.junit.Test;
@@ -147,7 +146,8 @@ public abstract class TransactionSystemTest {
 
     // we know this is one is older than current writePointer and was not used
     Transaction txOld = new Transaction(tx1.getReadPointer(), tx1.getWritePointer() - 1,
-                                        new long[] {}, new long[] {}, Transaction.NO_TX_IN_PROGRESS);
+                                        new long[] {}, new long[] {}, Transaction.NO_TX_IN_PROGRESS, 
+                                        TransactionType.SHORT);
     try {
       Assert.assertFalse(client.canCommit(txOld, asList(C3, C4)));
       Assert.fail();
@@ -165,7 +165,8 @@ public abstract class TransactionSystemTest {
 
     // we know this is one is newer than current readPointer and was not used
     Transaction txNew = new Transaction(tx1.getReadPointer(), tx1.getWritePointer() + 1,
-                                        new long[] {}, new long[] {}, Transaction.NO_TX_IN_PROGRESS);
+                                        new long[] {}, new long[] {}, Transaction.NO_TX_IN_PROGRESS, 
+                                        TransactionType.SHORT);
     try {
       Assert.assertFalse(client.canCommit(txNew, asList(C3, C4)));
       Assert.fail();

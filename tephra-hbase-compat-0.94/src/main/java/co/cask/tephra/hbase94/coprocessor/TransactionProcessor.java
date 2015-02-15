@@ -17,10 +17,10 @@
 package co.cask.tephra.hbase94.coprocessor;
 
 import co.cask.tephra.Transaction;
-import co.cask.tephra.TransactionCodec;
 import co.cask.tephra.TxConstants;
 import co.cask.tephra.coprocessor.TransactionStateCache;
 import co.cask.tephra.coprocessor.TransactionStateCacheSupplier;
+import co.cask.tephra.distributed.TransactionCodec;
 import co.cask.tephra.hbase94.Filters;
 import co.cask.tephra.persist.TransactionSnapshot;
 import co.cask.tephra.util.TxUtils;

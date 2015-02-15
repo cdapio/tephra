@@ -29,20 +29,22 @@ public class Transaction {
   private final long[] invalids;
   private final long[] inProgress;
   private final long firstShortInProgress;
+  private final TransactionType type;
 
   private static final long[] NO_EXCLUDES = { };
   public static final long NO_TX_IN_PROGRESS = Long.MAX_VALUE;
 
   public static final Transaction ALL_VISIBLE_LATEST =
-    new Transaction(Long.MAX_VALUE, Long.MAX_VALUE, NO_EXCLUDES, NO_EXCLUDES, NO_TX_IN_PROGRESS);
+    new Transaction(Long.MAX_VALUE, Long.MAX_VALUE, NO_EXCLUDES, NO_EXCLUDES, NO_TX_IN_PROGRESS, TransactionType.SHORT);
 
   public Transaction(long readPointer, long writePointer, long[] invalids, long[] inProgress,
-                     long firstShortInProgress) {
+                     long firstShortInProgress, TransactionType type) {
     this.readPointer = readPointer;
     this.writePointer = writePointer;
     this.invalids = invalids;
     this.inProgress = inProgress;
     this.firstShortInProgress = firstShortInProgress;
+    this.type = type;
   }
 
   public long getReadPointer() {
@@ -63,6 +65,10 @@ public class Transaction {
 
   public long getFirstInProgress() {
     return inProgress.length == 0 ? NO_TX_IN_PROGRESS : inProgress[0];
+  }
+
+  public TransactionType getType() {
+    return type;
   }
 
   /**
@@ -112,6 +118,8 @@ public class Transaction {
       .append(", writePointer: ").append(writePointer)
       .append(", invalids: ").append(Arrays.toString(invalids))
       .append(", inProgress: ").append(Arrays.toString(inProgress))
+      .append(", firstShortInProgress: ").append(firstShortInProgress)
+      .append(", type: ").append(type)
       .append('}')
       .toString();
   }

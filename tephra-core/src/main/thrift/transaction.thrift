@@ -14,12 +14,18 @@
 
 namespace java co.cask.tephra.distributed.thrift
 
+enum TTransactionType {
+  SHORT = 1,
+  LONG = 2
+}
+
 struct TTransaction {
   1: i64 writePointer,
   2: i64 readPointer,
   3: list<i64> invalids,
   4: list<i64> inProgress,
   5: i64 firstShort,
+  6: TTransactionType type,
 }
 
 exception TTransactionNotInProgressException {

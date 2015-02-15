@@ -1,5 +1,5 @@
 /*
- * Copyright © 2012-2014 Cask Data, Inc.
+ * Copyright © 2015 Cask Data, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not
  * use this file except in compliance with the License. You may obtain a copy of
@@ -46,6 +46,7 @@ public class TTransaction implements org.apache.thrift.TBase<TTransaction, TTran
   private static final org.apache.thrift.protocol.TField INVALIDS_FIELD_DESC = new org.apache.thrift.protocol.TField("invalids", org.apache.thrift.protocol.TType.LIST, (short)3);
   private static final org.apache.thrift.protocol.TField IN_PROGRESS_FIELD_DESC = new org.apache.thrift.protocol.TField("inProgress", org.apache.thrift.protocol.TType.LIST, (short)4);
   private static final org.apache.thrift.protocol.TField FIRST_SHORT_FIELD_DESC = new org.apache.thrift.protocol.TField("firstShort", org.apache.thrift.protocol.TType.I64, (short)5);
+  private static final org.apache.thrift.protocol.TField TYPE_FIELD_DESC = new org.apache.thrift.protocol.TField("type", org.apache.thrift.protocol.TType.I32, (short)6);
 
   private static final Map<Class<? extends IScheme>, SchemeFactory> schemes = new HashMap<Class<? extends IScheme>, SchemeFactory>();
   static {
@@ -58,6 +59,11 @@ public class TTransaction implements org.apache.thrift.TBase<TTransaction, TTran
   public List<Long> invalids; // required
   public List<Long> inProgress; // required
   public long firstShort; // required
+  /**
+   * 
+   * @see TTransactionType
+   */
+  public TTransactionType type; // required
 
   /** The set of fields this struct contains, along with convenience methods for finding and manipulating them. */
   public enum _Fields implements org.apache.thrift.TFieldIdEnum {
@@ -65,7 +71,12 @@ public class TTransaction implements org.apache.thrift.TBase<TTransaction, TTran
     READ_POINTER((short)2, "readPointer"),
     INVALIDS((short)3, "invalids"),
     IN_PROGRESS((short)4, "inProgress"),
-    FIRST_SHORT((short)5, "firstShort");
+    FIRST_SHORT((short)5, "firstShort"),
+    /**
+     * 
+     * @see TTransactionType
+     */
+    TYPE((short)6, "type");
 
     private static final Map<String, _Fields> byName = new HashMap<String, _Fields>();
 
@@ -90,6 +101,8 @@ public class TTransaction implements org.apache.thrift.TBase<TTransaction, TTran
           return IN_PROGRESS;
         case 5: // FIRST_SHORT
           return FIRST_SHORT;
+        case 6: // TYPE
+          return TYPE;
         default:
           return null;
       }
@@ -149,6 +162,8 @@ public class TTransaction implements org.apache.thrift.TBase<TTransaction, TTran
             new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.I64))));
     tmpMap.put(_Fields.FIRST_SHORT, new org.apache.thrift.meta_data.FieldMetaData("firstShort", org.apache.thrift.TFieldRequirementType.DEFAULT, 
         new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.I64)));
+    tmpMap.put(_Fields.TYPE, new org.apache.thrift.meta_data.FieldMetaData("type", org.apache.thrift.TFieldRequirementType.DEFAULT, 
+        new org.apache.thrift.meta_data.EnumMetaData(org.apache.thrift.protocol.TType.ENUM, TTransactionType.class)));
     metaDataMap = Collections.unmodifiableMap(tmpMap);
     org.apache.thrift.meta_data.FieldMetaData.addStructMetaDataMap(TTransaction.class, metaDataMap);
   }
@@ -161,7 +176,8 @@ public class TTransaction implements org.apache.thrift.TBase<TTransaction, TTran
     long readPointer,
     List<Long> invalids,
     List<Long> inProgress,
-    long firstShort)
+    long firstShort,
+    TTransactionType type)
   {
     this();
     this.writePointer = writePointer;
@@ -172,6 +188,7 @@ public class TTransaction implements org.apache.thrift.TBase<TTransaction, TTran
     this.inProgress = inProgress;
     this.firstShort = firstShort;
     setFirstShortIsSet(true);
+    this.type = type;
   }
 
   /**
@@ -196,6 +213,9 @@ public class TTransaction implements org.apache.thrift.TBase<TTransaction, TTran
       this.inProgress = __this__inProgress;
     }
     this.firstShort = other.firstShort;
+    if (other.isSetType()) {
+      this.type = other.type;
+    }
   }
 
   public TTransaction deepCopy() {
@@ -212,6 +232,7 @@ public class TTransaction implements org.apache.thrift.TBase<TTransaction, TTran
     this.inProgress = null;
     setFirstShortIsSet(false);
     this.firstShort = 0;
+    this.type = null;
   }
 
   public long getWritePointer() {
@@ -361,6 +382,38 @@ public class TTransaction implements org.apache.thrift.TBase<TTransaction, TTran
     __isset_bitfield = EncodingUtils.setBit(__isset_bitfield, __FIRSTSHORT_ISSET_ID, value);
   }
 
+  /**
+   * 
+   * @see TTransactionType
+   */
+  public TTransactionType getType() {
+    return this.type;
+  }
+
+  /**
+   * 
+   * @see TTransactionType
+   */
+  public TTransaction setType(TTransactionType type) {
+    this.type = type;
+    return this;
+  }
+
+  public void unsetType() {
+    this.type = null;
+  }
+
+  /** Returns true if field type is set (has been assigned a value) and false otherwise */
+  public boolean isSetType() {
+    return this.type != null;
+  }
+
+  public void setTypeIsSet(boolean value) {
+    if (!value) {
+      this.type = null;
+    }
+  }
+
   public void setFieldValue(_Fields field, Object value) {
     switch (field) {
     case WRITE_POINTER:
@@ -375,7 +428,7 @@ public class TTransaction implements org.apache.thrift.TBase<TTransaction, TTran
       if (value == null) {
         unsetReadPointer();
       } else {
-        setReadPointer((Long)value);
+        setReadPointer((Long) value);
       }
       break;
 
@@ -383,7 +436,7 @@ public class TTransaction implements org.apache.thrift.TBase<TTransaction, TTran
       if (value == null) {
         unsetInvalids();
       } else {
-        setInvalids((List<Long>)value);
+        setInvalids((List<Long>) value);
       }
       break;
 
@@ -391,7 +444,7 @@ public class TTransaction implements org.apache.thrift.TBase<TTransaction, TTran
       if (value == null) {
         unsetInProgress();
       } else {
-        setInProgress((List<Long>)value);
+        setInProgress((List<Long>) value);
       }
       break;
 
@@ -399,7 +452,15 @@ public class TTransaction implements org.apache.thrift.TBase<TTransaction, TTran
       if (value == null) {
         unsetFirstShort();
       } else {
-        setFirstShort((Long)value);
+        setFirstShort((Long) value);
+      }
+      break;
+
+    case TYPE:
+      if (value == null) {
+        unsetType();
+      } else {
+        setType((TTransactionType) value);
       }
       break;
 
@@ -423,6 +484,9 @@ public class TTransaction implements org.apache.thrift.TBase<TTransaction, TTran
     case FIRST_SHORT:
       return Long.valueOf(getFirstShort());
 
+    case TYPE:
+      return getType();
+
     }
     throw new IllegalStateException();
   }
@@ -444,6 +508,8 @@ public class TTransaction implements org.apache.thrift.TBase<TTransaction, TTran
       return isSetInProgress();
     case FIRST_SHORT:
       return isSetFirstShort();
+    case TYPE:
+      return isSetType();
     }
     throw new IllegalStateException();
   }
@@ -503,6 +569,15 @@ public class TTransaction implements org.apache.thrift.TBase<TTransaction, TTran
       if (!(this_present_firstShort && that_present_firstShort))
         return false;
       if (this.firstShort != that.firstShort)
+        return false;
+    }
+
+    boolean this_present_type = true && this.isSetType();
+    boolean that_present_type = true && that.isSetType();
+    if (this_present_type || that_present_type) {
+      if (!(this_present_type && that_present_type))
+        return false;
+      if (!this.type.equals(that.type))
         return false;
     }
 
@@ -572,6 +647,16 @@ public class TTransaction implements org.apache.thrift.TBase<TTransaction, TTran
         return lastComparison;
       }
     }
+    lastComparison = Boolean.valueOf(isSetType()).compareTo(typedOther.isSetType());
+    if (lastComparison != 0) {
+      return lastComparison;
+    }
+    if (isSetType()) {
+      lastComparison = org.apache.thrift.TBaseHelper.compareTo(this.type, typedOther.type);
+      if (lastComparison != 0) {
+        return lastComparison;
+      }
+    }
     return 0;
   }
 
@@ -618,6 +703,14 @@ public class TTransaction implements org.apache.thrift.TBase<TTransaction, TTran
     if (!first) sb.append(", ");
     sb.append("firstShort:");
     sb.append(this.firstShort);
+    first = false;
+    if (!first) sb.append(", ");
+    sb.append("type:");
+    if (this.type == null) {
+      sb.append("null");
+    } else {
+      sb.append(this.type);
+    }
     first = false;
     sb.append(")");
     return sb.toString();
@@ -724,6 +817,14 @@ public class TTransaction implements org.apache.thrift.TBase<TTransaction, TTran
               org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
             }
             break;
+          case 6: // TYPE
+            if (schemeField.type == org.apache.thrift.protocol.TType.I32) {
+              struct.type = TTransactionType.findByValue(iprot.readI32());
+              struct.setTypeIsSet(true);
+            } else { 
+              org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
+            }
+            break;
           default:
             org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
         }
@@ -772,6 +873,11 @@ public class TTransaction implements org.apache.thrift.TBase<TTransaction, TTran
       oprot.writeFieldBegin(FIRST_SHORT_FIELD_DESC);
       oprot.writeI64(struct.firstShort);
       oprot.writeFieldEnd();
+      if (struct.type != null) {
+        oprot.writeFieldBegin(TYPE_FIELD_DESC);
+        oprot.writeI32(struct.type.getValue());
+        oprot.writeFieldEnd();
+      }
       oprot.writeFieldStop();
       oprot.writeStructEnd();
     }
@@ -805,7 +911,10 @@ public class TTransaction implements org.apache.thrift.TBase<TTransaction, TTran
       if (struct.isSetFirstShort()) {
         optionals.set(4);
       }
-      oprot.writeBitSet(optionals, 5);
+      if (struct.isSetType()) {
+        optionals.set(5);
+      }
+      oprot.writeBitSet(optionals, 6);
       if (struct.isSetWritePointer()) {
         oprot.writeI64(struct.writePointer);
       }
@@ -833,12 +942,15 @@ public class TTransaction implements org.apache.thrift.TBase<TTransaction, TTran
       if (struct.isSetFirstShort()) {
         oprot.writeI64(struct.firstShort);
       }
+      if (struct.isSetType()) {
+        oprot.writeI32(struct.type.getValue());
+      }
     }
 
     @Override
     public void read(org.apache.thrift.protocol.TProtocol prot, TTransaction struct) throws org.apache.thrift.TException {
       TTupleProtocol iprot = (TTupleProtocol) prot;
-      BitSet incoming = iprot.readBitSet(5);
+      BitSet incoming = iprot.readBitSet(6);
       if (incoming.get(0)) {
         struct.writePointer = iprot.readI64();
         struct.setWritePointerIsSet(true);
@@ -876,6 +988,10 @@ public class TTransaction implements org.apache.thrift.TBase<TTransaction, TTran
       if (incoming.get(4)) {
         struct.firstShort = iprot.readI64();
         struct.setFirstShortIsSet(true);
+      }
+      if (incoming.get(5)) {
+        struct.type = TTransactionType.findByValue(iprot.readI32());
+        struct.setTypeIsSet(true);
       }
     }
   }
