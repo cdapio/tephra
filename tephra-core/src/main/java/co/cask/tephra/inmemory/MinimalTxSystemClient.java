@@ -16,6 +16,7 @@
 
 package co.cask.tephra.inmemory;
 
+import co.cask.tephra.InvalidTruncateTimeException;
 import co.cask.tephra.Transaction;
 import co.cask.tephra.TransactionCouldNotTakeSnapshotException;
 import co.cask.tephra.TransactionSystemClient;
@@ -24,6 +25,7 @@ import co.cask.tephra.TxConstants;
 
 import java.io.InputStream;
 import java.util.Collection;
+import java.util.Set;
 
 /**
  * Dummy implementation of TxSystemClient. May be useful for perf testing.
@@ -83,5 +85,20 @@ public class MinimalTxSystemClient implements TransactionSystemClient {
   @Override
   public void resetState() {
     // do nothing
+  }
+
+  @Override
+  public boolean truncateInvalidTx(Set<Long> invalidTxIds) {
+    return true;
+  }
+
+  @Override
+  public boolean truncateInvalidTxBefore(long time) throws InvalidTruncateTimeException {
+    return true;
+  }
+
+  @Override
+  public int getInvalidSize() {
+    return 0;
   }
 }

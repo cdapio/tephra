@@ -18,11 +18,13 @@ package co.cask.tephra;
 
 import co.cask.tephra.persist.TransactionSnapshot;
 import co.cask.tephra.persist.TransactionStateStorage;
+import com.google.common.collect.ImmutableSet;
 import org.junit.Assert;
 import org.junit.Test;
 
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.concurrent.TimeUnit;
 
 /**
  *
@@ -236,6 +238,78 @@ public abstract class TransactionSystemTest {
     Transaction txPostReset = client.startShort();
     Assert.assertTrue("New tx ID should be greater than last ID before reset",
                       txPostReset.getWritePointer() > txPreReset.getWritePointer());
+  }
+  
+  @Test
+  public void testTruncateInvalidTx() throws Exception {
+    // Start few transactions and invalidate all of them
+    TransactionSystemClient client = getClient();
+    Transaction tx1 = client.startLong();
+    Transaction tx2 = client.startShort();
+    Transaction tx3 = client.startLong();
+    
+    client.invalidate(tx1.getWritePointer());
+    client.invalidate(tx2.getWritePointer());
+    client.invalidate(tx3.getWritePointer());
+    
+    // Remove tx2 and tx3 from invalid list
+    Assert.assertTrue(client.truncateInvalidTx(ImmutableSet.of(tx2.getWritePointer(), tx3.getWritePointer())));
+    
+    Transaction tx = client.startShort();
+    // Only tx1 should be in invalid list now
+    Assert.assertArrayEquals(new long[] {tx1.getWritePointer()}, tx.getInvalids());
+    client.abort(tx);
+  }
+
+  @Test
+  public void testTruncateInvalidTxBefore() throws Exception {
+    // Start few transactions
+    TransactionSystemClient client = getClient();
+    Transaction tx1 = client.startLong();
+    Transaction tx2 = client.startShort();
+    // Sleep so that transaction ids get generated a millisecond apart for assertion
+    // TEPHRA-63 should eliminate the need to sleep
+    TimeUnit.MILLISECONDS.sleep(1);
+    long beforeTx3 = System.currentTimeMillis();
+    Transaction tx3 = client.startLong();
+    
+    try {
+      // throws exception since tx1 and tx2 are still in-progress
+      client.truncateInvalidTxBefore(beforeTx3);
+      Assert.fail("Expected InvalidTruncateTimeException exception");
+    } catch (InvalidTruncateTimeException e) {
+      // Expected exception
+    }
+    
+    // Invalidate all of them
+    client.invalidate(tx1.getWritePointer());
+    client.invalidate(tx2.getWritePointer());
+    client.invalidate(tx3.getWritePointer());
+
+    // Remove transactions before time beforeTx3
+    Assert.assertTrue(client.truncateInvalidTxBefore(beforeTx3));
+
+    Transaction tx = client.startShort();
+    // Only tx3 should be in invalid list now
+    Assert.assertArrayEquals(new long[] {tx3.getWritePointer()}, tx.getInvalids());
+    client.abort(tx);
+  }
+
+  @Test
+  public void testGetInvalidSize() throws Exception {
+    // Start few transactions and invalidate all of them
+    TransactionSystemClient client = getClient();
+    Transaction tx1 = client.startLong();
+    Transaction tx2 = client.startShort();
+    Transaction tx3 = client.startLong();
+
+    Assert.assertEquals(0, client.getInvalidSize());
+
+    client.invalidate(tx1.getWritePointer());
+    client.invalidate(tx2.getWritePointer());
+    client.invalidate(tx3.getWritePointer());
+
+    Assert.assertEquals(3, client.getInvalidSize());
   }
 
   private Collection<byte[]> asList(byte[]... val) {

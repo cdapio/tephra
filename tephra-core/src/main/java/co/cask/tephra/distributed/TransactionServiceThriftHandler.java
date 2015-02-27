@@ -16,10 +16,12 @@
 
 package co.cask.tephra.distributed;
 
+import co.cask.tephra.InvalidTruncateTimeException;
 import co.cask.tephra.TransactionManager;
 import co.cask.tephra.TransactionNotInProgressException;
 import co.cask.tephra.TxConstants;
 import co.cask.tephra.distributed.thrift.TBoolean;
+import co.cask.tephra.distributed.thrift.TInvalidTruncateTimeException;
 import co.cask.tephra.distributed.thrift.TTransaction;
 import co.cask.tephra.distributed.thrift.TTransactionCouldNotTakeSnapshotException;
 import co.cask.tephra.distributed.thrift.TTransactionNotInProgressException;
@@ -145,5 +147,24 @@ public class TransactionServiceThriftHandler implements TTransactionServer.Iface
   @Override
   public String status() throws TException {
     return txManager.isRunning() ? TxConstants.STATUS_OK : TxConstants.STATUS_NOTOK;
+  }
+
+  @Override
+  public TBoolean truncateInvalidTx(Set<Long> txns) throws TException {
+    return new TBoolean(txManager.truncateInvalidTx(txns));
+  }
+
+  @Override
+  public TBoolean truncateInvalidTxBefore(long time) throws TException {
+    try {
+      return new TBoolean(txManager.truncateInvalidTxBefore(time));
+    } catch (InvalidTruncateTimeException e) {
+      throw new TInvalidTruncateTimeException(e.getMessage());
+    }
+  }
+
+  @Override
+  public int invalidTxSize() throws TException {
+    return txManager.getInvalidSize();
   }
 }

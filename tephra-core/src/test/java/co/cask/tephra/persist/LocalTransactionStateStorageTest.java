@@ -71,7 +71,8 @@ public class LocalTransactionStateStorageTest extends AbstractTransactionStateSt
   private class TransactionEditV2 extends TransactionEdit {
     public TransactionEditV2(long writePointer, long visibilityUpperBound, State state, long expirationDate,
                              Set<ChangeId> changes, long commitPointer, boolean canCommit, TransactionType type) {
-      super(writePointer, visibilityUpperBound, state, expirationDate, changes, commitPointer, canCommit, type);
+      super(writePointer, visibilityUpperBound, state, expirationDate, changes, commitPointer, canCommit, type, 
+            null, 0L);
     }
     @Override
     public void write(DataOutput out) throws IOException {

@@ -26,6 +26,7 @@ import org.apache.hadoop.io.Writable;
 import java.io.DataInput;
 import java.io.DataOutput;
 import java.io.IOException;
+import java.util.Collections;
 import java.util.Set;
 
 /**
@@ -45,7 +46,7 @@ public class TransactionEdit implements Writable {
    * The possible state changes for a transaction.
    */
   public enum State {
-    INPROGRESS, COMMITTING, COMMITTED, INVALID, ABORTED, MOVE_WATERMARK
+    INPROGRESS, COMMITTING, COMMITTED, INVALID, ABORTED, MOVE_WATERMARK, TRUNCATE_INVALID_TX
   }
 
   private long writePointer;
@@ -59,28 +60,33 @@ public class TransactionEdit implements Writable {
   private long commitPointer;
   private long expirationDate;
   private State state;
-  private Set<ChangeId> changes = Sets.newHashSet();
+  private Set<ChangeId> changes;
   /** Whether or not the COMMITTED change should be fully committed. */
   private boolean canCommit;
   private TransactionType type;
+  private Set<Long> truncateInvalidTx;
+  private long truncateInvalidTxTime;
 
   // for Writable
   public TransactionEdit() {
+    this.changes = Sets.newHashSet();
+    this.truncateInvalidTx = Sets.newHashSet();
   }
 
   // package private for testing
   TransactionEdit(long writePointer, long visibilityUpperBound, State state, long expirationDate,
-                          Set<ChangeId> changes, long commitPointer, boolean canCommit, TransactionType type) {
+                  Set<ChangeId> changes, long commitPointer, boolean canCommit, TransactionType type,
+                  Set<Long> truncateInvalidTx, long truncateInvalidTxTime) {
     this.writePointer = writePointer;
     this.visibilityUpperBound = visibilityUpperBound;
     this.state = state;
     this.expirationDate = expirationDate;
-    if (changes != null) {
-      this.changes = changes;
-    }
+    this.changes = changes != null ? changes : Collections.<ChangeId>emptySet();
     this.commitPointer = commitPointer;
     this.canCommit = canCommit;
     this.type = type;
+    this.truncateInvalidTx = truncateInvalidTx != null ? truncateInvalidTx : Collections.<Long>emptySet();
+    this.truncateInvalidTxTime = truncateInvalidTxTime;
   }
 
   /**
@@ -142,19 +148,35 @@ public class TransactionEdit implements Writable {
   }
 
   /**
+   * Returns the transaction ids to be removed from invalid transaction list. This is only populated for
+   * edits of type {@link State#TRUNCATE_INVALID_TX} 
+   */
+  public Set<Long> getTruncateInvalidTx() {
+    return truncateInvalidTx;
+  }
+
+  /**
+   * Returns the time until which the invalid transactions need to be truncated from invalid transaction list.
+   * This is only populated for  edits of type {@link State#TRUNCATE_INVALID_TX}
+   */
+  public long getTruncateInvalidTxTime() {
+    return truncateInvalidTxTime;
+  }
+
+  /**
    * Creates a new instance in the {@link State#INPROGRESS} state.
    */
   public static TransactionEdit createStarted(long writePointer, long visibilityUpperBound,
                                               long expirationDate, TransactionType type) {
     return new TransactionEdit(writePointer, visibilityUpperBound, State.INPROGRESS,
-                               expirationDate, null, 0L, false, type);
+                               expirationDate, null, 0L, false, type, null, 0L);
   }
 
   /**
    * Creates a new instance in the {@link State#COMMITTING} state.
    */
   public static TransactionEdit createCommitting(long writePointer, Set<ChangeId> changes) {
-    return new TransactionEdit(writePointer, 0L, State.COMMITTING, 0L, changes, 0L, false, null);
+    return new TransactionEdit(writePointer, 0L, State.COMMITTING, 0L, changes, 0L, false, null, null, 0L);
   }
 
   /**
@@ -162,28 +184,44 @@ public class TransactionEdit implements Writable {
    */
   public static TransactionEdit createCommitted(long writePointer, Set<ChangeId> changes, long nextWritePointer,
                                                 boolean canCommit) {
-    return new TransactionEdit(writePointer, 0L, State.COMMITTED, 0L, changes, nextWritePointer, canCommit, null);
+    return new TransactionEdit(writePointer, 0L, State.COMMITTED, 0L, changes, nextWritePointer, canCommit, null, 
+                               null, 0L);
   }
 
   /**
    * Creates a new instance in the {@link State#ABORTED} state.
    */
   public static TransactionEdit createAborted(long writePointer, TransactionType type) {
-    return new TransactionEdit(writePointer, 0L, State.ABORTED, 0L, null, 0L, false, type);
+    return new TransactionEdit(writePointer, 0L, State.ABORTED, 0L, null, 0L, false, type, null, 0L);
   }
 
   /**
    * Creates a new instance in the {@link State#INVALID} state.
    */
   public static TransactionEdit createInvalid(long writePointer) {
-    return new TransactionEdit(writePointer, 0L, State.INVALID, 0L, null, 0L, false, null);
+    return new TransactionEdit(writePointer, 0L, State.INVALID, 0L, null, 0L, false, null, null, 0L);
   }
 
   /**
    * Creates a new instance in the {@link State#MOVE_WATERMARK} state.
    */
   public static TransactionEdit createMoveWatermark(long writePointer) {
-    return new TransactionEdit(writePointer, 0L, State.MOVE_WATERMARK, 0L, null, 0L, false, null);
+    return new TransactionEdit(writePointer, 0L, State.MOVE_WATERMARK, 0L, null, 0L, false, null, null, 0L);
+  }
+
+  /**
+   * Creates a new instance in the {@link State#TRUNCATE_INVALID_TX} state.
+   */
+  public static TransactionEdit createTruncateInvalidTx(Set<Long> truncateInvalidTx) {
+    return new TransactionEdit(0L, 0L, State.TRUNCATE_INVALID_TX, 0L, null, 0L, false, null, truncateInvalidTx, 0L);
+  }
+
+  /**
+   * Creates a new instance in the {@link State#TRUNCATE_INVALID_TX} state.
+   */
+  public static TransactionEdit createTruncateInvalidTxBefore(long truncateInvalidTxTime) {
+    return new TransactionEdit(0L, 0L, State.TRUNCATE_INVALID_TX, 0L, null, 0L, false, null, null, 
+                               truncateInvalidTxTime);
   }
 
   @Override
@@ -227,7 +265,9 @@ public class TransactionEdit implements Writable {
       Objects.equal(this.state, that.state) &&
       Objects.equal(this.changes, that.changes) &&
       Objects.equal(this.canCommit, that.canCommit) &&
-      Objects.equal(this.type, that.type);
+      Objects.equal(this.type, that.type) &&
+      Objects.equal(this.truncateInvalidTx, that.truncateInvalidTx) &&
+      Objects.equal(this.truncateInvalidTxTime, that.truncateInvalidTxTime);
   }
   
   @Override
@@ -247,6 +287,8 @@ public class TransactionEdit implements Writable {
       .add("changesSize", changes != null ? changes.size() : 0)
       .add("canCommit", canCommit)
       .add("type", type)
+      .add("truncateInvalidTx", truncateInvalidTx)
+      .add("truncateInvalidTxTime", truncateInvalidTxTime)
       .toString();
   }
 
@@ -313,7 +355,8 @@ public class TransactionEdit implements Writable {
         }
       }
       // NOTE: we didn't have visibilityUpperBound in V1, it was added in V2
-      // we didn't have transaction type in V1 and V2, it was added in V3
+      // we didn't have transaction type, truncateInvalidTx and truncateInvalidTxTime in V1 and V2, 
+      // it was added in V3
     }
   }
 
@@ -368,7 +411,8 @@ public class TransactionEdit implements Writable {
         }
       }
       out.writeLong(src.visibilityUpperBound);
-      // NOTE: we didn't have transaction type in V1 and V2, it was added in V3
+      // NOTE: we didn't have transaction type, truncateInvalidTx and truncateInvalidTxTime in V1 and V2, 
+      // it was added in V3
     }
   }
   
@@ -377,12 +421,6 @@ public class TransactionEdit implements Writable {
   static class TransactionEditCodecV3 implements TransactionEditCodec {
     @Override
     public void decode(TransactionEdit dest, DataInput in) throws IOException {
-      if (dest.changes == null) {
-        dest.changes = Sets.newHashSet();
-      } else {
-        dest.changes.clear();
-      }
-
       dest.writePointer = in.readLong();
       int stateIdx = in.readInt();
       try {
@@ -394,6 +432,7 @@ public class TransactionEdit implements Writable {
       dest.commitPointer = in.readLong();
       dest.canCommit = in.readBoolean();
       int changeSize = in.readInt();
+      dest.changes = emptySet(dest.changes);
       for (int i = 0; i < changeSize; i++) {
         int currentLength = in.readInt();
         byte[] currentBytes = new byte[currentLength];
@@ -412,6 +451,21 @@ public class TransactionEdit implements Writable {
           throw new IOException("Type enum ordinal value is out of range: " + typeIdx);
         }
       }
+      
+      int truncateInvalidTxSize = in.readInt();
+      dest.truncateInvalidTx = emptySet(dest.truncateInvalidTx);
+      for (int i = 0; i < truncateInvalidTxSize; i++) {
+        dest.truncateInvalidTx.add(in.readLong());
+      }
+      dest.truncateInvalidTxTime = in.readLong();
+    }
+    
+    private <T> Set<T> emptySet(Set<T> set) {
+      if (set == null) {
+        return Sets.newHashSet();
+      }
+      set.clear();
+      return set;
     }
 
     @Override
@@ -440,6 +494,16 @@ public class TransactionEdit implements Writable {
       } else {
         out.writeInt(src.type.ordinal());
       }
+      
+      if (src.truncateInvalidTx == null) {
+        out.writeInt(0);
+      } else {
+        out.writeInt(src.truncateInvalidTx.size());
+        for (long id : src.truncateInvalidTx) {
+          out.writeLong(id);
+        }
+      }
+      out.writeLong(src.truncateInvalidTxTime);
     }
   }
 }

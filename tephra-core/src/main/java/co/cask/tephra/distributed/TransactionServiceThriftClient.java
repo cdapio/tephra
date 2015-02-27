@@ -30,6 +30,7 @@ import java.io.ByteArrayInputStream;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.util.Collection;
+import java.util.Set;
 
 /**
  * This class is a wrapper around the thrift tx service client, it takes
@@ -124,5 +125,17 @@ public class TransactionServiceThriftClient {
 
   public void resetState() throws TException {
     client.resetState();
+  }
+
+  public boolean truncateInvalidTx(Set<Long> invalidTxIds) throws TException {
+    return client.truncateInvalidTx(invalidTxIds).isValue();
+  }
+  
+  public boolean truncateInvalidTxBefore(long time) throws TException {
+    return client.truncateInvalidTxBefore(time).isValue();
+  }
+  
+  public int getInvalidSize() throws TException {
+    return client.invalidTxSize();
   }
 }

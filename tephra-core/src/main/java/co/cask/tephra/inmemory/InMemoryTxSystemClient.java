@@ -16,6 +16,7 @@
 
 package co.cask.tephra.inmemory;
 
+import co.cask.tephra.InvalidTruncateTimeException;
 import co.cask.tephra.Transaction;
 import co.cask.tephra.TransactionCouldNotTakeSnapshotException;
 import co.cask.tephra.TransactionManager;
@@ -31,6 +32,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Collection;
+import java.util.Set;
 
 /**
  *
@@ -108,5 +110,20 @@ public class InMemoryTxSystemClient implements TransactionSystemClient {
   @Override
   public void resetState() {
     txManager.resetState();
+  }
+
+  @Override
+  public boolean truncateInvalidTx(Set<Long> invalidTxIds) {
+    return txManager.truncateInvalidTx(invalidTxIds);
+  }
+
+  @Override
+  public boolean truncateInvalidTxBefore(long time) throws InvalidTruncateTimeException {
+    return txManager.truncateInvalidTxBefore(time);
+  }
+
+  @Override
+  public int getInvalidSize() {
+    return txManager.getInvalidSize();
   }
 }
