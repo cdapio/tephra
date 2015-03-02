@@ -53,8 +53,8 @@ public class TxUtils {
    * @return The maximum timestamp (exclusive) to use for time-range operations
    */
   public static long getMaxVisibleTimestamp(Transaction tx) {
-    // NOTE: +1 here because we want read up to readpointer inclusive, but timerange's end is exclusive
-    return tx.getReadPointer() + 1;
+    // NOTE: +1 here because we want read up to writepointer inclusive, but timerange's end is exclusive
+    return tx.getWritePointer() + 1;
   }
 
   /**
