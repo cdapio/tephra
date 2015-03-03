@@ -24,6 +24,7 @@ import co.cask.tephra.persist.TransactionLogReader;
 import co.cask.tephra.persist.TransactionSnapshot;
 import co.cask.tephra.persist.TransactionStateStorage;
 import co.cask.tephra.snapshot.SnapshotCodecProvider;
+import co.cask.tephra.util.TxUtils;
 import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Stopwatch;
@@ -795,17 +796,7 @@ public class TransactionManager extends AbstractService {
     // here we ignore transactions that have no timeout, they are long-running and don't participate in
     // conflict detection.
     // TODO: for efficiency, can we do this once per-log in replayLogs instead of once per edit?
-    committedChangeSets.headMap(firstShortInProgress()).clear();
-  }
-
-  // find the first non long-running in-progress tx, or Long.MAX if none such exists
-  private long firstShortInProgress() {
-    for (Map.Entry<Long, InProgressTx> tx : inProgress.entrySet()) {
-      if (!tx.getValue().isLongRunning()) {
-        return tx.getKey();
-      }
-    }
-    return Transaction.NO_TX_IN_PROGRESS;
+    committedChangeSets.headMap(TxUtils.getFirstShortInProgress(inProgress)).clear();
   }
 
   public void abort(Transaction tx) {
