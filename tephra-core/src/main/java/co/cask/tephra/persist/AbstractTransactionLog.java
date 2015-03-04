@@ -37,7 +37,7 @@ public abstract class AbstractTransactionLog implements TransactionLog {
   /** Time limit, in milliseconds, of an append to the transaction log before we log it as "slow". */
   private static final long SLOW_APPEND_THRESHOLD = 1000L;
 
-  private static final Logger LOG = LoggerFactory.getLogger(HDFSTransactionStateStorage.class);
+  private static final Logger LOG = LoggerFactory.getLogger(AbstractTransactionLog.class);
 
   private final AtomicLong logSequence = new AtomicLong();
   protected long timestamp;

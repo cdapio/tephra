@@ -18,6 +18,7 @@ package co.cask.tephra.hbase96.coprocessor;
 
 import co.cask.tephra.ChangeId;
 import co.cask.tephra.TransactionManager;
+import co.cask.tephra.TransactionType;
 import co.cask.tephra.TxConstants;
 import co.cask.tephra.coprocessor.TransactionStateCache;
 import co.cask.tephra.coprocessor.TransactionStateCacheSupplier;
@@ -133,7 +134,8 @@ public class TransactionProcessorTest {
       TransactionSnapshot.copyFrom(
         System.currentTimeMillis(), V[6] - 1, V[7], invalidSet,
         // this will set visibility upper bound to V[6]
-        Maps.newTreeMap(ImmutableSortedMap.of(V[6], new TransactionManager.InProgressTx(V[6] - 1, Long.MAX_VALUE))),
+        Maps.newTreeMap(ImmutableSortedMap.of(V[6], new TransactionManager.InProgressTx(V[6] - 1, Long.MAX_VALUE,
+                                                                                        TransactionType.SHORT))),
         new HashMap<Long, Set<ChangeId>>(), new TreeMap<Long, Set<ChangeId>>());
     HDFSTransactionStateStorage tmpStorage =
       new HDFSTransactionStateStorage(conf, new SnapshotCodecProvider(conf));

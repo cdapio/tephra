@@ -14,10 +14,10 @@
  * the License.
  */
 
-package co.cask.tephra;
+package co.cask.tephra.distributed;
 
+import co.cask.tephra.Transaction;
 import co.cask.tephra.distributed.thrift.TTransaction;
-import com.google.common.primitives.Longs;
 import org.apache.hadoop.hbase.client.OperationWithAttributes;
 import org.apache.thrift.TDeserializer;
 import org.apache.thrift.TException;
@@ -35,9 +35,7 @@ public class TransactionCodec {
   }
 
   public byte[] encode(Transaction tx) throws IOException {
-    TTransaction thriftTx = new TTransaction(tx.getWritePointer(), tx.getReadPointer(),
-                                             Longs.asList(tx.getInvalids()), Longs.asList(tx.getInProgress()),
-                                             tx.getFirstShortInProgress());
+    TTransaction thriftTx = ConverterUtils.wrap(tx);
     TSerializer serializer = new TSerializer();
     try {
       return serializer.serialize(thriftTx);
@@ -51,9 +49,7 @@ public class TransactionCodec {
     TDeserializer deserializer = new TDeserializer();
     try {
       deserializer.deserialize(thriftTx, encoded);
-      return new Transaction(thriftTx.getReadPointer(), thriftTx.getWritePointer(),
-                             Longs.toArray(thriftTx.getInvalids()), Longs.toArray(thriftTx.getInProgress()),
-                             thriftTx.getFirstShort());
+      return ConverterUtils.unwrap(thriftTx);
     } catch (TException te) {
       throw new IOException(te);
     }

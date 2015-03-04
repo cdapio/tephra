@@ -138,4 +138,45 @@ public class TransactionManagerTest extends TransactionSystemTest {
       txm.stopAndWait();
     }
   }
+
+  @Test
+  public void testLongTransactionCleanup() throws Exception {
+    conf.setInt(TxConstants.Manager.CFG_TX_CLEANUP_INTERVAL, 3);
+    conf.setInt(TxConstants.Manager.CFG_TX_LONG_TIMEOUT, 2);
+    // using a new tx manager that cleans up
+    TransactionManager txm = new TransactionManager
+      (conf, new InMemoryTransactionStateStorage(), new TxMetricsCollector());
+    txm.startAndWait();
+    try {
+      Assert.assertEquals(0, txm.getInvalidSize());
+      Assert.assertEquals(0, txm.getCommittedSize());
+      
+      // start a long running transaction
+      Transaction tx1 = txm.startLong();
+      
+      Assert.assertEquals(0, txm.getInvalidSize());
+      Assert.assertEquals(0, txm.getCommittedSize());
+
+      // sleep longer than the cleanup interval
+      TimeUnit.SECONDS.sleep(5);
+
+      // transaction should now be invalid
+      Assert.assertEquals(1, txm.getInvalidSize());
+      Assert.assertEquals(0, txm.getCommittedSize());
+
+      // cannot commit transaction as it was timed out
+      try {
+        txm.canCommit(tx1, Collections.singleton(new byte[] { 0x11 }));
+        Assert.fail();
+      } catch (TransactionNotInProgressException e) {
+        // expected
+      }
+      
+      txm.abort(tx1);
+      // abort should not remove long running transaction from invalid list
+      Assert.assertEquals(1, txm.getInvalidSize());
+    } finally {
+      txm.stopAndWait();
+    }
+  }
 }

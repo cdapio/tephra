@@ -19,6 +19,7 @@ package co.cask.tephra.inmemory;
 import co.cask.tephra.Transaction;
 import co.cask.tephra.TransactionCouldNotTakeSnapshotException;
 import co.cask.tephra.TransactionSystemClient;
+import co.cask.tephra.TransactionType;
 import co.cask.tephra.TxConstants;
 
 import java.io.InputStream;
@@ -36,7 +37,7 @@ public class MinimalTxSystemClient implements TransactionSystemClient {
     // NOTE: -1 here is because we have logic that uses (readpointer + 1) as a "exclusive stop key" in some datasets
     return new Transaction(
       Long.MAX_VALUE - 1, wp, new long[0], new long[0],
-      Transaction.NO_TX_IN_PROGRESS);
+      Transaction.NO_TX_IN_PROGRESS, TransactionType.SHORT);
   }
 
   @Override

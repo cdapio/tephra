@@ -26,13 +26,11 @@ import com.google.inject.Guice;
 import com.google.inject.Injector;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.HBaseConfiguration;
-import org.apache.twill.common.Services;
 import org.apache.twill.zookeeper.ZKClientService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.Future;
 
 /**
  * Driver class to start and stop tx in distributed mode.
@@ -113,19 +111,19 @@ public class TransactionServiceMain {
 
     // start a tx server
     txService = injector.getInstance(TransactionService.class);
-    Future<?> future = Services.getCompletionFuture(txService);
     try {
-      txService.start();
+      LOG.info("Starting {}", getClass().getSimpleName());
+      txService.startAndWait();
     } catch (Exception e) {
       System.err.println("Failed to start service: " + e.getMessage());
     }
-    future.get();
   }
 
   /**
    * Invoked by jsvc to stop the program.
    */
   public void stop() {
+    LOG.info("Stopping {}", getClass().getSimpleName());
     if (txService == null) {
       return;
     }

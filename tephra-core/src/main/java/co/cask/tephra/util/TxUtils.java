@@ -18,6 +18,7 @@ package co.cask.tephra.util;
 
 import co.cask.tephra.Transaction;
 import co.cask.tephra.TransactionManager;
+import co.cask.tephra.TransactionType;
 import co.cask.tephra.TxConstants;
 import co.cask.tephra.persist.TransactionSnapshot;
 import com.google.common.primitives.Longs;
@@ -68,7 +69,7 @@ public class TxUtils {
     return new Transaction(snapshot.getReadPointer(), Long.MAX_VALUE,
                            Longs.toArray(snapshot.getInvalid()),
                            Longs.toArray(snapshot.getInProgress().keySet()),
-                           TxUtils.getFirstShortInProgress(snapshot.getInProgress()));
+                           TxUtils.getFirstShortInProgress(snapshot.getInProgress()), TransactionType.SHORT);
   }
 
   /**

@@ -19,8 +19,10 @@ package co.cask.tephra.persist;
 import co.cask.tephra.ChangeId;
 import co.cask.tephra.Transaction;
 import co.cask.tephra.TransactionManager;
+import co.cask.tephra.TransactionType;
 import co.cask.tephra.TxConstants;
 import co.cask.tephra.metrics.TxMetricsCollector;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
@@ -39,6 +41,7 @@ import java.util.Map;
 import java.util.NavigableMap;
 import java.util.Random;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
@@ -284,7 +287,7 @@ public abstract class AbstractTransactionStateStorageTest {
       Map<Long, Set<ChangeId>> committed = Maps.newHashMap();
       TransactionSnapshot snapshot = new TransactionSnapshot(now, 0, writePointer++, invalid,
                                                              inprogress, committing, committed);
-      TransactionEdit dummyEdit = TransactionEdit.createStarted(1, 0, Long.MAX_VALUE);
+      TransactionEdit dummyEdit = TransactionEdit.createStarted(1, 0, Long.MAX_VALUE, TransactionType.SHORT);
 
       // write snapshot 1
       storage.writeSnapshot(snapshot);
@@ -350,6 +353,62 @@ public abstract class AbstractTransactionStateStorageTest {
       }
     }
   }
+  
+  @Test
+  public void testLongTxnEditReplay() throws Exception {
+    Configuration conf = getConfiguration("testLongTxnEditReplay");
+    TransactionStateStorage storage = null;
+    try {
+      storage = getStorage(conf);
+      storage.startAndWait();
+
+      // Create long running txns. Abort one of them, invalidate another, invalidate and abort the last.
+      long time1 = System.currentTimeMillis();
+      long wp1 = time1 * TxConstants.MAX_TX_PER_MS;
+      TransactionEdit edit1 = TransactionEdit.createStarted(wp1, wp1 - 10, time1 + 100000, TransactionType.LONG);
+      TransactionEdit edit2 = TransactionEdit.createAborted(wp1, TransactionType.LONG);
+
+      long time2 = time1 + 100;
+      long wp2 = time2 * TxConstants.MAX_TX_PER_MS;
+      TransactionEdit edit3 = TransactionEdit.createStarted(wp2, wp2 - 10, time2 + 100000, TransactionType.LONG);
+      TransactionEdit edit4 = TransactionEdit.createInvalid(wp2);
+
+      long time3 = time1 + 200;
+      long wp3 = time3 * TxConstants.MAX_TX_PER_MS;
+      TransactionEdit edit5 = TransactionEdit.createStarted(wp3, wp3 - 10, time3 + 100000, TransactionType.LONG);
+      TransactionEdit edit6 = TransactionEdit.createInvalid(wp3);
+      TransactionEdit edit7 = TransactionEdit.createAborted(wp3, TransactionType.LONG);
+      
+      // write transaction edits
+      TransactionLog log = storage.createLog(time1);
+      log.append(edit1);
+      log.append(edit2);
+      log.append(edit3);
+      log.append(edit4);
+      log.append(edit5);
+      log.append(edit6);
+      log.append(edit7);
+      log.close();
+
+      // Start transaction manager
+      TransactionManager txm = new TransactionManager(conf, storage, new TxMetricsCollector());
+      txm.startAndWait();
+      try {
+        // Verify that all txns are in invalid list.
+        TransactionSnapshot snapshot1 = txm.getCurrentState();
+        Assert.assertEquals(ImmutableList.of(wp1, wp2, wp3), snapshot1.getInvalid());
+        Assert.assertEquals(0, snapshot1.getInProgress().size());
+        Assert.assertEquals(0, snapshot1.getCommittedChangeSets().size());
+        Assert.assertEquals(0, snapshot1.getCommittedChangeSets().size());
+      } finally {
+        txm.stopAndWait();
+      }
+    } finally {
+      if (storage != null) {
+        storage.stopAndWait();
+      }
+    }
+  }
 
   /**
    * Generates a new snapshot object with semi-randomly populated values.  This does not necessarily accurately
@@ -380,10 +439,12 @@ public abstract class AbstractTransactionStateStorageTest {
       // make some "long" transactions
       if (i % 20 == 0) {
         inProgress.put(startPointer + i,
-                       new TransactionManager.InProgressTx(startPointer - 1, -currentTime));
+                       new TransactionManager.InProgressTx(startPointer - 1, currentTime + TimeUnit.DAYS.toSeconds(1),
+                                                           TransactionType.LONG));
       } else {
         inProgress.put(startPointer + i,
-                       new TransactionManager.InProgressTx(startPointer - 1, currentTime + 300000L));
+                       new TransactionManager.InProgressTx(startPointer - 1, currentTime + 300000L, 
+                                                           TransactionType.SHORT));
       }
     }
 
@@ -437,7 +498,7 @@ public abstract class AbstractTransactionStateStorageTest {
         case INPROGRESS:
           edits.add(
             TransactionEdit.createStarted(writePointer, writePointer - 1,
-                                          System.currentTimeMillis() + 300000L));
+                                          System.currentTimeMillis() + 300000L, TransactionType.SHORT));
           break;
         case COMMITTING:
           edits.add(TransactionEdit.createCommitting(writePointer, generateChangeSet(10)));
@@ -450,7 +511,7 @@ public abstract class AbstractTransactionStateStorageTest {
           edits.add(TransactionEdit.createInvalid(writePointer));
           break;
         case ABORTED:
-          edits.add(TransactionEdit.createAborted(writePointer));
+          edits.add(TransactionEdit.createAborted(writePointer, TransactionType.SHORT));
           break;
         case MOVE_WATERMARK:
           edits.add(TransactionEdit.createMoveWatermark(writePointer));

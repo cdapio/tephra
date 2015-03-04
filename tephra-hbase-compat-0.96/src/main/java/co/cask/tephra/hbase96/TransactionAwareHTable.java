@@ -17,7 +17,7 @@ package co.cask.tephra.hbase96;
 
 import co.cask.tephra.Transaction;
 import co.cask.tephra.TransactionAware;
-import co.cask.tephra.TransactionCodec;
+import co.cask.tephra.distributed.TransactionCodec;
 import com.google.protobuf.Service;
 import com.google.protobuf.ServiceException;
 import org.apache.hadoop.conf.Configuration;

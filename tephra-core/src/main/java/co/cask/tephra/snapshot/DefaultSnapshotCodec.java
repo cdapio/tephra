@@ -39,7 +39,9 @@ import java.util.TreeMap;
 /**
  * Handles serialization/deserialization of a {@link co.cask.tephra.persist.TransactionSnapshot}
  * and its elements to {@code byte[]}.
+ * @deprecated This codec is now deprecated and is replaced by {@link SnapshotCodecV2}.
  */
+@Deprecated
 public class DefaultSnapshotCodec implements SnapshotCodec {
 
   private static final Logger LOG = LoggerFactory.getLogger(DefaultSnapshotCodec.class);
