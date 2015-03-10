@@ -124,7 +124,6 @@ public class TransactionVisibilityFilterTest extends AbstractTransactionVisibili
                  filter.filterKeyValue(newKeyValue("row2", FAM, "val1", now - 1 * TxConstants.MAX_TX_PER_MS)));
   }
 
-  @Override
   protected Filter createFilter(Transaction tx, Map<byte[], Long> familyTTLs) {
     return new TransactionVisibilityFilter(tx, familyTTLs, false, ScanType.USER_SCAN);
   }

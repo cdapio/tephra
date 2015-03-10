@@ -30,7 +30,6 @@ import com.google.inject.Injector;
 import com.google.inject.Singleton;
 import com.google.inject.util.Modules;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hbase.HBaseConfiguration;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.BeforeClass;
@@ -54,7 +53,7 @@ public class TransactionContextTest {
 
   @BeforeClass
   public static void setup() throws IOException {
-    final Configuration conf = HBaseConfiguration.create();
+    final Configuration conf = new Configuration();
     conf.set(TxConstants.Persist.CFG_TX_SNAPHOT_CODEC_CLASSES, DefaultSnapshotCodec.class.getName());
     conf.set(TxConstants.Manager.CFG_TX_SNAPSHOT_DIR, tmpFolder.newFolder().getAbsolutePath());
     Injector injector = Guice.createInjector(

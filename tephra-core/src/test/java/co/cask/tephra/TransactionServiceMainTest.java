@@ -19,7 +19,6 @@ package co.cask.tephra;
 import co.cask.tephra.distributed.TransactionServiceClient;
 import com.google.common.base.Throwables;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hbase.HBaseConfiguration;
 import org.apache.twill.internal.zookeeper.InMemoryZKServer;
 import org.junit.ClassRule;
 import org.junit.Test;
@@ -42,7 +41,7 @@ public class TransactionServiceMainTest {
     zkServer.startAndWait();
 
     try {
-      Configuration conf = HBaseConfiguration.create();
+      Configuration conf = new Configuration();
       conf.set(TxConstants.Service.CFG_DATA_TX_ZOOKEEPER_QUORUM, zkServer.getConnectionStr());
       conf.set(TxConstants.Manager.CFG_TX_SNAPSHOT_DIR, tmpFolder.newFolder().getAbsolutePath());
 

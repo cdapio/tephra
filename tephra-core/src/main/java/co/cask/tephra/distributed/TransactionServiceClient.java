@@ -28,13 +28,13 @@ import co.cask.tephra.runtime.DiscoveryModules;
 import co.cask.tephra.runtime.TransactionClientModule;
 import co.cask.tephra.runtime.TransactionModules;
 import co.cask.tephra.runtime.ZKModule;
+import co.cask.tephra.util.ConfigurationFactory;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Throwables;
 import com.google.inject.Guice;
 import com.google.inject.Inject;
 import com.google.inject.Injector;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hbase.HBaseConfiguration;
 import org.apache.thrift.TException;
 import org.apache.twill.zookeeper.ZKClientService;
 import org.slf4j.Logger;
@@ -72,7 +72,7 @@ public class TransactionServiceClient implements TransactionSystemClient {
     if (args.length == 1 && "-v".equals(args[0])) {
       verbose = true;
     }
-    doMain(verbose, HBaseConfiguration.create());
+    doMain(verbose, new ConfigurationFactory().get());
   }
 
   @VisibleForTesting

@@ -21,7 +21,6 @@ import co.cask.tephra.metrics.TxMetricsCollector;
 import co.cask.tephra.persist.InMemoryTransactionStateStorage;
 import co.cask.tephra.persist.TransactionStateStorage;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hbase.HBaseConfiguration;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
@@ -35,7 +34,7 @@ import java.util.concurrent.TimeUnit;
  */
 public class TransactionManagerTest extends TransactionSystemTest {
 
-  static Configuration conf = HBaseConfiguration.create();
+  static Configuration conf = new Configuration();
 
   TransactionManager txManager = null;
   TransactionStateStorage txStateStorage = null;
