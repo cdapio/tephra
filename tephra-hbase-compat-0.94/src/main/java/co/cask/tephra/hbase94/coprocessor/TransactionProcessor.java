@@ -35,6 +35,7 @@ import org.apache.hadoop.hbase.HConstants;
 import org.apache.hadoop.hbase.HTableDescriptor;
 import org.apache.hadoop.hbase.KeyValue;
 import org.apache.hadoop.hbase.client.Get;
+import org.apache.hadoop.hbase.client.OperationWithAttributes;
 import org.apache.hadoop.hbase.client.Scan;
 import org.apache.hadoop.hbase.coprocessor.BaseRegionObserver;
 import org.apache.hadoop.hbase.coprocessor.ObserverContext;
@@ -142,7 +143,7 @@ public class TransactionProcessor extends BaseRegionObserver {
   @Override
   public void preGet(ObserverContext<RegionCoprocessorEnvironment> e, Get get, List<KeyValue> results)
     throws IOException {
-    Transaction tx = txCodec.getFromOperation(get);
+    Transaction tx = getFromOperation(get);
     if (tx != null) {
       if (LOG.isTraceEnabled()) {
         LOG.trace("Applying filter to GET for transaction " + tx.getWritePointer());
@@ -157,7 +158,7 @@ public class TransactionProcessor extends BaseRegionObserver {
   @Override
   public RegionScanner preScannerOpen(ObserverContext<RegionCoprocessorEnvironment> e, Scan scan, RegionScanner s)
     throws IOException {
-    Transaction tx = txCodec.getFromOperation(scan);
+    Transaction tx = getFromOperation(scan);
     if (tx != null) {
       if (LOG.isTraceEnabled()) {
         LOG.trace("Applying filter to SCAN for transaction " + tx.getWritePointer());
@@ -211,6 +212,14 @@ public class TransactionProcessor extends BaseRegionObserver {
 
     return new StoreScanner(store, store.getScanInfo(), scan, scanners, type,
                             env.getRegion().getSmallestReadPoint(), earliestPutTs);
+  }
+
+  private Transaction getFromOperation(OperationWithAttributes op) throws IOException {
+    byte[] encoded = op.getAttribute(TxConstants.TX_OPERATION_ATTRIBUTE_KEY);
+    if (encoded != null) {
+      return txCodec.decode(encoded);
+    }
+    return null;
   }
 
   /**

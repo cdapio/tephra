@@ -59,6 +59,11 @@ public class TxConstants {
   public static final String ALLOW_EMPTY_VALUES_KEY = "data.tx.allow.empty.values";
   public static final boolean ALLOW_EMPTY_VALUES_DEFAULT = false;
 
+  /**
+   * Key used to set the serialized transaction as an attribute on Get and Scan operations.
+   */
+  public static final String TX_OPERATION_ATTRIBUTE_KEY = "cask.tx";
+
   // Constants for monitoring status
   public static final String STATUS_OK = "OK";
   public static final String STATUS_NOTOK = "NOTOK";

@@ -17,6 +17,7 @@ package co.cask.tephra.hbase94;
 
 import co.cask.tephra.Transaction;
 import co.cask.tephra.TransactionAware;
+import co.cask.tephra.TxConstants;
 import co.cask.tephra.distributed.TransactionCodec;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.HTableDescriptor;
@@ -27,6 +28,7 @@ import org.apache.hadoop.hbase.client.Get;
 import org.apache.hadoop.hbase.client.HTableInterface;
 import org.apache.hadoop.hbase.client.Increment;
 import org.apache.hadoop.hbase.client.Mutation;
+import org.apache.hadoop.hbase.client.OperationWithAttributes;
 import org.apache.hadoop.hbase.client.Put;
 import org.apache.hadoop.hbase.client.Result;
 import org.apache.hadoop.hbase.client.ResultScanner;
@@ -436,12 +438,12 @@ public class TransactionAwareHTable implements HTableInterface, TransactionAware
   // Helpers to get copies of objects with the timestamp set to the current transaction timestamp.
 
   private Get transactionalizeAction(Get get) throws IOException {
-    txCodec.addToOperation(get, tx);
+    addToOperation(get, tx);
     return get;
   }
 
   private Scan transactionalizeAction(Scan scan) throws IOException {
-    txCodec.addToOperation(scan, tx);
+    addToOperation(scan, tx);
     return scan;
   }
 
@@ -491,7 +493,7 @@ public class TransactionAwareHTable implements HTableInterface, TransactionAware
       txPut.setAttribute(entry.getKey(), entry.getValue());
     }
     txPut.setWriteToWAL(put.getWriteToWAL());
-    txCodec.addToOperation(txPut, tx);
+    addToOperation(txPut, tx);
     return txPut;
   }
 
@@ -550,5 +552,9 @@ public class TransactionAwareHTable implements HTableInterface, TransactionAware
       }
     }
     return transactionalizedActions;
+  }
+
+  public void addToOperation(OperationWithAttributes op, Transaction tx) throws IOException {
+    op.setAttribute(TxConstants.TX_OPERATION_ATTRIBUTE_KEY, txCodec.encode(tx));
   }
 }

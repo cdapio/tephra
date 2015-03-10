@@ -18,7 +18,6 @@ package co.cask.tephra.distributed;
 
 import co.cask.tephra.Transaction;
 import co.cask.tephra.distributed.thrift.TTransaction;
-import org.apache.hadoop.hbase.client.OperationWithAttributes;
 import org.apache.thrift.TDeserializer;
 import org.apache.thrift.TException;
 import org.apache.thrift.TSerializer;
@@ -29,7 +28,6 @@ import java.io.IOException;
  * Handles serialization and deserialization of {@link co.cask.tephra.Transaction} instances to and from {@code byte[]}.
  */
 public class TransactionCodec {
-  public static final String TX_OPERATION_ATTRIBUTE_KEY = "cask.tx";
 
   public TransactionCodec() {
   }
@@ -53,17 +51,5 @@ public class TransactionCodec {
     } catch (TException te) {
       throw new IOException(te);
     }
-  }
-
-  public void addToOperation(OperationWithAttributes op, Transaction tx) throws IOException {
-    op.setAttribute(TX_OPERATION_ATTRIBUTE_KEY, encode(tx));
-  }
-
-  public Transaction getFromOperation(OperationWithAttributes op) throws IOException {
-    byte[] encoded = op.getAttribute(TX_OPERATION_ATTRIBUTE_KEY);
-    if (encoded != null) {
-      return decode(encoded);
-    }
-    return null;
   }
 }
