@@ -21,7 +21,6 @@ import com.google.inject.AbstractModule;
 import com.google.inject.Provides;
 import com.google.inject.Singleton;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hbase.HConstants;
 import org.apache.twill.zookeeper.RetryStrategies;
 import org.apache.twill.zookeeper.ZKClient;
 import org.apache.twill.zookeeper.ZKClientService;
@@ -50,14 +49,15 @@ public class ZKModule extends AbstractModule {
     String zkStr = conf.get(TxConstants.Service.CFG_DATA_TX_ZOOKEEPER_QUORUM);
     if (zkStr == null) {
       // Default to HBase one.
-      zkStr = conf.get(HConstants.ZOOKEEPER_QUORUM);
+      zkStr = conf.get(TxConstants.HBase.ZOOKEEPER_QUORUM);
     }
 
     return ZKClientServices.delegate(
       ZKClients.reWatchOnExpire(
         ZKClients.retryOnFailure(
           ZKClientService.Builder.of(zkStr)
-            .setSessionTimeout(conf.getInt(HConstants.ZK_SESSION_TIMEOUT, HConstants.DEFAULT_ZK_SESSION_TIMEOUT))
+            .setSessionTimeout(conf.getInt(TxConstants.HBase.ZK_SESSION_TIMEOUT,
+                TxConstants.HBase.DEFAULT_ZK_SESSION_TIMEOUT))
             .build(),
           RetryStrategies.exponentialDelay(500, 2000, TimeUnit.MILLISECONDS)
         )

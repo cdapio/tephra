@@ -18,7 +18,6 @@ package co.cask.tephra;
 
 import co.cask.tephra.persist.TransactionSnapshot;
 import co.cask.tephra.persist.TransactionStateStorage;
-import org.apache.hadoop.hbase.util.Bytes;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -30,10 +29,10 @@ import java.util.Collection;
  */
 public abstract class TransactionSystemTest {
 
-  public static final byte[] C1 = Bytes.toBytes("change1");
-  public static final byte[] C2 = Bytes.toBytes("change2");
-  public static final byte[] C3 = Bytes.toBytes("change3");
-  public static final byte[] C4 = Bytes.toBytes("change4");
+  public static final byte[] C1 = new byte[] { 'c', '1' };
+  public static final byte[] C2 = new byte[] { 'c', '2' };
+  public static final byte[] C3 = new byte[] { 'c', '3' };
+  public static final byte[] C4 = new byte[] { 'c', '4' };
 
   protected abstract TransactionSystemClient getClient() throws Exception;
 

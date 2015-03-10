@@ -29,7 +29,6 @@ import com.google.common.collect.ImmutableSortedSet;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hbase.HBaseConfiguration;
 import org.junit.Assert;
 import org.junit.ClassRule;
 import org.junit.Test;
@@ -55,7 +54,7 @@ public class LocalTransactionStateStorageTest extends AbstractTransactionStateSt
   @Override
   protected Configuration getConfiguration(String testName) throws IOException {
     File testDir = tmpDir.newFolder(testName);
-    Configuration conf = HBaseConfiguration.create();
+    Configuration conf = new Configuration();
     conf.set(TxConstants.Manager.CFG_TX_SNAPSHOT_LOCAL_DIR, testDir.getAbsolutePath());
     conf.set(TxConstants.Persist.CFG_TX_SNAPHOT_CODEC_CLASSES, SnapshotCodecV2.class.getName());
 

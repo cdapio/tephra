@@ -22,10 +22,10 @@ import co.cask.tephra.runtime.DiscoveryModules;
 import co.cask.tephra.runtime.TransactionClientModule;
 import co.cask.tephra.runtime.TransactionModules;
 import co.cask.tephra.runtime.ZKModule;
+import co.cask.tephra.util.ConfigurationFactory;
 import com.google.inject.Guice;
 import com.google.inject.Injector;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hbase.HBaseConfiguration;
 import org.apache.twill.zookeeper.ZKClientService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -90,7 +90,7 @@ public class TransactionServiceMain {
    */
   public void init(String[] args) {
     if (conf == null) {
-      conf = HBaseConfiguration.create();
+      conf = new ConfigurationFactory().get();
     }
   }
 

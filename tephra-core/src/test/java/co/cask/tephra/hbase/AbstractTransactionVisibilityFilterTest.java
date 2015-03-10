@@ -16,36 +16,32 @@
 
 package co.cask.tephra.hbase;
 
-import co.cask.tephra.Transaction;
 import co.cask.tephra.TransactionManager;
 import co.cask.tephra.TxConstants;
+import co.cask.tephra.util.ConfigurationFactory;
 import com.google.common.collect.Lists;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hbase.HBaseConfiguration;
-import org.apache.hadoop.hbase.filter.Filter;
-import org.apache.hadoop.hbase.util.Bytes;
 import org.junit.After;
 import org.junit.Before;
 
 import java.util.List;
-import java.util.Map;
 
 /**
  * Common test class for TransactionVisibilityFilter implementations.
  */
 public abstract class AbstractTransactionVisibilityFilterTest {
 
-  protected static final byte[] FAM = Bytes.toBytes("f");
-  protected static final byte[] FAM2 = Bytes.toBytes("f2");
-  protected static final byte[] FAM3 = Bytes.toBytes("f3");
-  protected static final byte[] COL = Bytes.toBytes("c");
+  protected static final byte[] FAM = new byte[] {'f'};
+  protected static final byte[] FAM2 = new byte[] {'f', '2'};
+  protected static final byte[] FAM3 = new byte[] {'f', '3'};
+  protected static final byte[] COL = new byte[] {'c'};
   protected static final List<byte[]> EMPTY_CHANGESET = Lists.newArrayListWithCapacity(0);
 
   protected TransactionManager txManager;
 
   @Before
   public void setup() throws Exception {
-    Configuration conf = HBaseConfiguration.create();
+    Configuration conf = new ConfigurationFactory().get();
     conf.unset(TxConstants.Persist.CFG_TX_SNAPHOT_CODEC_CLASSES);
     txManager = new TransactionManager(conf);
     txManager.startAndWait();
@@ -55,9 +51,4 @@ public abstract class AbstractTransactionVisibilityFilterTest {
   public void tearDown() throws Exception {
     txManager.stopAndWait();
   }
-
-  /**
-   * Creates a new TransactionVisibilityFilter for the specific HBase version of the implementation.
-   */
-  protected abstract Filter createFilter(Transaction tx, Map<byte[], Long> familyTTLs);
 }

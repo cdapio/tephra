@@ -20,7 +20,6 @@ import co.cask.tephra.ChangeId;
 import com.google.common.collect.Sets;
 import com.google.common.io.ByteArrayDataOutput;
 import com.google.common.io.ByteStreams;
-import org.apache.hadoop.hbase.util.Bytes;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -31,6 +30,8 @@ import java.io.IOException;
  * test for {@link TransactionEdit}
  */
 public class TransactionEditTest {
+  private static final byte[] COL = new byte[] {'c'};
+
   @Test
   public void testV1SerdeCompat() throws Exception {
     TransactionEdit.TransactionEditCodec olderCodec = new TransactionEdit.TransactionEditCodecV1();
@@ -39,7 +40,7 @@ public class TransactionEditTest {
     // for decoding older versions that doesn't store it
     verifyDecodingSupportsOlderVersion(TransactionEdit.createStarted(2L, 0L, 1000L, null), olderCodec);
     verifyDecodingSupportsOlderVersion(
-      TransactionEdit.createCommitted(2L, Sets.newHashSet(new ChangeId(Bytes.toBytes("c"))), 3L, true), olderCodec);
+      TransactionEdit.createCommitted(2L, Sets.newHashSet(new ChangeId(COL)), 3L, true), olderCodec);
   }
   
   @Test
@@ -49,7 +50,7 @@ public class TransactionEditTest {
     // NOTE: transaction type to null as this is expected default for decoding older versions that doesn't store it
     verifyDecodingSupportsOlderVersion(TransactionEdit.createStarted(2L, 100L, 1000L, null), olderCodec);
     verifyDecodingSupportsOlderVersion(
-      TransactionEdit.createCommitted(2L, Sets.newHashSet(new ChangeId(Bytes.toBytes("c"))), 3L, true), olderCodec);
+      TransactionEdit.createCommitted(2L, Sets.newHashSet(new ChangeId(COL)), 3L, true), olderCodec);
   }
 
   @SuppressWarnings("deprecation")

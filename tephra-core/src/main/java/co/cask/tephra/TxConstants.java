@@ -231,6 +231,15 @@ public class TxConstants {
   }
 
   /**
+   * Configuration properties used by HBase
+   */
+  public static final class HBase {
+    public static final String ZOOKEEPER_QUORUM = "hbase.zookeeper.quorum";
+    public static final String ZK_SESSION_TIMEOUT = "zookeeper.session.timeout";
+    public static final int DEFAULT_ZK_SESSION_TIMEOUT = 180 * 1000;
+  }
+
+  /**
    * Configuration for the TransactionDataJanitor coprocessor.
    */
   public static final class DataJanitor {

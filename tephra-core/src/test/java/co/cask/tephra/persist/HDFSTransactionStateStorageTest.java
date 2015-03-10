@@ -20,7 +20,6 @@ import co.cask.tephra.TxConstants;
 import co.cask.tephra.snapshot.SnapshotCodecProvider;
 import co.cask.tephra.snapshot.SnapshotCodecV2;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hbase.HBaseConfiguration;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
@@ -48,7 +47,7 @@ public class HDFSTransactionStateStorageTest extends AbstractTransactionStateSto
     hConf.set(MiniDFSCluster.HDFS_MINIDFS_BASEDIR, tmpFolder.newFolder().getAbsolutePath());
 
     dfsCluster = new MiniDFSCluster.Builder(hConf).numDataNodes(1).build();
-    conf = HBaseConfiguration.create(dfsCluster.getFileSystem().getConf());
+    conf = new Configuration(dfsCluster.getFileSystem().getConf());
   }
 
   @AfterClass

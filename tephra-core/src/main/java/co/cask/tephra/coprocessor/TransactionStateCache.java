@@ -21,12 +21,12 @@ import co.cask.tephra.persist.HDFSTransactionStateStorage;
 import co.cask.tephra.persist.TransactionSnapshot;
 import co.cask.tephra.persist.TransactionStateStorage;
 import co.cask.tephra.snapshot.SnapshotCodecProvider;
+import co.cask.tephra.util.ConfigurationFactory;
 import com.google.common.util.concurrent.AbstractIdleService;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configurable;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hbase.HBaseConfiguration;
 
 import java.io.IOException;
 import java.util.concurrent.TimeUnit;
@@ -99,7 +99,7 @@ public class TransactionStateCache extends AbstractIdleService implements Config
   }
 
   protected Configuration getSnapshotConfiguration() throws IOException {
-    Configuration conf = HBaseConfiguration.create(hConf);
+    Configuration conf = new ConfigurationFactory().get(hConf);
     conf.unset(TxConstants.Persist.CFG_TX_SNAPHOT_CODEC_CLASSES);
     return conf;
   }
