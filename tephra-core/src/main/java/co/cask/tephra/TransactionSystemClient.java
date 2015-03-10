@@ -18,6 +18,7 @@ package co.cask.tephra;
 
 import java.io.InputStream;
 import java.util.Collection;
+import java.util.Set;
 
 /**
  * Client talking to transaction system.
@@ -108,4 +109,24 @@ public interface TransactionSystemClient {
    * Resets the state of the transaction manager.
    */
   void resetState();
+
+  /**
+   * Removes the given transaction ids from the invalid list. 
+   * @param invalidTxIds transaction ids
+   * @return true if invalid list got changed, false otherwise
+   */
+  boolean truncateInvalidTx(Set<Long> invalidTxIds);
+
+  /**
+   * Removes all transaction ids started before the given time from invalid list.
+   * @param time time in milliseconds
+   * @return true if invalid list got changed, false otherwise
+   * @throws InvalidTruncateTimeException if there are any in-progress transactions started before given time
+   */
+  boolean truncateInvalidTxBefore(long time) throws InvalidTruncateTimeException;
+
+  /**
+   * @return the size of invalid list
+   */
+  int getInvalidSize();
 }

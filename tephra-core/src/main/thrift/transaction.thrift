@@ -36,6 +36,10 @@ exception TTransactionCouldNotTakeSnapshotException {
   1: string message
 }
 
+exception TInvalidTruncateTimeException {
+  1: string message
+}
+
 # workaround for THRIFT-1474
 struct TBoolean {
   1: bool value
@@ -53,4 +57,7 @@ service TTransactionServer {
   binary getSnapshot() throws (1:TTransactionCouldNotTakeSnapshotException e),
   void resetState(),
   string status(),
+  TBoolean truncateInvalidTx(1: set<i64> txns),
+  TBoolean truncateInvalidTxBefore(1: i64 time) throws (1: TInvalidTruncateTimeException e),
+  i32 invalidTxSize(),
 }

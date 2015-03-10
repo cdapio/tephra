@@ -20,6 +20,8 @@ import co.cask.tephra.inmemory.InMemoryTxSystemClient;
 import co.cask.tephra.metrics.TxMetricsCollector;
 import co.cask.tephra.persist.InMemoryTransactionStateStorage;
 import co.cask.tephra.persist.TransactionStateStorage;
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
 import org.apache.hadoop.conf.Configuration;
 import org.junit.After;
 import org.junit.Assert;
@@ -176,6 +178,165 @@ public class TransactionManagerTest extends TransactionSystemTest {
       Assert.assertEquals(1, txm.getInvalidSize());
     } finally {
       txm.stopAndWait();
+    }
+  }
+  
+  @Test
+  public void testTruncateInvalid() throws Exception {
+    InMemoryTransactionStateStorage storage = new InMemoryTransactionStateStorage();
+    Configuration testConf = new Configuration(conf);
+    // No snapshots
+    testConf.setLong(TxConstants.Manager.CFG_TX_SNAPSHOT_INTERVAL, -1);
+    TransactionManager txm1 = new TransactionManager(testConf, storage, new TxMetricsCollector());
+    txm1.startAndWait();
+
+    TransactionManager txm2 = null;
+    Transaction tx1;
+    Transaction tx2;
+    Transaction tx3;
+    Transaction tx4;
+    Transaction tx5;
+    Transaction tx6;
+    try {
+      Assert.assertEquals(0, txm1.getInvalidSize());
+
+      // start a few transactions
+      tx1 = txm1.startLong();
+      tx2 = txm1.startShort();
+      tx3 = txm1.startLong();
+      tx4 = txm1.startShort();
+      tx5 = txm1.startLong();
+      tx6 = txm1.startShort();
+
+      // invalidate tx1, tx2, tx5 and tx6
+      txm1.invalidate(tx1.getWritePointer());
+      txm1.invalidate(tx2.getWritePointer());
+      txm1.invalidate(tx5.getWritePointer());
+      txm1.invalidate(tx6.getWritePointer());
+
+      // tx1, tx2, tx5 and tx6 should be in invalid list
+      Assert.assertEquals(
+        ImmutableList.of(tx1.getWritePointer(), tx2.getWritePointer(), tx5.getWritePointer(), tx6.getWritePointer()),
+        txm1.getCurrentState().getInvalid()
+      );
+      
+      // remove tx1 and tx6 from invalid list
+      Assert.assertTrue(txm1.truncateInvalidTx(ImmutableSet.of(tx1.getWritePointer(), tx6.getWritePointer())));
+      
+      // only tx2 and tx5 should be in invalid list now
+      Assert.assertEquals(ImmutableList.of(tx2.getWritePointer(), tx5.getWritePointer()),
+                          txm1.getCurrentState().getInvalid());
+      
+      // removing in-progress transactions should not have any effect
+      Assert.assertEquals(ImmutableSet.of(tx3.getWritePointer(), tx4.getWritePointer()),
+                          txm1.getCurrentState().getInProgress().keySet());
+      Assert.assertFalse(txm1.truncateInvalidTx(ImmutableSet.of(tx3.getWritePointer(), tx4.getWritePointer())));
+      // no change to in-progress
+      Assert.assertEquals(ImmutableSet.of(tx3.getWritePointer(), tx4.getWritePointer()),
+                          txm1.getCurrentState().getInProgress().keySet());
+      // no change to invalid list
+      Assert.assertEquals(ImmutableList.of(tx2.getWritePointer(), tx5.getWritePointer()),
+                          txm1.getCurrentState().getInvalid());
+
+      // Test transaction edit logs replay
+      // Start another transaction manager without stopping txm1 so that snapshot does not get written,
+      // and all logs can be replayed.
+      txm2 = new TransactionManager(testConf, storage, new TxMetricsCollector());
+      txm2.startAndWait();
+      Assert.assertEquals(ImmutableList.of(tx2.getWritePointer(), tx5.getWritePointer()),
+                          txm2.getCurrentState().getInvalid());
+      Assert.assertEquals(ImmutableSet.of(tx3.getWritePointer(), tx4.getWritePointer()),
+                          txm2.getCurrentState().getInProgress().keySet());
+    } finally {
+      txm1.stopAndWait();
+      if (txm2 != null) {
+        txm2.stopAndWait();
+      }
+    }
+  }
+
+  @Test
+  public void testTruncateInvalidBeforeTime() throws Exception {
+    InMemoryTransactionStateStorage storage = new InMemoryTransactionStateStorage();
+    Configuration testConf = new Configuration(conf);
+    // No snapshots
+    testConf.setLong(TxConstants.Manager.CFG_TX_SNAPSHOT_INTERVAL, -1);
+    TransactionManager txm1 = new TransactionManager(testConf, storage, new TxMetricsCollector());
+    txm1.startAndWait();
+
+    TransactionManager txm2 = null;
+    Transaction tx1;
+    Transaction tx2;
+    Transaction tx3;
+    Transaction tx4;
+    Transaction tx5;
+    Transaction tx6;
+    try {
+      Assert.assertEquals(0, txm1.getInvalidSize());
+
+      // start a few transactions
+      tx1 = txm1.startLong();
+      tx2 = txm1.startShort();
+      // Sleep so that transaction ids get generated a millisecond apart for assertion
+      // TEPHRA-63 should eliminate the need to sleep
+      TimeUnit.MILLISECONDS.sleep(1);
+      long timeBeforeTx3 = System.currentTimeMillis();
+      tx3 = txm1.startLong();
+      tx4 = txm1.startShort();
+      TimeUnit.MILLISECONDS.sleep(1);
+      long timeBeforeTx5 = System.currentTimeMillis();
+      tx5 = txm1.startLong();
+      tx6 = txm1.startShort();
+
+      // invalidate tx1, tx2, tx5 and tx6
+      txm1.invalidate(tx1.getWritePointer());
+      txm1.invalidate(tx2.getWritePointer());
+      txm1.invalidate(tx5.getWritePointer());
+      txm1.invalidate(tx6.getWritePointer());
+
+      // tx1, tx2, tx5 and tx6 should be in invalid list
+      Assert.assertEquals(
+        ImmutableList.of(tx1.getWritePointer(), tx2.getWritePointer(), tx5.getWritePointer(), tx6.getWritePointer()),
+        txm1.getCurrentState().getInvalid()
+      );
+
+      // remove transactions before tx3 from invalid list
+      Assert.assertTrue(txm1.truncateInvalidTxBefore(timeBeforeTx3));
+
+      // only tx5 and tx6 should be in invalid list now
+      Assert.assertEquals(ImmutableList.of(tx5.getWritePointer(), tx6.getWritePointer()),
+                          txm1.getCurrentState().getInvalid());
+
+      // removing invalid transactions before tx5 should throw exception since tx3 and tx4 are in-progress
+      Assert.assertEquals(ImmutableSet.of(tx3.getWritePointer(), tx4.getWritePointer()),
+                          txm1.getCurrentState().getInProgress().keySet());
+      try {
+        txm1.truncateInvalidTxBefore(timeBeforeTx5);
+        Assert.fail("Expected InvalidTruncateTimeException exception");
+      } catch (InvalidTruncateTimeException e) {
+        // Expected exception
+      }
+      // no change to in-progress
+      Assert.assertEquals(ImmutableSet.of(tx3.getWritePointer(), tx4.getWritePointer()),
+                          txm1.getCurrentState().getInProgress().keySet());
+      // no change to invalid list
+      Assert.assertEquals(ImmutableList.of(tx5.getWritePointer(), tx6.getWritePointer()),
+                          txm1.getCurrentState().getInvalid());
+
+      // Test transaction edit logs replay
+      // Start another transaction manager without stopping txm1 so that snapshot does not get written, 
+      // and all logs can be replayed.
+      txm2 = new TransactionManager(testConf, storage, new TxMetricsCollector());
+      txm2.startAndWait();
+      Assert.assertEquals(ImmutableList.of(tx5.getWritePointer(), tx6.getWritePointer()),
+                          txm2.getCurrentState().getInvalid());
+      Assert.assertEquals(ImmutableSet.of(tx3.getWritePointer(), tx4.getWritePointer()),
+                          txm2.getCurrentState().getInProgress().keySet());
+    } finally {
+      txm1.stopAndWait();
+      if (txm2 != null) {
+        txm2.stopAndWait();
+      }
     }
   }
 }

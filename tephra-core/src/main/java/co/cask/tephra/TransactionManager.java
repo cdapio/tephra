@@ -593,6 +593,13 @@ public class TransactionManager extends AbstractService {
               }
               doAbort(edit.getWritePointer(), type);
               break;
+            case TRUNCATE_INVALID_TX:
+              if (edit.getTruncateInvalidTxTime() != 0) {
+                doTruncateInvalidTxBefore(edit.getTruncateInvalidTxTime());
+              } else {
+                doTruncateInvalidTx(edit.getTruncateInvalidTx());
+              }
+              break;
             default:
               // unknown type!
               throw new IllegalArgumentException("Invalid state for WAL entry: " + edit.getState());
@@ -600,6 +607,8 @@ public class TransactionManager extends AbstractService {
         }
       } catch (IOException ioe) {
         throw Throwables.propagate(ioe);
+      } catch (InvalidTruncateTimeException e) {
+        throw Throwables.propagate(e);
       }
       LOG.info("Read " + editCnt + " edits from log " + log.getName());
     }
@@ -955,14 +964,96 @@ public class TransactionManager extends AbstractService {
     return false;
   }
 
+  /**
+   * Removes the given transaction ids from the invalid list.
+   * @param invalidTxIds transaction ids
+   * @return true if invalid list got changed, false otherwise
+   */
+  public boolean truncateInvalidTx(Set<Long> invalidTxIds) {
+    // guard against changes to the transaction log while processing
+    txMetricsCollector.gauge("truncateInvalidTx", 1);
+    Stopwatch timer = new Stopwatch().start();
+    this.logReadLock.lock();
+    try {
+      boolean success;
+      synchronized (this) {
+        ensureAvailable();
+        success = doTruncateInvalidTx(invalidTxIds);
+      }
+      appendToLog(TransactionEdit.createTruncateInvalidTx(invalidTxIds));
+      txMetricsCollector.gauge("truncateInvalidTx.latency", (int) timer.elapsedMillis());
+      return success;
+    } finally {
+      this.logReadLock.unlock();
+    }
+  }
+
+  private boolean doTruncateInvalidTx(Set<Long> invalidTxIds) {
+    LOG.info("Removing tx ids {} from invalid list", invalidTxIds);
+    boolean success = invalid.removeAll(invalidTxIds);
+    if (success) {
+      invalidArray = invalid.toLongArray();
+    }
+    return success;
+  }
+
+  /**
+   * Removes all transaction ids started before the given time from invalid list.
+   * @param time time in milliseconds
+   * @return true if invalid list got changed, false otherwise
+   * @throws InvalidTruncateTimeException if there are any in-progress transactions started before given time
+   */
+  public boolean truncateInvalidTxBefore(long time) throws InvalidTruncateTimeException {
+    // guard against changes to the transaction log while processing
+    txMetricsCollector.gauge("truncateInvalidTxBefore", 1);
+    Stopwatch timer = new Stopwatch().start();
+    this.logReadLock.lock();
+    try {
+      boolean success;
+      synchronized (this) {
+        ensureAvailable();
+        success = doTruncateInvalidTxBefore(time);
+      }
+      appendToLog(TransactionEdit.createTruncateInvalidTxBefore(time));
+      txMetricsCollector.gauge("truncateInvalidTxBefore.latency", (int) timer.elapsedMillis());
+      return success;
+    } finally {
+      this.logReadLock.unlock();
+    }
+  }
+  
+  private boolean doTruncateInvalidTxBefore(long time) throws InvalidTruncateTimeException {
+    LOG.info("Removing tx ids before {} from invalid list", time);
+    long truncateWp = time * TxConstants.MAX_TX_PER_MS;
+    // Check if there any in-progress transactions started earlier than truncate time
+    if (inProgress.lowerKey(truncateWp) != null) {
+      throw new InvalidTruncateTimeException("Transactions started earlier than " + time + " are in-progress");
+    }
+    
+    // Find all invalid transactions earlier than truncateWp
+    Set<Long> toTruncate = Sets.newHashSet();
+    for (long wp : invalid) {
+      // invalid list is sorted, hence can stop as soon as we reach a wp >= truncateWp
+      if (wp >= truncateWp) {
+        break;
+      }
+      toTruncate.add(wp);
+    }
+    return doTruncateInvalidTx(toTruncate);
+  }
+  
   // hack for exposing important metric
   public int getExcludedListSize() {
     return invalid.size() + inProgress.size();
   }
-  // package visible hack for exposing internals to unit tests
-  int getInvalidSize() {
+
+  /**
+   * @return the size of invalid list
+   */
+  public int getInvalidSize() {
     return this.invalid.size();
   }
+
   int getCommittedSize() {
     return this.committedChangeSets.size();
   }

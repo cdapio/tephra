@@ -16,11 +16,13 @@
 
 package co.cask.tephra.distributed;
 
+import co.cask.tephra.InvalidTruncateTimeException;
 import co.cask.tephra.Transaction;
 import co.cask.tephra.TransactionCouldNotTakeSnapshotException;
 import co.cask.tephra.TransactionNotInProgressException;
 import co.cask.tephra.TransactionSystemClient;
 import co.cask.tephra.TxConstants;
+import co.cask.tephra.distributed.thrift.TInvalidTruncateTimeException;
 import co.cask.tephra.distributed.thrift.TTransactionCouldNotTakeSnapshotException;
 import co.cask.tephra.distributed.thrift.TTransactionNotInProgressException;
 import co.cask.tephra.runtime.ConfigModule;
@@ -43,6 +45,7 @@ import org.slf4j.LoggerFactory;
 import java.io.InputStream;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Set;
 
 /**
  * A tx service client
@@ -415,7 +418,7 @@ public class TransactionServiceClient implements TransactionSystemClient {
   public void resetState() {
     try {
       this.execute(
-          new Operation<Boolean>("invalidate") {
+          new Operation<Boolean>("resetState") {
             @Override
             public Boolean execute(TransactionServiceThriftClient client)
                 throws TException {
@@ -428,4 +431,54 @@ public class TransactionServiceClient implements TransactionSystemClient {
     }
   }
 
+  @Override
+  public boolean truncateInvalidTx(final Set<Long> invalidTxIds) {
+    try {
+      return this.execute(
+        new Operation<Boolean>("truncateInvalidTx") {
+          @Override
+          public Boolean execute(TransactionServiceThriftClient client) throws TException {
+            return client.truncateInvalidTx(invalidTxIds);
+          }
+        });
+    } catch (Exception e) {
+      throw Throwables.propagate(e);
+    }
+  }
+
+  @Override
+  public boolean truncateInvalidTxBefore(final long time) throws InvalidTruncateTimeException {
+    try {
+      return this.execute(
+        new Operation<Boolean>("truncateInvalidTxBefore") {
+          @Override
+          public Boolean execute(TransactionServiceThriftClient client) throws Exception {
+            try {
+              return client.truncateInvalidTxBefore(time);
+            } catch (TInvalidTruncateTimeException e) {
+              throw new InvalidTruncateTimeException(e.getMessage());
+            }
+          }
+        });
+    } catch (InvalidTruncateTimeException e) {
+      throw e;
+    } catch (Exception e) {
+      throw Throwables.propagate(e);
+    }
+  }
+
+  @Override
+  public int getInvalidSize() {
+    try {
+      return this.execute(
+        new Operation<Integer>("getInvalidSize") {
+          @Override
+          public Integer execute(TransactionServiceThriftClient client) throws TException {
+            return client.getInvalidSize();
+          }
+        });
+    } catch (Exception e) {
+      throw Throwables.propagate(e);
+    }
+  }
 }

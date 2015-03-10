@@ -23,6 +23,7 @@ import co.cask.tephra.TransactionType;
 import co.cask.tephra.TxConstants;
 import co.cask.tephra.metrics.TxMetricsCollector;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
@@ -400,6 +401,74 @@ public abstract class AbstractTransactionStateStorageTest {
         Assert.assertEquals(0, snapshot1.getInProgress().size());
         Assert.assertEquals(0, snapshot1.getCommittedChangeSets().size());
         Assert.assertEquals(0, snapshot1.getCommittedChangeSets().size());
+      } finally {
+        txm.stopAndWait();
+      }
+    } finally {
+      if (storage != null) {
+        storage.stopAndWait();
+      }
+    }
+  }
+
+  @Test
+  public void testTruncateInvalidTxEditReplay() throws Exception {
+    Configuration conf = getConfiguration("testTruncateInvalidTxEditReplay");
+    TransactionStateStorage storage = null;
+    try {
+      storage = getStorage(conf);
+      storage.startAndWait();
+
+      // Create some txns, and invalidate all of them.
+      long time1 = System.currentTimeMillis();
+      long wp1 = time1 * TxConstants.MAX_TX_PER_MS;
+      TransactionEdit edit1 = TransactionEdit.createStarted(wp1, wp1 - 10, time1 + 100000, TransactionType.LONG);
+      TransactionEdit edit2 = TransactionEdit.createInvalid(wp1);
+
+      long time2 = time1 + 100;
+      long wp2 = time2 * TxConstants.MAX_TX_PER_MS;
+      TransactionEdit edit3 = TransactionEdit.createStarted(wp2, wp2 - 10, time2 + 10000, TransactionType.SHORT);
+      TransactionEdit edit4 = TransactionEdit.createInvalid(wp2);
+
+      long time3 = time1 + 2000;
+      long wp3 = time3 * TxConstants.MAX_TX_PER_MS;
+      TransactionEdit edit5 = TransactionEdit.createStarted(wp3, wp3 - 10, time3 + 100000, TransactionType.LONG);
+      TransactionEdit edit6 = TransactionEdit.createInvalid(wp3);
+
+      long time4 = time1 + 2100;
+      long wp4 = time4 * TxConstants.MAX_TX_PER_MS;
+      TransactionEdit edit7 = TransactionEdit.createStarted(wp4, wp4 - 10, time4 + 10000, TransactionType.SHORT);
+      TransactionEdit edit8 = TransactionEdit.createInvalid(wp4);
+
+      // remove wp1 and wp3 from invalid list
+      TransactionEdit edit9 = TransactionEdit.createTruncateInvalidTx(ImmutableSet.of(wp1, wp3));
+      // truncate invalid transactions before time3
+      TransactionEdit edit10 = TransactionEdit.createTruncateInvalidTxBefore(time3);
+
+      // write transaction edits
+      TransactionLog log = storage.createLog(time1);
+      log.append(edit1);
+      log.append(edit2);
+      log.append(edit3);
+      log.append(edit4);
+      log.append(edit5);
+      log.append(edit6);
+      log.append(edit7);
+      log.append(edit8);
+      log.append(edit9);
+      log.append(edit10);
+      log.close();
+
+      // Start transaction manager
+      TransactionManager txm = new TransactionManager(conf, storage, new TxMetricsCollector());
+      txm.startAndWait();
+      try {
+        // Only wp4 should be in invalid list.
+        TransactionSnapshot snapshot = txm.getCurrentState();
+        Assert.assertEquals(ImmutableList.of(wp4), snapshot.getInvalid());
+        Assert.assertEquals(0, snapshot.getInProgress().size());
+        Assert.assertEquals(0, snapshot.getCommittedChangeSets().size());
+        Assert.assertEquals(0, snapshot.getCommittedChangeSets().size());
       } finally {
         txm.stopAndWait();
       }
