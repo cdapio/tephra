@@ -35,6 +35,7 @@ import org.apache.hadoop.hbase.HColumnDescriptor;
 import org.apache.hadoop.hbase.HConstants;
 import org.apache.hadoop.hbase.HTableDescriptor;
 import org.apache.hadoop.hbase.client.Get;
+import org.apache.hadoop.hbase.client.OperationWithAttributes;
 import org.apache.hadoop.hbase.client.Scan;
 import org.apache.hadoop.hbase.coprocessor.BaseRegionObserver;
 import org.apache.hadoop.hbase.coprocessor.ObserverContext;
@@ -140,7 +141,7 @@ public class TransactionProcessor extends BaseRegionObserver {
   @Override
   public void preGetOp(ObserverContext<RegionCoprocessorEnvironment> e, Get get, List<Cell> results)
     throws IOException {
-    Transaction tx = txCodec.getFromOperation(get);
+    Transaction tx = getFromOperation(get);
     if (tx != null) {
       get.setMaxVersions();
       get.setTimeRange(TxUtils.getOldestVisibleTimestamp(ttlByFamily, tx), TxUtils.getMaxVisibleTimestamp(tx));
@@ -152,7 +153,7 @@ public class TransactionProcessor extends BaseRegionObserver {
   @Override
   public RegionScanner preScannerOpen(ObserverContext<RegionCoprocessorEnvironment> e, Scan scan, RegionScanner s)
     throws IOException {
-    Transaction tx = txCodec.getFromOperation(scan);
+    Transaction tx = getFromOperation(scan);
     if (tx != null) {
       scan.setMaxVersions();
       scan.setTimeRange(TxUtils.getOldestVisibleTimestamp(ttlByFamily, tx), TxUtils.getMaxVisibleTimestamp(tx));
@@ -204,6 +205,14 @@ public class TransactionProcessor extends BaseRegionObserver {
 
     return new StoreScanner(store, store.getScanInfo(), scan, scanners,
                             type, store.getSmallestReadPoint(), earliestPutTs);
+  }
+
+  private Transaction getFromOperation(OperationWithAttributes op) throws IOException {
+    byte[] encoded = op.getAttribute(TxConstants.TX_OPERATION_ATTRIBUTE_KEY);
+    if (encoded != null) {
+      return txCodec.decode(encoded);
+    }
+    return null;
   }
 
   /**
