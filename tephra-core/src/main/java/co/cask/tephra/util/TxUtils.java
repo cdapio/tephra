@@ -55,7 +55,8 @@ public class TxUtils {
    */
   public static long getMaxVisibleTimestamp(Transaction tx) {
     // NOTE: +1 here because we want read up to writepointer inclusive, but timerange's end is exclusive
-    return tx.getWritePointer() + 1;
+    // however, we also need to guard against overflow in the case write pointer is set to MAX_VALUE
+    return tx.getWritePointer() < Long.MAX_VALUE ? tx.getWritePointer() + 1 : tx.getWritePointer();
   }
 
   /**
