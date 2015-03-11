@@ -37,6 +37,15 @@ public class Transaction {
   public static final Transaction ALL_VISIBLE_LATEST =
     new Transaction(Long.MAX_VALUE, Long.MAX_VALUE, NO_EXCLUDES, NO_EXCLUDES, NO_TX_IN_PROGRESS, TransactionType.SHORT);
 
+  /**
+   * Creates a new transaction.
+   * @param readPointer read pointer for transaction
+   * @param writePointer write pointer for transaction
+   * @param invalids list of invalid transactions to exclude while reading
+   * @param inProgress list of in-progress transactions to exclude while reading
+   * @param firstShortInProgress earliest in-progress short transaction
+   * @param type transaction type
+   */
   public Transaction(long readPointer, long writePointer, long[] invalids, long[] inProgress,
                      long firstShortInProgress, TransactionType type) {
     this.readPointer = readPointer;
@@ -45,6 +54,19 @@ public class Transaction {
     this.inProgress = inProgress;
     this.firstShortInProgress = firstShortInProgress;
     this.type = type;
+  }
+
+  /**
+   * Creates a new short transaction.
+   * @param readPointer read pointer for transaction
+   * @param writePointer write pointer for transaction
+   * @param invalids list of invalid transactions to exclude while reading
+   * @param inProgress list of in-progress transactions to exclude while reading
+   * @param firstShortInProgress earliest in-progress short transaction
+   */
+  public Transaction(long readPointer, long writePointer, long[] invalids, long[] inProgress,
+                     long firstShortInProgress) {
+    this(readPointer, writePointer, invalids, inProgress, firstShortInProgress, TransactionType.SHORT);
   }
 
   public long getReadPointer() {

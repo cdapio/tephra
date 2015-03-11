@@ -17,8 +17,8 @@ package co.cask.tephra.hbase94;
 
 import co.cask.tephra.Transaction;
 import co.cask.tephra.TransactionAware;
+import co.cask.tephra.TransactionCodec;
 import co.cask.tephra.TxConstants;
-import co.cask.tephra.distributed.TransactionCodec;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.HTableDescriptor;
 import org.apache.hadoop.hbase.KeyValue;

@@ -17,8 +17,8 @@ package co.cask.tephra.hbase98;
 
 import co.cask.tephra.Transaction;
 import co.cask.tephra.TransactionAware;
+import co.cask.tephra.TransactionCodec;
 import co.cask.tephra.TxConstants;
-import co.cask.tephra.distributed.TransactionCodec;
 import com.google.protobuf.Descriptors.MethodDescriptor;
 import com.google.protobuf.Message;
 import com.google.protobuf.Service;

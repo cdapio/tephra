@@ -79,30 +79,30 @@ public class TransactionServiceThriftClient {
   }
 
   public Transaction startLong() throws TException {
-    return ConverterUtils.unwrap(client.startLong());
+    return TransactionConverterUtils.unwrap(client.startLong());
   }
 
   public Transaction startShort() throws TException {
-      return ConverterUtils.unwrap(client.startShort());
+      return TransactionConverterUtils.unwrap(client.startShort());
   }
 
   public Transaction startShort(int timeout) throws TException {
-      return ConverterUtils.unwrap(client.startShortTimeout(timeout));
+      return TransactionConverterUtils.unwrap(client.startShortTimeout(timeout));
   }
 
   public boolean canCommit(Transaction tx, Collection<byte[]> changeIds) throws TException {
 
-      return client.canCommitTx(ConverterUtils.wrap(tx),
+      return client.canCommitTx(TransactionConverterUtils.wrap(tx),
                                 ImmutableSet.copyOf(Iterables.transform(changeIds, BYTES_WRAPPER))).isValue();
   }
 
   public boolean commit(Transaction tx) throws TException {
 
-      return client.commitTx(ConverterUtils.wrap(tx)).isValue();
+      return client.commitTx(TransactionConverterUtils.wrap(tx)).isValue();
   }
 
   public void abort(Transaction tx) throws TException {
-      client.abortTx(ConverterUtils.wrap(tx));
+      client.abortTx(TransactionConverterUtils.wrap(tx));
   }
 
   public boolean invalidate(long tx) throws TException {

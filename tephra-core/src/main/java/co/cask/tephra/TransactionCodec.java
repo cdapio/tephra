@@ -14,9 +14,9 @@
  * the License.
  */
 
-package co.cask.tephra.distributed;
+package co.cask.tephra;
 
-import co.cask.tephra.Transaction;
+import co.cask.tephra.distributed.TransactionConverterUtils;
 import co.cask.tephra.distributed.thrift.TTransaction;
 import org.apache.thrift.TDeserializer;
 import org.apache.thrift.TException;
@@ -33,7 +33,7 @@ public class TransactionCodec {
   }
 
   public byte[] encode(Transaction tx) throws IOException {
-    TTransaction thriftTx = ConverterUtils.wrap(tx);
+    TTransaction thriftTx = TransactionConverterUtils.wrap(tx);
     TSerializer serializer = new TSerializer();
     try {
       return serializer.serialize(thriftTx);
@@ -47,7 +47,7 @@ public class TransactionCodec {
     TDeserializer deserializer = new TDeserializer();
     try {
       deserializer.deserialize(thriftTx, encoded);
-      return ConverterUtils.unwrap(thriftTx);
+      return TransactionConverterUtils.unwrap(thriftTx);
     } catch (TException te) {
       throw new IOException(te);
     }
