@@ -26,7 +26,7 @@ import java.util.concurrent.TimeUnit;
  */
 public class TxConstants {
   /**
-   * property set for {@link org.apache.hadoop.hbase.HColumnDescriptor} to configure time-to-live on data within
+   * property set for {@code org.apache.hadoop.hbase.HColumnDescriptor} to configure time-to-live on data within
    * the column family.  The value given is in milliseconds.  Once a cell's data has surpassed the given value in age,
    * the cell's data will no longer be visible and may be garbage collected.
    */
@@ -55,7 +55,11 @@ public class TxConstants {
    * overwritten with an empty {@code byte[]} to flag it as removed.  Cells with empty values will be filtered out
    * of the results for read operations.  If cells with empty values should be included in results (meaning data
    * cannot be transactionally deleted), then set this configuration property to true.
+   *
+   * @deprecated With HBase 0.98+, delete markers are indicated using cell tags, so empty values are implicitly
+   * allowed.
    */
+  @Deprecated
   public static final String ALLOW_EMPTY_VALUES_KEY = "data.tx.allow.empty.values";
   public static final boolean ALLOW_EMPTY_VALUES_DEFAULT = false;
 
@@ -63,6 +67,10 @@ public class TxConstants {
    * Key used to set the serialized transaction as an attribute on Get and Scan operations.
    */
   public static final String TX_OPERATION_ATTRIBUTE_KEY = "cask.tx";
+  /**
+   * Attribute key used to identify a Put as a delete marker
+   */
+  public static final String DELETE_OPERATION_ATTRIBUTE_KEY = "cask.tx.delete";
 
   // Constants for monitoring status
   public static final String STATUS_OK = "OK";
@@ -237,6 +245,9 @@ public class TxConstants {
     public static final String ZOOKEEPER_QUORUM = "hbase.zookeeper.quorum";
     public static final String ZK_SESSION_TIMEOUT = "zookeeper.session.timeout";
     public static final int DEFAULT_ZK_SESSION_TIMEOUT = 180 * 1000;
+
+    /** Cell tag type used for delete markers */
+    public static final byte CELL_TAG_TYPE_DELETE = (byte) 193;
   }
 
   /**

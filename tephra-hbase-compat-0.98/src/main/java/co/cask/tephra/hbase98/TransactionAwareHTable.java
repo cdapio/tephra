@@ -24,9 +24,11 @@ import com.google.protobuf.Message;
 import com.google.protobuf.Service;
 import com.google.protobuf.ServiceException;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hbase.Cell;
 import org.apache.hadoop.hbase.HTableDescriptor;
 import org.apache.hadoop.hbase.KeyValue;
 import org.apache.hadoop.hbase.TableName;
+import org.apache.hadoop.hbase.Tag;
 import org.apache.hadoop.hbase.client.Append;
 import org.apache.hadoop.hbase.client.Delete;
 import org.apache.hadoop.hbase.client.Durability;
@@ -62,6 +64,8 @@ import java.util.Set;
  * was started.
  */
 public class TransactionAwareHTable implements HTableInterface, TransactionAware {
+  public static final Tag DELETE_TAG = new Tag(TxConstants.HBase.CELL_TAG_TYPE_DELETE, new byte[0]);
+
   private static final Logger LOG = LoggerFactory.getLogger(TransactionAwareHTable.class);
   private Transaction tx;
   private final HTableInterface hTable;
@@ -539,12 +543,12 @@ public class TransactionAwareHTable implements HTableInterface, TransactionAware
 
   private Put transactionalizeAction(Put put) throws IOException {
     Put txPut = new Put(put.getRow(), tx.getWritePointer());
-    Set<Map.Entry<byte[], List<KeyValue>>> familyMap = put.getFamilyMap().entrySet();
+    Set<Map.Entry<byte[], List<Cell>>> familyMap = put.getFamilyCellMap().entrySet();
     if (!familyMap.isEmpty()) {
-      for (Map.Entry<byte[], List<KeyValue>> family : familyMap) {
-        List<KeyValue> familyValues = family.getValue();
+      for (Map.Entry<byte[], List<Cell>> family : familyMap) {
+        List<Cell> familyValues = family.getValue();
         if (!familyValues.isEmpty()) {
-          for (KeyValue value : familyValues) {
+          for (Cell value : familyValues) {
             txPut.add(value.getFamily(), value.getQualifier(), tx.getWritePointer(), value.getValue());
             changeSet.add(new ActionChange(txPut.getRow(), value.getFamily(), value.getQualifier()));
           }
@@ -555,7 +559,6 @@ public class TransactionAwareHTable implements HTableInterface, TransactionAware
       txPut.setAttribute(entry.getKey(), entry.getValue());
     }
     txPut.setWriteToWAL(put.getWriteToWAL());
-    addToOperation(txPut, tx);
     return txPut;
   }
 
@@ -564,6 +567,7 @@ public class TransactionAwareHTable implements HTableInterface, TransactionAware
 
     byte[] deleteRow = delete.getRow();
     Put txPut = new Put(deleteRow, transactionTimestamp);
+    txPut.setAttribute(TxConstants.DELETE_OPERATION_ATTRIBUTE_KEY, new byte[0]);
 
     Map<byte[], List<KeyValue>> familyToDelete = delete.getFamilyMap();
     if (familyToDelete.isEmpty()) {

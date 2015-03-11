@@ -25,17 +25,24 @@ import co.cask.tephra.hbase98.Filters;
 import co.cask.tephra.persist.TransactionSnapshot;
 import co.cask.tephra.util.TxUtils;
 import com.google.common.base.Supplier;
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.hbase.Cell;
+import org.apache.hadoop.hbase.CellUtil;
 import org.apache.hadoop.hbase.CoprocessorEnvironment;
 import org.apache.hadoop.hbase.HColumnDescriptor;
 import org.apache.hadoop.hbase.HConstants;
 import org.apache.hadoop.hbase.HTableDescriptor;
+import org.apache.hadoop.hbase.KeyValue;
+import org.apache.hadoop.hbase.Tag;
+import org.apache.hadoop.hbase.client.Durability;
 import org.apache.hadoop.hbase.client.Get;
 import org.apache.hadoop.hbase.client.OperationWithAttributes;
+import org.apache.hadoop.hbase.client.Put;
 import org.apache.hadoop.hbase.client.Scan;
 import org.apache.hadoop.hbase.coprocessor.BaseRegionObserver;
 import org.apache.hadoop.hbase.coprocessor.ObserverContext;
@@ -49,6 +56,7 @@ import org.apache.hadoop.hbase.regionserver.ScanType;
 import org.apache.hadoop.hbase.regionserver.Store;
 import org.apache.hadoop.hbase.regionserver.StoreScanner;
 import org.apache.hadoop.hbase.regionserver.compactions.CompactionRequest;
+import org.apache.hadoop.hbase.regionserver.wal.WALEdit;
 import org.apache.hadoop.hbase.util.Bytes;
 
 import java.io.IOException;
@@ -56,6 +64,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.NavigableMap;
 import java.util.Set;
 
 /**
@@ -88,12 +97,15 @@ import java.util.Set;
  * </p>
  */
 public class TransactionProcessor extends BaseRegionObserver {
+  public static final List<Tag> DELETE_TAGS = ImmutableList.<Tag>of(
+      new Tag(TxConstants.HBase.CELL_TAG_TYPE_DELETE, new byte[]{1}));
+
   private static final Log LOG = LogFactory.getLog(TransactionProcessor.class);
 
   private TransactionStateCache cache;
   private final TransactionCodec txCodec;
+
   protected Map<byte[], Long> ttlByFamily = Maps.newTreeMap(Bytes.BYTES_COMPARATOR);
-  protected boolean allowEmptyValues = TxConstants.ALLOW_EMPTY_VALUES_DEFAULT;
 
   public TransactionProcessor() {
     this.txCodec = new TransactionCodec();
@@ -123,9 +135,6 @@ public class TransactionProcessor extends BaseRegionObserver {
         }
         ttlByFamily.put(columnDesc.getName(), ttl);
       }
-
-      this.allowEmptyValues = env.getConfiguration().getBoolean(TxConstants.ALLOW_EMPTY_VALUES_KEY,
-                                                                TxConstants.ALLOW_EMPTY_VALUES_DEFAULT);
     }
   }
 
@@ -147,6 +156,27 @@ public class TransactionProcessor extends BaseRegionObserver {
       get.setTimeRange(TxUtils.getOldestVisibleTimestamp(ttlByFamily, tx), TxUtils.getMaxVisibleTimestamp(tx));
       Filter newFilter = Filters.combine(getTransactionFilter(tx, ScanType.USER_SCAN), get.getFilter());
       get.setFilter(newFilter);
+    }
+  }
+
+  @Override
+  public void prePut(ObserverContext<RegionCoprocessorEnvironment> e, Put put, WALEdit edit, Durability durability)
+      throws IOException {
+    if (put.getAttribute(TxConstants.DELETE_OPERATION_ATTRIBUTE_KEY) != null) {
+      LOG.info("Received a delete for " + put);
+      NavigableMap<byte[], List<Cell>> newFamilyMap = Maps.newTreeMap(Bytes.BYTES_COMPARATOR);
+
+      for (Map.Entry<byte[], List<Cell>> entry : put.getFamilyCellMap().entrySet()) {
+        List<Cell> newCells = Lists.newArrayListWithCapacity(entry.getValue().size());
+        for (Cell cell : entry.getValue()) {
+          LOG.info("Converting cell: " + cell);
+          newCells.add(new KeyValue(CellUtil.cloneRow(cell), CellUtil.cloneFamily(cell),
+              CellUtil.cloneQualifier(cell), cell.getTimestamp(), CellUtil.cloneValue(cell),
+              ImmutableList.<Tag>of(new Tag(TxConstants.HBase.CELL_TAG_TYPE_DELETE, new byte[]{1}))));
+        }
+        newFamilyMap.put(entry.getKey(), newCells);
+      }
+      put.setFamilyCellMap(newFamilyMap);
     }
   }
 
@@ -223,7 +253,7 @@ public class TransactionProcessor extends BaseRegionObserver {
    * @param type the type of scan being performed
    */
   protected Filter getTransactionFilter(Transaction tx, ScanType type) {
-    return new TransactionVisibilityFilter(tx, ttlByFamily, allowEmptyValues, type);
+    return new TransactionVisibilityFilter(tx, ttlByFamily, type);
   }
 
   /**

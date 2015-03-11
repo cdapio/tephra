@@ -23,6 +23,8 @@ import co.cask.tephra.metrics.TxMetricsCollector;
 import co.cask.tephra.persist.InMemoryTransactionStateStorage;
 import co.cask.tephra.persist.TransactionStateStorage;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hbase.Cell;
+import org.apache.hadoop.hbase.CellUtil;
 import org.apache.hadoop.hbase.HBaseTestingUtility;
 import org.apache.hadoop.hbase.HColumnDescriptor;
 import org.apache.hadoop.hbase.HTableDescriptor;
@@ -42,6 +44,11 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 
 import java.io.IOException;
+
+import static org.junit.Assert.assertArrayEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
 
 /**
  * Tests for TransactionAwareHTables.
@@ -122,7 +129,7 @@ public class TransactionAwareHTableTest {
     transactionContext.finish();
 
     byte[] value = result.getValue(TestBytes.family, TestBytes.qualifier);
-    Assert.assertArrayEquals(TestBytes.value, value);
+    assertArrayEquals(TestBytes.value, value);
   }
 
   /**
@@ -142,7 +149,7 @@ public class TransactionAwareHTableTest {
     Result result = transactionAwareHTable.get(new Get(TestBytes.row));
     transactionContext.finish();
     byte[] value = result.getValue(TestBytes.family, TestBytes.qualifier);
-    Assert.assertArrayEquals(value, null);
+    assertArrayEquals(value, null);
   }
 
   /**
@@ -161,7 +168,7 @@ public class TransactionAwareHTableTest {
     Result result = transactionAwareHTable.get(new Get(TestBytes.row));
     transactionContext.finish();
     byte[] value = result.getValue(TestBytes.family, TestBytes.qualifier);
-    Assert.assertArrayEquals(TestBytes.value, value);
+    assertArrayEquals(TestBytes.value, value);
 
     transactionContext.start();
     Delete delete = new Delete(TestBytes.row);
@@ -192,7 +199,7 @@ public class TransactionAwareHTableTest {
     Result result = transactionAwareHTable.get(new Get(TestBytes.row));
     transactionContext.finish();
     byte[] value = result.getValue(TestBytes.family, TestBytes.qualifier);
-    Assert.assertArrayEquals(TestBytes.value, value);
+    assertArrayEquals(TestBytes.value, value);
 
     transactionContext.start();
     Delete delete = new Delete(TestBytes.row);
@@ -203,7 +210,7 @@ public class TransactionAwareHTableTest {
     result = transactionAwareHTable.get(new Get(TestBytes.row));
     transactionContext.finish();
     value = result.getValue(TestBytes.family, TestBytes.qualifier);
-    Assert.assertArrayEquals(TestBytes.value, value);
+    assertArrayEquals(TestBytes.value, value);
   }
 
   /**
@@ -255,10 +262,10 @@ public class TransactionAwareHTableTest {
 
     Get get = new Get(TestBytes.row);
     Result row = transactionAwareHTable.get(get);
-    Assert.assertFalse(row.isEmpty());
+    assertFalse(row.isEmpty());
     byte[] col1Value = row.getValue(TestBytes.family, TestBytes.qualifier);
-    Assert.assertNotNull(col1Value);
-    Assert.assertArrayEquals(value, col1Value);
+    assertNotNull(col1Value);
+    assertArrayEquals(value, col1Value);
     // write from in-progress transaction should not be visible
     byte[] col2Value = row.getValue(TestBytes.family, col2);
     Assert.assertNull(col2Value);
@@ -268,12 +275,44 @@ public class TransactionAwareHTableTest {
 
     get = new Get(TestBytes.row);
     row = transactionAwareHTable.get(get);
-    Assert.assertFalse(row.isEmpty());
+    assertFalse(row.isEmpty());
     col2Value = row.getValue(TestBytes.family, col2);
     Assert.assertNull(col2Value);
 
     transactionContext.finish();
 
     inprogressTxContext2.abort();
+  }
+
+  /**
+   * Tests that empty values can be stored, since delete markers are now done using cell tags.
+   */
+  @Test
+  public void testEmptyValues() throws Exception {
+    // test a normal delete
+    transactionContext.start();
+    Put put = new Put(TestBytes.row);
+    put.add(TestBytes.family, TestBytes.qualifier, TestBytes.value);
+    transactionAwareHTable.put(put);
+    transactionContext.finish();
+
+    transactionContext.start();
+    Result result = transactionAwareHTable.get(new Get(TestBytes.row));
+    transactionContext.finish();
+    assertNotNull(result);
+    assertFalse(result.isEmpty());
+    Cell cell = result.getColumnLatestCell(TestBytes.family, TestBytes.qualifier);
+    assertNotNull(cell);
+    assertArrayEquals(TestBytes.value, CellUtil.cloneValue(cell));
+
+    transactionContext.start();
+    transactionAwareHTable.delete(new Delete(TestBytes.row));
+    transactionContext.finish();
+
+    transactionContext.start();
+    result = transactionAwareHTable.get(new Get(TestBytes.row));
+    transactionContext.finish();
+    assertNotNull(result);
+    assertTrue(result.isEmpty());
   }
 }

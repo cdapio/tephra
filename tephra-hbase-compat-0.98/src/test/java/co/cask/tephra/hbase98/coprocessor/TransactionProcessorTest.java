@@ -42,6 +42,7 @@ import org.apache.hadoop.hbase.HRegionInfo;
 import org.apache.hadoop.hbase.HTableDescriptor;
 import org.apache.hadoop.hbase.ServerName;
 import org.apache.hadoop.hbase.TableName;
+import org.apache.hadoop.hbase.Tag;
 import org.apache.hadoop.hbase.catalog.CatalogTracker;
 import org.apache.hadoop.hbase.client.Delete;
 import org.apache.hadoop.hbase.client.Put;
@@ -125,6 +126,7 @@ public class TransactionProcessorTest {
     dfsCluster = new MiniDFSCluster.Builder(hConf).numDataNodes(1).build();
     dfsCluster.waitActive();
     conf = HBaseConfiguration.create(dfsCluster.getFileSystem().getConf());
+    conf.set("hfile.format.version", "3");
 
     conf.unset(TxConstants.Manager.CFG_TX_HDFS_USER);
     conf.unset(TxConstants.Persist.CFG_TX_SNAPHOT_CODEC_CLASSES);
@@ -296,6 +298,7 @@ public class TransactionProcessorTest {
         if (i % 2 == 1) {
           // deletes are performed as puts with empty values
           Put deletePut = new Put(row);
+          deletePut.setAttribute(TxConstants.DELETE_OPERATION_ATTRIBUTE_KEY, new byte[0]);
           deletePut.add(familyBytes, Bytes.toBytes(i), deleteTs, new byte[0]);
           region.put(deletePut);
         }
@@ -304,7 +307,7 @@ public class TransactionProcessorTest {
       // read all back
       scan = new Scan(row);
       scan.setFilter(new TransactionVisibilityFilter(
-          TxUtils.createDummyTransaction(txSnapshot), new TreeMap<byte[], Long>(), false, ScanType.USER_SCAN));
+          TxUtils.createDummyTransaction(txSnapshot), new TreeMap<byte[], Long>(), ScanType.USER_SCAN));
       regionScanner = region.getScanner(scan);
       results = Lists.newArrayList();
       assertFalse(regionScanner.next(results));
@@ -326,7 +329,7 @@ public class TransactionProcessorTest {
 
       scan = new Scan(row);
       scan.setFilter(new TransactionVisibilityFilter(
-          TxUtils.createDummyTransaction(txSnapshot), new TreeMap<byte[], Long>(), false, ScanType.USER_SCAN));
+          TxUtils.createDummyTransaction(txSnapshot), new TreeMap<byte[], Long>(), ScanType.USER_SCAN));
       regionScanner = region.getScanner(scan);
       results = Lists.newArrayList();
       assertFalse(regionScanner.next(results));
