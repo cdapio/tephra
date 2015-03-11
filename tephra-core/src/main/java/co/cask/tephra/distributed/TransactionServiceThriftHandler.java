@@ -61,17 +61,17 @@ public class TransactionServiceThriftHandler implements TTransactionServer.Iface
 
   @Override
   public TTransaction startLong() throws TException {
-    return ConverterUtils.wrap(txManager.startLong());
+    return TransactionConverterUtils.wrap(txManager.startLong());
   }
 
   @Override
   public TTransaction startShort() throws TException {
-    return ConverterUtils.wrap(txManager.startShort());
+    return TransactionConverterUtils.wrap(txManager.startShort());
   }
 
   @Override
   public TTransaction startShortTimeout(int timeout) throws TException {
-    return ConverterUtils.wrap(txManager.startShort(timeout));
+    return TransactionConverterUtils.wrap(txManager.startShort(timeout));
   }
 
 
@@ -85,7 +85,7 @@ public class TransactionServiceThriftHandler implements TTransactionServer.Iface
       changeIds.add(changeId);
     }
     try {
-      return new TBoolean(txManager.canCommit(ConverterUtils.unwrap(tx), changeIds));
+      return new TBoolean(txManager.canCommit(TransactionConverterUtils.unwrap(tx), changeIds));
     } catch (TransactionNotInProgressException e) {
       throw new TTransactionNotInProgressException(e.getMessage());
     }
@@ -94,7 +94,7 @@ public class TransactionServiceThriftHandler implements TTransactionServer.Iface
   @Override
   public TBoolean commitTx(TTransaction tx) throws TException {
     try {
-      return new TBoolean(txManager.commit(ConverterUtils.unwrap(tx)));
+      return new TBoolean(txManager.commit(TransactionConverterUtils.unwrap(tx)));
     } catch (TransactionNotInProgressException e) {
       throw new TTransactionNotInProgressException(e.getMessage());
     }
@@ -102,7 +102,7 @@ public class TransactionServiceThriftHandler implements TTransactionServer.Iface
 
   @Override
   public void abortTx(TTransaction tx) throws TException {
-    txManager.abort(ConverterUtils.unwrap(tx));
+    txManager.abort(TransactionConverterUtils.unwrap(tx));
   }
 
   @Override

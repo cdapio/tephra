@@ -25,7 +25,7 @@ import com.google.common.primitives.Longs;
 /**
  * Utility methods to convert to thrift and back.
  */
-final class ConverterUtils {
+public final class TransactionConverterUtils {
 
   public static TTransaction wrap(Transaction tx) {
     return new TTransaction(tx.getWritePointer(), tx.getReadPointer(),
