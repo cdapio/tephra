@@ -24,8 +24,7 @@ elif [ -f /lib/lsb/init-functions ] ; then
   PLATFORM="UBUNTU"
   . /lib/lsb/init-functions
 else
-  echo "Platform is unsupported."
-  exit 0
+  PLATFORM="UNSUPPORTED"
 fi
 
 # Attempt to set APP_HOME
@@ -215,6 +214,10 @@ condrestart(){
         ub_status > /dev/null 2>&1
         retval=$?
       ;;
+      "UNSUPPORTED")
+        echo "condrestart is not supported on platform"
+        exit 1
+      ;;
     esac
 
   if [[ $retval -eq 0 ]]; then
@@ -277,6 +280,10 @@ case "$1" in
       ;;
       "UBUNTU")
         ub_status
+      ;;
+      "UNSUPPORTED")
+        echo "status is not supported on platform"
+        exit 1
       ;;
     esac 
   ;;
