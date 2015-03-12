@@ -23,6 +23,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.Collection;
+import javax.annotation.Nullable;
 
 /**
  * Utility class that encapsulates the transaction life cycle over a given set of
@@ -86,6 +87,13 @@ public class TransactionContext {
     abort(null);
   }
 
+  /**
+   * Returns the current transaction or null if no transaction is currently in progress.
+   */
+  @Nullable
+  public Transaction getCurrentTransaction() {
+    return currentTx;
+  }
 
   // CHECKSTYLE IGNORE "@throws" FOR 11 LINES
   /**
