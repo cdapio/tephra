@@ -41,9 +41,8 @@ public class InMemoryTransactionService extends AbstractService {
 
   private final DiscoveryService discoveryService;
   private final String serviceName;
-  protected final Provider<TransactionManager> txManagerProvider;
+  protected final TransactionManager txManager;
   private Cancellable cancelDiscovery;
-  protected TransactionManager txManager;
 
   // thrift server config
   protected final String address;
@@ -54,10 +53,10 @@ public class InMemoryTransactionService extends AbstractService {
   @Inject
   public InMemoryTransactionService(Configuration conf,
                             DiscoveryService discoveryService,
-                            Provider<TransactionManager> txManagerProvider) {
+                            TransactionManager txManager) {
 
     this.discoveryService = discoveryService;
-    this.txManagerProvider = txManagerProvider;
+    this.txManager = txManager;
     this.serviceName = conf.get(TxConstants.Service.CFG_DATA_TX_DISCOVERY_SERVICE_NAME,
                                 TxConstants.Service.DEFAULT_DATA_TX_DISCOVERY_SERVICE_NAME);
 
@@ -106,7 +105,6 @@ public class InMemoryTransactionService extends AbstractService {
   @Override
   protected void doStart() {
     try {
-      txManager = txManagerProvider.get();
       txManager.startAndWait();
       doRegister();
       LOG.info("Transaction Thrift service started successfully on " + getAddress());

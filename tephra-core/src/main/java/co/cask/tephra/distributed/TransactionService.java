@@ -52,8 +52,8 @@ public final class TransactionService extends InMemoryTransactionService {
   public TransactionService(Configuration conf,
                             ZKClient zkClient,
                             DiscoveryService discoveryService,
-                            Provider<TransactionManager> txManagerProvider) {
-    super(conf, discoveryService, txManagerProvider);
+                            TransactionManager txManager) {
+    super(conf, discoveryService, txManager);
     this.zkClient = zkClient;
   }
 
@@ -68,7 +68,6 @@ public final class TransactionService extends InMemoryTransactionService {
       @Override
       public void leader() {
         // if the txManager fails, we should stop the server
-        txManager = txManagerProvider.get();
         txManager.addListener(new ServiceListenerAdapter() {
           @Override
           public void failed(State from, Throwable failure) {
