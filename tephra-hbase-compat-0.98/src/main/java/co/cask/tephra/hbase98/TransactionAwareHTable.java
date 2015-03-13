@@ -55,6 +55,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.NavigableMap;
 import java.util.Set;
+import java.util.TreeSet;
 
 /**
  * A Transaction Aware HTable implementation for HBase 0.98. Operations are committed as usual,
@@ -67,27 +68,54 @@ public class TransactionAwareHTable implements HTableInterface, TransactionAware
   private final HTableInterface hTable;
   private final TransactionCodec txCodec;
   private final List<ActionChange> changeSet;
+  private final TxConstants.ConflictDetection conflictLevel;
   private boolean allowNonTransactional;
 
   /**
    * Create a transactional aware instance of the passed HTable
-   * @param hTable
+   *
+   * @param hTable underlying HBase table to use
    */
   public TransactionAwareHTable(HTableInterface hTable) {
     this(hTable, false);
   }
 
   /**
+   * Create a transactional aware instance of the passed HTable
+   *
+   * @param hTable underlying HBase table to use
+   * @param conflictLevel level of conflict detection to perform
+   */
+  public TransactionAwareHTable(HTableInterface hTable, TxConstants.ConflictDetection conflictLevel) {
+    this(hTable, conflictLevel, false);
+  }
+
+  /**
    * Create a transactional aware instance of the passed HTable, with the option
    * of allowing non-transactional operations.
-   * @param hTable
-   * @param allowNonTransactional
+   * @param hTable underlying HBase table to use
+   * @param allowNonTransactional if true, additional operations (checkAndPut, increment, checkAndDelete)
+   *                              will be available, though non-transactional
    */
   public TransactionAwareHTable(HTableInterface hTable, boolean allowNonTransactional) {
+    this(hTable, TxConstants.ConflictDetection.COLUMN, allowNonTransactional);
+  }
+
+  /**
+   * Create a transactional aware instance of the passed HTable, with the option
+   * of allowing non-transactional operations.
+   * @param hTable underlying HBase table to use
+   * @param conflictLevel level of conflict detection to perform
+   * @param allowNonTransactional if true, additional operations (checkAndPut, increment, checkAndDelete)
+   *                              will be available, though non-transactional
+   */
+  public TransactionAwareHTable(HTableInterface hTable, TxConstants.ConflictDetection conflictLevel,
+                                boolean allowNonTransactional) {
     this.hTable = hTable;
     this.changeSet = new ArrayList<ActionChange>();
     this.txCodec = new TransactionCodec();
     this.allowNonTransactional = allowNonTransactional;
+    this.conflictLevel = conflictLevel;
   }
 
   /**
@@ -442,10 +470,24 @@ public class TransactionAwareHTable implements HTableInterface, TransactionAware
 
   @Override
   public Collection<byte[]> getTxChanges() {
-    List<byte[]> txChanges = new ArrayList<byte[]>();
-    for (ActionChange change : changeSet) {
-      txChanges.add(Bytes.add(getTableName(), change.getRow(),
-                              Bytes.add(change.getFamily(), change.getQualifier())));
+    Collection<byte[]> txChanges;
+    switch (conflictLevel) {
+      case ROW:
+        // avoid reporting duplicate row keys
+        txChanges = new TreeSet<byte[]>(Bytes.BYTES_COMPARATOR);
+        for (ActionChange change : changeSet) {
+          txChanges.add(Bytes.add(getTableName(), change.getRow()));
+        }
+        break;
+      case COLUMN:
+        txChanges = new ArrayList<byte[]>(changeSet.size());
+        for (ActionChange change : changeSet) {
+          txChanges.add(Bytes.add(getTableName(), change.getRow(),
+              Bytes.add(change.getFamily(), change.getQualifier())));
+        }
+        break;
+      default:
+        throw new IllegalStateException("Unknown conflict detection level: " + conflictLevel);
     }
     return txChanges;
   }
