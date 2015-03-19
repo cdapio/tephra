@@ -15,17 +15,17 @@
  */
 package co.cask.tephra.hbase98;
 
+import co.cask.tephra.AbstractTransactionAwareTable;
 import co.cask.tephra.Transaction;
 import co.cask.tephra.TransactionAware;
-import co.cask.tephra.TransactionCodec;
 import co.cask.tephra.TxConstants;
 import com.google.protobuf.Descriptors.MethodDescriptor;
 import com.google.protobuf.Message;
 import com.google.protobuf.Service;
 import com.google.protobuf.ServiceException;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hbase.Cell;
 import org.apache.hadoop.hbase.HTableDescriptor;
-import org.apache.hadoop.hbase.KeyValue;
 import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.client.Append;
 import org.apache.hadoop.hbase.client.Delete;
@@ -44,32 +44,26 @@ import org.apache.hadoop.hbase.client.Scan;
 import org.apache.hadoop.hbase.client.coprocessor.Batch;
 import org.apache.hadoop.hbase.client.coprocessor.Batch.Callback;
 import org.apache.hadoop.hbase.ipc.CoprocessorRpcChannel;
-import org.apache.hadoop.hbase.util.Bytes;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.NavigableMap;
 import java.util.Set;
-import java.util.TreeSet;
 
 /**
  * A Transaction Aware HTable implementation for HBase 0.98. Operations are committed as usual,
  * but upon a failed or aborted transaction, they are rolled back to the state before the transaction
  * was started.
  */
-public class TransactionAwareHTable implements HTableInterface, TransactionAware {
+public class TransactionAwareHTable extends AbstractTransactionAwareTable
+    implements HTableInterface, TransactionAware {
+
   private static final Logger LOG = LoggerFactory.getLogger(TransactionAwareHTable.class);
-  private Transaction tx;
   private final HTableInterface hTable;
-  private final TransactionCodec txCodec;
-  private final List<ActionChange> changeSet;
-  private final TxConstants.ConflictDetection conflictLevel;
-  private boolean allowNonTransactional;
 
   /**
    * Create a transactional aware instance of the passed HTable
@@ -84,7 +78,7 @@ public class TransactionAwareHTable implements HTableInterface, TransactionAware
    * Create a transactional aware instance of the passed HTable
    *
    * @param hTable underlying HBase table to use
-   * @param conflictLevel level of conflict detection to perform
+   * @param conflictLevel level of conflict detection to perform (defaults to {@code COLUMN})
    */
   public TransactionAwareHTable(HTableInterface hTable, TxConstants.ConflictDetection conflictLevel) {
     this(hTable, conflictLevel, false);
@@ -105,34 +99,70 @@ public class TransactionAwareHTable implements HTableInterface, TransactionAware
    * Create a transactional aware instance of the passed HTable, with the option
    * of allowing non-transactional operations.
    * @param hTable underlying HBase table to use
-   * @param conflictLevel level of conflict detection to perform
+   * @param conflictLevel level of conflict detection to perform (defaults to {@code COLUMN})
    * @param allowNonTransactional if true, additional operations (checkAndPut, increment, checkAndDelete)
    *                              will be available, though non-transactional
    */
   public TransactionAwareHTable(HTableInterface hTable, TxConstants.ConflictDetection conflictLevel,
                                 boolean allowNonTransactional) {
+    super(conflictLevel, allowNonTransactional);
     this.hTable = hTable;
-    this.changeSet = new ArrayList<ActionChange>();
-    this.txCodec = new TransactionCodec();
-    this.allowNonTransactional = allowNonTransactional;
-    this.conflictLevel = conflictLevel;
   }
 
-  /**
-   * True if the instance allows non-transaction operations.
-   * @return
-   */
-  public boolean getAllowNonTransactional() {
-    return this.allowNonTransactional;
+  /* AbstractTransactionAwareTable implementation */
+
+  @Override
+  protected byte[] getTableKey() {
+    return getTableName();
   }
 
-  /**
-   * Set whether the instance allows non-transactional operations.
-   * @param allowNonTransactional
-   */
-  public void setAllowNonTransactional(boolean allowNonTransactional) {
-    this.allowNonTransactional = allowNonTransactional;
+  @Override
+  protected boolean doCommit() throws IOException {
+    hTable.flushCommits();
+    return true;
   }
+
+  @Override
+  protected boolean doRollback() throws Exception {
+    try {
+      List<Delete> rollbackDeletes = new ArrayList<Delete>(changeSet.size());
+      for (ActionChange change : changeSet) {
+        byte[] row = change.getRow();
+        byte[] family = change.getFamily();
+        byte[] qualifier = change.getQualifier();
+        long transactionTimestamp = tx.getWritePointer();
+        Delete rollbackDelete = new Delete(row);
+        switch (conflictLevel) {
+          case ROW:
+            // issue family delete for the tx write pointer
+            rollbackDelete.deleteFamilyVersion(change.getFamily(), transactionTimestamp);
+            break;
+          case COLUMN:
+            if (family != null && qualifier == null) {
+              rollbackDelete.deleteFamilyVersion(family, transactionTimestamp);
+            } else if (family != null && qualifier != null) {
+              rollbackDelete.deleteColumn(family, qualifier, transactionTimestamp);
+            }
+            break;
+          default:
+            throw new IllegalStateException("Unknown conflict detection level: " + conflictLevel);
+        }
+        rollbackDeletes.add(rollbackDelete);
+      }
+      hTable.delete(rollbackDeletes);
+      return true;
+    } finally {
+      try {
+        hTable.flushCommits();
+      } catch (Exception e) {
+        LOG.error("Could not flush HTable commits", e);
+      }
+      tx = null;
+      changeSet.clear();
+    }
+  }
+
+  /* HTableInterface implementation */
 
   @Override
   public byte[] getTableName() {
@@ -463,110 +493,6 @@ public class TransactionAwareHTable implements HTableInterface, TransactionAware
     hTable.setWriteBufferSize(writeBufferSize);
   }
 
-  @Override
-  public void startTx(Transaction tx) {
-    this.tx = tx;
-  }
-
-  @Override
-  public Collection<byte[]> getTxChanges() {
-    Collection<byte[]> txChanges;
-    switch (conflictLevel) {
-      case ROW:
-        // avoid reporting duplicate row keys
-        txChanges = new TreeSet<byte[]>(Bytes.BYTES_COMPARATOR);
-        for (ActionChange change : changeSet) {
-          txChanges.add(Bytes.add(getTableName(), change.getRow()));
-        }
-        break;
-      case COLUMN:
-        txChanges = new ArrayList<byte[]>(changeSet.size());
-        for (ActionChange change : changeSet) {
-          txChanges.add(Bytes.add(getTableName(), change.getRow(),
-              Bytes.add(change.getFamily(), change.getQualifier())));
-        }
-        break;
-      default:
-        throw new IllegalStateException("Unknown conflict detection level: " + conflictLevel);
-    }
-    return txChanges;
-  }
-
-  @Override
-  public boolean commitTx() throws Exception {
-    hTable.flushCommits();
-    return true;
-  }
-
-  @Override
-  public void postTxCommit() {
-    tx = null;
-    changeSet.clear();
-  }
-
-  @Override
-  public boolean rollbackTx() throws Exception {
-    try {
-      List<Delete> rollbackDeletes = new ArrayList<Delete>(changeSet.size());
-      for (ActionChange change : changeSet) {
-        byte[] row = change.getRow();
-        byte[] family = change.getFamily();
-        byte[] qualifier = change.getQualifier();
-        long transactionTimestamp = tx.getWritePointer();
-        Delete rollbackDelete = new Delete(row, transactionTimestamp);
-        if (family != null && qualifier == null) {
-          rollbackDelete.deleteFamily(family, transactionTimestamp);
-        } else if (family != null && qualifier != null) {
-          rollbackDelete.deleteColumn(family, qualifier, transactionTimestamp);
-        }
-        rollbackDeletes.add(rollbackDelete);
-      }
-      hTable.delete(rollbackDeletes);
-      return true;
-    } finally {
-      try {
-        hTable.flushCommits();
-      } catch (Exception e) {
-        LOG.error("Could not flush HTable commits", e);
-      }
-      tx = null;
-      changeSet.clear();
-    }
-  }
-
-  @Override
-  public String getTransactionAwareName() {
-    return Bytes.toString(getTableName());
-  }
-
-  /**
-   * Record of each transaction that causes a change. This reference is used to rollback
-   * any operation upon failure.
-   */
-  private class ActionChange {
-    private final byte[] row;
-    private final byte[] family;
-    private final byte[] qualifier;
-
-    private ActionChange(byte[] row, byte[] family, byte[] qualifier) {
-      this.row = row;
-      this.family = family;
-      this.qualifier = qualifier;
-    }
-
-    private byte[] getRow() {
-      return row;
-    }
-
-    private byte[] getFamily() {
-      return family;
-    }
-
-    private byte[] getQualifier() {
-      return qualifier;
-    }
-  }
-
   // Helpers to get copies of objects with the timestamp set to the current transaction timestamp.
 
   private Get transactionalizeAction(Get get) throws IOException {
@@ -581,14 +507,14 @@ public class TransactionAwareHTable implements HTableInterface, TransactionAware
 
   private Put transactionalizeAction(Put put) throws IOException {
     Put txPut = new Put(put.getRow(), tx.getWritePointer());
-    Set<Map.Entry<byte[], List<KeyValue>>> familyMap = put.getFamilyMap().entrySet();
+    Set<Map.Entry<byte[], List<Cell>>> familyMap = put.getFamilyCellMap().entrySet();
     if (!familyMap.isEmpty()) {
-      for (Map.Entry<byte[], List<KeyValue>> family : familyMap) {
-        List<KeyValue> familyValues = family.getValue();
+      for (Map.Entry<byte[], List<Cell>> family : familyMap) {
+        List<Cell> familyValues = family.getValue();
         if (!familyValues.isEmpty()) {
-          for (KeyValue value : familyValues) {
+          for (Cell value : familyValues) {
             txPut.add(value.getFamily(), value.getQualifier(), tx.getWritePointer(), value.getValue());
-            changeSet.add(new ActionChange(txPut.getRow(), value.getFamily(), value.getQualifier()));
+            addToChangeSet(txPut.getRow(), value.getFamily(), value.getQualifier());
           }
         }
       }
@@ -607,7 +533,7 @@ public class TransactionAwareHTable implements HTableInterface, TransactionAware
     byte[] deleteRow = delete.getRow();
     Put txPut = new Put(deleteRow, transactionTimestamp);
 
-    Map<byte[], List<KeyValue>> familyToDelete = delete.getFamilyMap();
+    Map<byte[], List<Cell>> familyToDelete = delete.getFamilyCellMap();
     if (familyToDelete.isEmpty()) {
       Result result = get(new Get(delete.getRow()));
       // Delete everything
@@ -616,25 +542,25 @@ public class TransactionAwareHTable implements HTableInterface, TransactionAware
         NavigableMap<byte[], byte[]> familyColumns = result.getFamilyMap(familyEntry.getKey());
         for (Map.Entry<byte[], byte[]> column : familyColumns.entrySet()) {
           txPut.add(familyEntry.getKey(), column.getKey(), transactionTimestamp, new byte[0]);
-          changeSet.add(new ActionChange(deleteRow, familyEntry.getKey(), column.getKey()));
+          addToChangeSet(deleteRow, familyEntry.getKey(), column.getKey());
         }
       }
     } else {
-      for (Map.Entry<byte [], List<KeyValue>> familyEntry : familyToDelete.entrySet()) {
+      for (Map.Entry<byte [], List<Cell>> familyEntry : familyToDelete.entrySet()) {
         byte[] family = familyEntry.getKey();
-        List<KeyValue> entries = familyEntry.getValue();
+        List<Cell> entries = familyEntry.getValue();
         if (entries.isEmpty()) {
           Result result = get(new Get(delete.getRow()));
           // Delete entire family
           NavigableMap<byte[], byte[]> familyColumns = result.getFamilyMap(family);
           for (Map.Entry<byte[], byte[]> column : familyColumns.entrySet()) {
             txPut.add(family, column.getKey(), transactionTimestamp, new byte[0]);
-            changeSet.add(new ActionChange(deleteRow, family, column.getKey()));
+            addToChangeSet(deleteRow, family, column.getKey());
           }
         } else {
-          for (KeyValue value : entries) {
+          for (Cell value : entries) {
             txPut.add(value.getFamily(), value.getQualifier(), transactionTimestamp, new byte[0]);
-            changeSet.add(new ActionChange(deleteRow, value.getFamily(), value.getQualifier()));
+            addToChangeSet(deleteRow, value.getFamily(), value.getQualifier());
           }
         }
       }
