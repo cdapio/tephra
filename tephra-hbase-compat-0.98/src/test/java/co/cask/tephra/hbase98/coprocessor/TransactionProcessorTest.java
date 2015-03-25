@@ -31,6 +31,7 @@ import com.google.common.collect.ImmutableSortedMap;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.protobuf.Message;
+import com.google.protobuf.Service;
 import it.unimi.dsi.fastutil.longs.LongArrayList;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
@@ -52,10 +53,12 @@ import org.apache.hadoop.hbase.ipc.RpcServerInterface;
 import org.apache.hadoop.hbase.master.TableLockManager;
 import org.apache.hadoop.hbase.protobuf.generated.HBaseProtos;
 import org.apache.hadoop.hbase.protobuf.generated.RPCProtos.RequestHeader;
+import org.apache.hadoop.hbase.protobuf.generated.RegionServerStatusProtos;
 import org.apache.hadoop.hbase.regionserver.CompactionRequestor;
 import org.apache.hadoop.hbase.regionserver.FlushRequester;
 import org.apache.hadoop.hbase.regionserver.HRegion;
 import org.apache.hadoop.hbase.regionserver.HRegionFileSystem;
+import org.apache.hadoop.hbase.regionserver.HeapMemoryManager;
 import org.apache.hadoop.hbase.regionserver.Leases;
 import org.apache.hadoop.hbase.regionserver.RegionScanner;
 import org.apache.hadoop.hbase.regionserver.RegionServerAccounting;
@@ -562,6 +565,30 @@ public class TransactionProcessorTest {
 
     @Override
     public ServerNonceManager getNonceManager() {
+      return null;
+    }
+
+    @Override
+    public boolean reportRegionStateTransition(
+        RegionServerStatusProtos.RegionStateTransition.TransitionCode transitionCode,
+        long l, HRegionInfo... hRegionInfos) {
+      return false;
+    }
+
+    @Override
+    public boolean reportRegionStateTransition(
+        RegionServerStatusProtos.RegionStateTransition.TransitionCode transitionCode,
+        HRegionInfo... hRegionInfos) {
+      return false;
+    }
+
+    @Override
+    public boolean registerService(Service service) {
+      return false;
+    }
+
+    @Override
+    public HeapMemoryManager getHeapMemoryManager() {
       return null;
     }
   }
