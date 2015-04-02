@@ -26,7 +26,24 @@ import java.util.concurrent.TimeUnit;
  */
 public class TxConstants {
   /**
-   * property set for {@link org.apache.hadoop.hbase.HColumnDescriptor} to configure time-to-live on data within
+   * Defines what level of conflict detection should be used for transactions.  {@code ROW} means that only the
+   * table name and row key for each change will be used to determine if the transaction change sets conflict.
+   * {@code COLUMN} means that the table name, row key, column family, and column qualifier will all be used to
+   * identify write conflicts.  The default value used by {@code TransactionAwareHTable} implementations is
+   * {@code COLUMN}.
+   *
+   * <p>
+   * <strong>Note: for a given table, all clients must use the same conflict detection setting!</strong>
+   * Otherwise conflicts will not be flagged correctly.
+   * </p>
+   */
+  public enum ConflictDetection {
+    ROW,
+    COLUMN
+  }
+
+  /**
+   * property set for {@code org.apache.hadoop.hbase.HColumnDescriptor} to configure time-to-live on data within
    * the column family.  The value given is in milliseconds.  Once a cell's data has surpassed the given value in age,
    * the cell's data will no longer be visible and may be garbage collected.
    */

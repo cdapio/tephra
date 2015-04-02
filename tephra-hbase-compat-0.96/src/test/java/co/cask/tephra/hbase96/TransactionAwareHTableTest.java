@@ -15,14 +15,18 @@
  */
 package co.cask.tephra.hbase96;
 
+import co.cask.tephra.TransactionConflictException;
 import co.cask.tephra.TransactionContext;
 import co.cask.tephra.TransactionManager;
+import co.cask.tephra.TxConstants;
 import co.cask.tephra.hbase96.coprocessor.TransactionProcessor;
 import co.cask.tephra.inmemory.InMemoryTxSystemClient;
 import co.cask.tephra.metrics.TxMetricsCollector;
 import co.cask.tephra.persist.InMemoryTransactionStateStorage;
 import co.cask.tephra.persist.TransactionStateStorage;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hbase.Cell;
+import org.apache.hadoop.hbase.CellUtil;
 import org.apache.hadoop.hbase.HBaseTestingUtility;
 import org.apache.hadoop.hbase.HColumnDescriptor;
 import org.apache.hadoop.hbase.HTableDescriptor;
@@ -42,6 +46,12 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 
 import java.io.IOException;
+
+import static org.junit.Assert.assertArrayEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.fail;
 
 /**
  * Tests for TransactionAwareHTables.
@@ -122,7 +132,7 @@ public class TransactionAwareHTableTest {
     transactionContext.finish();
 
     byte[] value = result.getValue(TestBytes.family, TestBytes.qualifier);
-    Assert.assertArrayEquals(TestBytes.value, value);
+    assertArrayEquals(TestBytes.value, value);
   }
 
   /**
@@ -142,7 +152,7 @@ public class TransactionAwareHTableTest {
     Result result = transactionAwareHTable.get(new Get(TestBytes.row));
     transactionContext.finish();
     byte[] value = result.getValue(TestBytes.family, TestBytes.qualifier);
-    Assert.assertArrayEquals(value, null);
+    assertArrayEquals(value, null);
   }
 
   /**
@@ -161,7 +171,7 @@ public class TransactionAwareHTableTest {
     Result result = transactionAwareHTable.get(new Get(TestBytes.row));
     transactionContext.finish();
     byte[] value = result.getValue(TestBytes.family, TestBytes.qualifier);
-    Assert.assertArrayEquals(TestBytes.value, value);
+    assertArrayEquals(TestBytes.value, value);
 
     transactionContext.start();
     Delete delete = new Delete(TestBytes.row);
@@ -173,7 +183,7 @@ public class TransactionAwareHTableTest {
     result = transactionAwareHTable.get(new Get(TestBytes.row));
     transactionContext.finish();
     value = result.getValue(TestBytes.family, TestBytes.qualifier);
-    Assert.assertNull(value);
+    assertNull(value);
   }
 
   /**
@@ -192,7 +202,7 @@ public class TransactionAwareHTableTest {
     Result result = transactionAwareHTable.get(new Get(TestBytes.row));
     transactionContext.finish();
     byte[] value = result.getValue(TestBytes.family, TestBytes.qualifier);
-    Assert.assertArrayEquals(TestBytes.value, value);
+    assertArrayEquals(TestBytes.value, value);
 
     transactionContext.start();
     Delete delete = new Delete(TestBytes.row);
@@ -203,7 +213,7 @@ public class TransactionAwareHTableTest {
     result = transactionAwareHTable.get(new Get(TestBytes.row));
     transactionContext.finish();
     value = result.getValue(TestBytes.family, TestBytes.qualifier);
-    Assert.assertArrayEquals(TestBytes.value, value);
+    assertArrayEquals(TestBytes.value, value);
   }
 
   /**
@@ -255,25 +265,120 @@ public class TransactionAwareHTableTest {
 
     Get get = new Get(TestBytes.row);
     Result row = transactionAwareHTable.get(get);
-    Assert.assertFalse(row.isEmpty());
+    assertFalse(row.isEmpty());
     byte[] col1Value = row.getValue(TestBytes.family, TestBytes.qualifier);
-    Assert.assertNotNull(col1Value);
-    Assert.assertArrayEquals(value, col1Value);
+    assertNotNull(col1Value);
+    assertArrayEquals(value, col1Value);
     // write from in-progress transaction should not be visible
     byte[] col2Value = row.getValue(TestBytes.family, col2);
-    Assert.assertNull(col2Value);
+    assertNull(col2Value);
 
     // commit in-progress transaction, should still not be visible
     inprogressTxContext1.finish();
 
     get = new Get(TestBytes.row);
     row = transactionAwareHTable.get(get);
-    Assert.assertFalse(row.isEmpty());
+    assertFalse(row.isEmpty());
     col2Value = row.getValue(TestBytes.family, col2);
-    Assert.assertNull(col2Value);
+    assertNull(col2Value);
 
     transactionContext.finish();
 
     inprogressTxContext2.abort();
+  }
+
+  @Test
+  public void testRowLevelConflictDetection() throws Exception {
+    TransactionAwareHTable txTable1 = new TransactionAwareHTable(new HTable(conf, TestBytes.table),
+        TxConstants.ConflictDetection.ROW);
+    TransactionContext txContext1 = new TransactionContext(new InMemoryTxSystemClient(txManager), txTable1);
+
+    TransactionAwareHTable txTable2 = new TransactionAwareHTable(new HTable(conf, TestBytes.table),
+        TxConstants.ConflictDetection.ROW);
+    TransactionContext txContext2 = new TransactionContext(new InMemoryTxSystemClient(txManager), txTable2);
+
+    byte[] row1 = Bytes.toBytes("row1");
+    byte[] row2 = Bytes.toBytes("row2");
+    byte[] col1 = Bytes.toBytes("c1");
+    byte[] col2 = Bytes.toBytes("c2");
+    byte[] val1 = Bytes.toBytes("val1");
+    byte[] val2 = Bytes.toBytes("val2");
+
+    // test that concurrent writing to different rows succeeds
+    txContext1.start();
+    txTable1.put(new Put(row1).add(TestBytes.family, col1, val1));
+
+    txContext2.start();
+    txTable2.put(new Put(row2).add(TestBytes.family, col1, val2));
+
+    // should be no conflicts
+    txContext1.finish();
+    txContext2.finish();
+
+    transactionContext.start();
+    Result res = transactionAwareHTable.get(new Get(row1));
+    assertFalse(res.isEmpty());
+    Cell cell = res.getColumnLatestCell(TestBytes.family, col1);
+    assertNotNull(cell);
+    assertArrayEquals(val1, CellUtil.cloneValue(cell));
+
+    res = transactionAwareHTable.get(new Get(row2));
+    assertFalse(res.isEmpty());
+    cell = res.getColumnLatestCell(TestBytes.family, col1);
+    assertNotNull(cell);
+    assertArrayEquals(val2, CellUtil.cloneValue(cell));
+    transactionContext.finish();
+
+    // test that writing to different columns in the same row fails
+    txContext1.start();
+    txTable1.put(new Put(row1).add(TestBytes.family, col1, val2));
+
+    txContext2.start();
+    txTable2.put(new Put(row1).add(TestBytes.family, col2, val2));
+
+    txContext1.finish();
+    try {
+      txContext2.finish();
+      fail("txContext2 should have encountered a row-level conflict during commit");
+    } catch (TransactionConflictException tce) {
+      txContext2.abort();
+    }
+
+    transactionContext.start();
+    res = transactionAwareHTable.get(new Get(row1));
+    assertFalse(res.isEmpty());
+    cell = res.getColumnLatestCell(TestBytes.family, col1);
+    assertNotNull(cell);
+    // should now be val2
+    assertArrayEquals(val2, CellUtil.cloneValue(cell));
+
+    cell = res.getColumnLatestCell(TestBytes.family, col2);
+    // col2 should not be visible due to conflict
+    assertNull(cell);
+    transactionContext.finish();
+
+    // test that writing to the same column in the same row fails
+    txContext1.start();
+    txTable1.put(new Put(row2).add(TestBytes.family, col2, val1));
+
+    txContext2.start();
+    txTable2.put(new Put(row2).add(TestBytes.family, col2, val2));
+
+    txContext1.finish();
+    try {
+      txContext2.finish();
+      fail("txContext2 should have encountered a row and column level conflict during commit");
+    } catch (TransactionConflictException tce) {
+      txContext2.abort();
+    }
+
+    transactionContext.start();
+    res = transactionAwareHTable.get(new Get(row2));
+    assertFalse(res.isEmpty());
+    cell = res.getColumnLatestCell(TestBytes.family, col2);
+    assertNotNull(cell);
+    // should now be val1
+    assertArrayEquals(val1, CellUtil.cloneValue(cell));
+    transactionContext.finish();
   }
 }
