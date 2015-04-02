@@ -76,6 +76,7 @@ public class InMemoryTransactionService extends AbstractService {
 
     LOG.info("Configuring TransactionService" +
                ", address: " + address +
+               ", port: " + port +
                ", threads: " + threads +
                ", io threads: " + ioThreads +
                ", max read buffer (bytes): " + maxReadBufferBytes);
