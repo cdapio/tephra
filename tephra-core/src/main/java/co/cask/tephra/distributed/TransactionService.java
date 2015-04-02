@@ -33,7 +33,9 @@ import org.apache.twill.zookeeper.ZKClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
+import java.net.UnknownHostException;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -59,6 +61,14 @@ public final class TransactionService extends InMemoryTransactionService {
 
   @Override
   protected InetSocketAddress getAddress() {
+    if (address.equals("0.0.0.0")) {
+      // resolve hostname
+      try {
+        return new InetSocketAddress(InetAddress.getLocalHost().getHostName(), server.getBindAddress().getPort());
+      } catch (UnknownHostException x) {
+        LOG.error("Cannot resolve hostname for 0.0.0.0", x);
+      }
+    }
     return server.getBindAddress();
   }
 
