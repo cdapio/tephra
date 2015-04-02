@@ -231,6 +231,20 @@ public class TxConstants {
   }
 
   /**
+   * Configuration properties for metrics reporting
+   */
+  public static final class Metrics {
+    /**
+     * Frequency at which metrics should be reported, in seconds.
+     */
+    public static final String REPORT_PERIOD_KEY = "data.tx.metrics.period";
+    /**
+     * Default report period for metrics, in seconds.
+     */
+    public static final int REPORT_PERIOD_DEFAULT = 60;
+  }
+
+  /**
    * Configuration properties used by HBase
    */
   public static final class HBase {

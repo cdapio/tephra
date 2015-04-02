@@ -16,17 +16,47 @@
 
 package co.cask.tephra.metrics;
 
+import com.google.common.util.concurrent.AbstractIdleService;
+import org.apache.hadoop.conf.Configuration;
+
 /**
  * Metrics Collector Class, to emit Transaction Related Metrics.
  * Note: This default implementation is a no-op and doesn't emit any metrics
  */
-public class TxMetricsCollector {
+public class TxMetricsCollector extends AbstractIdleService implements MetricsCollector {
 
   /**
    * Send metric value for a given metric, identified by the metricsName, can also be tagged
    */
-  public void gauge(String metricName, int value, String...tags) {
-   //no-op
+  @Override
+  public void gauge(String metricName, int value, String... tags) {
+    //no-op
   }
 
+  @Override
+  public void rate(String metricName) {
+    // no-op
+  }
+
+  @Override
+  public void histogram(String metricName, int value) {
+    // no-op
+  }
+
+  @Override
+  public void configure(Configuration conf) {
+    // no-op
+  }
+
+  /* Service methods */
+
+  @Override
+  protected void startUp() throws Exception {
+    // no-op
+  }
+
+  @Override
+  protected void shutDown() throws Exception {
+    // no-op
+  }
 }
