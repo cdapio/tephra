@@ -79,6 +79,7 @@ public final class TransactionService extends InMemoryTransactionService {
 
         server = ThriftRPCServer.builder(TTransactionServer.class)
           .setHost(address)
+          .setPort(port)
           .setWorkerThreads(threads)
           .setMaxReadBufferBytes(maxReadBufferBytes)
           .setIOThreads(ioThreads)

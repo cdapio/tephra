@@ -47,6 +47,7 @@ public class InMemoryTransactionService extends AbstractService {
 
   // thrift server config
   protected final String address;
+  protected final int port;
   protected final int threads;
   protected final int ioThreads;
   protected final int maxReadBufferBytes;
@@ -62,6 +63,7 @@ public class InMemoryTransactionService extends AbstractService {
                                 TxConstants.Service.DEFAULT_DATA_TX_DISCOVERY_SERVICE_NAME);
 
     address = conf.get(TxConstants.Service.CFG_DATA_TX_BIND_ADDRESS, TxConstants.Service.DEFAULT_DATA_TX_BIND_ADDRESS);
+    port = conf.getInt(TxConstants.Service.CFG_DATA_TX_BIND_PORT, TxConstants.Service.DEFAULT_DATA_TX_BIND_PORT);
 
     // Retrieve the number of threads for the service
     threads = conf.getInt(TxConstants.Service.CFG_DATA_TX_SERVER_THREADS,
@@ -74,6 +76,7 @@ public class InMemoryTransactionService extends AbstractService {
 
     LOG.info("Configuring TransactionService" +
                ", address: " + address +
+               ", port: " + port +
                ", threads: " + threads +
                ", io threads: " + ioThreads +
                ", max read buffer (bytes): " + maxReadBufferBytes);
