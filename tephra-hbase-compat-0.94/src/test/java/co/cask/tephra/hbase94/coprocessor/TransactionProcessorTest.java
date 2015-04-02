@@ -22,6 +22,7 @@ import co.cask.tephra.TransactionType;
 import co.cask.tephra.TxConstants;
 import co.cask.tephra.coprocessor.TransactionStateCache;
 import co.cask.tephra.coprocessor.TransactionStateCacheSupplier;
+import co.cask.tephra.metrics.TxMetricsCollector;
 import co.cask.tephra.persist.HDFSTransactionStateStorage;
 import co.cask.tephra.persist.TransactionSnapshot;
 import co.cask.tephra.snapshot.DefaultSnapshotCodec;
@@ -118,7 +119,7 @@ public class TransactionProcessorTest {
                                                                                         TransactionType.SHORT))),
         new HashMap<Long, Set<ChangeId>>(), new TreeMap<Long, Set<ChangeId>>());
     HDFSTransactionStateStorage tmpStorage =
-      new HDFSTransactionStateStorage(conf, new SnapshotCodecProvider(conf));
+      new HDFSTransactionStateStorage(conf, new SnapshotCodecProvider(conf), new TxMetricsCollector());
     tmpStorage.startAndWait();
     tmpStorage.writeSnapshot(txSnapshot);
     tmpStorage.stopAndWait();

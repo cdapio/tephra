@@ -36,8 +36,20 @@ export PID_DIR=/tmp
 # Set the JVM heap size
 # export JAVA_HEAPMAX=-Xmx2048m
 
+# Additional runtime options
+#
+# GC logging options.
+# Uncomment the following two lines, making any desired changes, to enable GC logging output
+# export GC_LOG_OPTS="-verbose:gc -XX:+PrintGCDetails -XX:+PrintGCDateStamps -Xloggc:server-gc.log -XX:+UseGCLogFileRotation -XX:NumberOfGCLogFiles=2 -XX:GCLogFileSize=50M"
+# export OPTS="$OPTS $GC_LOG_OPTS"
+#
+# JMX options.
+# Uncomment the following two lines, making any desired changes, to enable remote JMX connectivity
+# export JMX_OPTS="-Dcom.sun.management.jmxremote.ssl=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.port=13001"
+# export OPTS="$OPTS $JMX_OPTS"
+
 # Extra Java runtime options.
 # Below are what we set by default.  May only work with SUN JVM.
 # For more on why as well as other possible settings,
 # see http://wiki.apache.org/hadoop/PerformanceTuning
-export OPTS="-XX:+UseConcMarkSweepGC"
+export OPTS="$OPTS -XX:+UseConcMarkSweepGC"

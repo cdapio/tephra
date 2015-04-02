@@ -170,6 +170,8 @@ properties can be added to the ``hbase-site.xml`` file on the server's ``CLASSPA
 +-------------------------------+------------+-----------------------------------------------------------------+
 | ``data.tx.snapshot.retain``   | 10         | Number of old transaction snapshots to retain                   |
 +-------------------------------+------------+-----------------------------------------------------------------+
+| ``data.tx.metrics.period``    | 60         | Frequency for metrics reporting (seconds)                       |
++-------------------------------+------------+-----------------------------------------------------------------+
 
 To run the Transaction server, execute the following command in your Tephra installation::
 
@@ -246,6 +248,40 @@ For HBase 0.98::
 You may configure the ``TransactionProcessor`` to be loaded only on HBase tables that you will
 be using for transaction reads and writes.  However, you must ensure that the coprocessor is 
 available on all impacted tables in order for Tephra to function correctly.
+
+Metrics Reporting
+.................
+
+Tephra ships with built-in support for reporting metrics via JMX and a log file, using the
+`Dropwizard Metrics <http://metrics.dropwizard.io>`_ library.
+
+To enable JMX reporting for metrics, you will need to enable JMX in the Java runtime
+arguments. Edit the ``bin/tephra-env.sh`` script and uncomment the following lines, making any
+desired changes to configuration for port used, SSL, and JMX authentication::
+
+  # export JMX_OPTS="-Dcom.sun.management.jmxremote.ssl=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.port=13001"
+  # export OPTS="$OPTS $JMX_OPTS"
+
+To enable file-based reporting for metrics, edit the ``conf/logback.xml`` file and uncomment the
+following section, replacing the ``FILE-PATH`` placeholder with a valid directory on the local
+filesystem::
+
+  <appender name="METRICS" class="ch.qos.logback.core.rolling.RollingFileAppender">
+    <file>/FILE-PATH/metrics.log</file>
+    <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+      <fileNamePattern>metrics.log.%d{yyyy-MM-dd}</fileNamePattern>
+      <maxHistory>30</maxHistory>
+    </rollingPolicy>
+    <encoder>
+      <pattern>%d{ISO8601} %msg%n</pattern>
+    </encoder>
+  </appender>
+  <logger name="tephra-metrics" level="TRACE" additivity="false">
+    <appender-ref ref="METRICS" />
+  </logger>
+
+The frequency of metrics reporting may be configured by setting the ``data.tx.metrics.period``
+configuration property to the report frequency in seconds.
 
 
 Client APIs

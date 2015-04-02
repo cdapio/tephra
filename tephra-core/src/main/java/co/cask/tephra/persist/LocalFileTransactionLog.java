@@ -16,6 +16,8 @@
 
 package co.cask.tephra.persist;
 
+import co.cask.tephra.metrics.MetricsCollector;
+
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
 import java.io.DataInputStream;
@@ -36,8 +38,8 @@ public class LocalFileTransactionLog extends AbstractTransactionLog {
    * Creates a new transaction log using the given file instance.
    * @param logFile The log file to use.
    */
-  public LocalFileTransactionLog(File logFile, long timestamp) {
-    super(timestamp);
+  public LocalFileTransactionLog(File logFile, long timestamp, MetricsCollector metricsCollector) {
+    super(timestamp, metricsCollector);
     this.logFile = logFile;
   }
 
