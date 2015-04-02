@@ -97,8 +97,11 @@
     <logback.version>1.0.9</logback.version>
     <hadoop.version>2.2.0</hadoop.version>
     <hbase94.version>0.94.6.1.continuuity</hbase94.version>
+    <zk.hbase94.version>3.4.5</zk.hbase94.version>
     <hbase96.version>0.96.2-hadoop2</hbase96.version>
+    <zk.hbase96.version>3.4.5</zk.hbase96.version>
     <hbase98.version>0.98.4-hadoop2</hbase98.version>
+    <zk.hbase98.version>3.4.6</zk.hbase98.version>
     <junit.version>4.11</junit.version>
     <slf4j.version>1.7.5</slf4j.version>
     <thrift.version>0.9.0</thrift.version>
