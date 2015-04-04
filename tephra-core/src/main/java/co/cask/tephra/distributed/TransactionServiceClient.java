@@ -32,6 +32,7 @@ import co.cask.tephra.runtime.TransactionModules;
 import co.cask.tephra.runtime.ZKModule;
 import co.cask.tephra.util.ConfigurationFactory;
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Stopwatch;
 import com.google.common.base.Throwables;
 import com.google.inject.Guice;
 import com.google.inject.Inject;
@@ -75,11 +76,28 @@ public class TransactionServiceClient implements TransactionSystemClient {
     if (args.length == 1 && "-v".equals(args[0])) {
       verbose = true;
     }
-    doMain(verbose, new ConfigurationFactory().get());
+    Options opts = parseOptions(args);
+    doMain(opts, verbose, new ConfigurationFactory().get());
+  }
+
+  private static Options parseOptions(String[] args) {
+    Options opts = new Options();
+    for (int i = 0; i < args.length; i++) {
+      if ("-c".equals(args[i])) {
+        i++;
+        if (args.length > i) {
+          opts.count = Integer.parseInt(args[i]);
+        }
+      } else {
+        System.err.println("Unknown arguement: " + args[i]);
+        System.exit(1);
+      }
+    }
+    return opts;
   }
 
   @VisibleForTesting
-  public static void doMain(boolean verbose, Configuration conf) throws Exception {
+  public static void doMain(Options opts, boolean verbose, Configuration conf) throws Exception {
     LOG.info("Starting tx server client test.");
     Injector injector = Guice.createInjector(
       new ConfigModule(conf),
@@ -94,36 +112,49 @@ public class TransactionServiceClient implements TransactionSystemClient {
 
     try {
       TransactionServiceClient client = injector.getInstance(TransactionServiceClient.class);
-      LOG.info("Starting tx...");
-      Transaction tx = client.startShort();
-      if (verbose) {
-        LOG.info("Started tx details: " + tx.toString());
-      } else {
-        LOG.info("Started tx: " + tx.getWritePointer() +
-                   ", readPointer: " + tx.getReadPointer() +
-                   ", invalids: " + tx.getInvalids().length +
-                   ", inProgress: " + tx.getInProgress().length);
-      }
-      LOG.info("Checking if canCommit tx...");
-      boolean canCommit = client.canCommit(tx, Collections.<byte[]>emptyList());
-      LOG.info("canCommit: " + canCommit);
-      if (canCommit) {
-        LOG.info("Committing tx...");
-        boolean committed = client.commit(tx);
-        LOG.info("Committed tx: " + committed);
-        if (!committed) {
-          LOG.info("Aborting tx...");
-          client.abort(tx);
-          LOG.info("Aborted tx...");
+      LOG.info("Running for {} transactions", opts.count);
+      Stopwatch timer = new Stopwatch().start();
+      int cnt = 0;
+      while (cnt++ < opts.count) {
+        LOG.debug("Starting tx...");
+        Transaction tx = client.startShort();
+        if (verbose) {
+          LOG.debug("Started tx details: {}", tx.toString());
+        } else {
+          LOG.debug("Started tx: {}, readPointer: {}, invalids: {}, inProgress: ",
+              tx.getWritePointer(), tx.getReadPointer(), tx.getInvalids().length, tx.getInProgress().length);
         }
-      } else {
-        LOG.info("Aborting tx...");
-        client.abort(tx);
-        LOG.info("Aborted tx...");
+        LOG.debug("Checking if canCommit tx...");
+        boolean canCommit = client.canCommit(tx, Collections.<byte[]>emptyList());
+        LOG.debug("canCommit: " + canCommit);
+        if (canCommit) {
+          LOG.debug("Committing tx...");
+          boolean committed = client.commit(tx);
+          LOG.debug("Committed tx: " + committed);
+          if (!committed) {
+            LOG.debug("Aborting tx...");
+            client.abort(tx);
+            LOG.debug("Aborted tx...");
+          }
+        } else {
+          LOG.debug("Aborting tx...");
+          client.abort(tx);
+          LOG.debug("Aborted tx...");
+        }
       }
+      LOG.info("Finished in {}", timer.toString());
     } finally {
       zkClient.stopAndWait();
     }
+  }
+
+  /**
+   * Command line options
+   */
+  @VisibleForTesting
+  public static class Options {
+    // number of operations to run
+    int count = 1;
   }
 
   /**
