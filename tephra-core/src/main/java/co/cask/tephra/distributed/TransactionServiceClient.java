@@ -68,16 +68,13 @@ public class TransactionServiceClient implements TransactionSystemClient {
    * @throws Exception
    */
   public static void main(String[] args) throws Exception {
-    if (args.length > 1 || (args.length == 1 && !"-v".equals(args[0]))) {
-      System.out.println("USAGE: TransactionServiceClient [-v]");
-    }
-
-    boolean verbose = false;
-    if (args.length == 1 && "-v".equals(args[0])) {
-      verbose = true;
-    }
     Options opts = parseOptions(args);
-    doMain(opts, verbose, new ConfigurationFactory().get());
+    doMain(opts, new ConfigurationFactory().get());
+  }
+
+  private static void usage(int exitCode) {
+    System.out.println("USAGE: TransactionServiceClient [-v] [-c runCount]");
+    System.exit(exitCode);
   }
 
   private static Options parseOptions(String[] args) {
@@ -88,16 +85,20 @@ public class TransactionServiceClient implements TransactionSystemClient {
         if (args.length > i) {
           opts.count = Integer.parseInt(args[i]);
         }
+      } else if ("-v".equals(args[i])) {
+        opts.verbose = true;
+      } else if ("-h".equals(args[i]) || "-?".equals(args[i])) {
+        usage(0);
       } else {
-        System.err.println("Unknown arguement: " + args[i]);
-        System.exit(1);
+        System.err.println("Unknown argument: " + args[i]);
+        usage(1);
       }
     }
     return opts;
   }
 
   @VisibleForTesting
-  public static void doMain(Options opts, boolean verbose, Configuration conf) throws Exception {
+  public static void doMain(Options opts, Configuration conf) throws Exception {
     LOG.info("Starting tx server client test.");
     Injector injector = Guice.createInjector(
       new ConfigModule(conf),
@@ -118,7 +119,7 @@ public class TransactionServiceClient implements TransactionSystemClient {
       while (cnt++ < opts.count) {
         LOG.debug("Starting tx...");
         Transaction tx = client.startShort();
-        if (verbose) {
+        if (opts.verbose) {
           LOG.debug("Started tx details: {}", tx.toString());
         } else {
           LOG.debug("Started tx: {}, readPointer: {}, invalids: {}, inProgress: ",
@@ -155,6 +156,8 @@ public class TransactionServiceClient implements TransactionSystemClient {
   public static class Options {
     // number of operations to run
     int count = 1;
+    // whether to print additional output
+    boolean verbose;
   }
 
   /**

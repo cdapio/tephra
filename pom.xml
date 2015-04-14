@@ -32,6 +32,7 @@
     <module>tephra-hbase-compat-0.94</module>
     <module>tephra-hbase-compat-0.96</module>
     <module>tephra-hbase-compat-0.98</module>
+    <module>tephra-perf</module>
     <module>tephra-distribution</module>
   </modules>
 
@@ -102,7 +103,7 @@
     <junit.version>4.11</junit.version>
     <slf4j.version>1.7.5</slf4j.version>
     <thrift.version>0.9.0</thrift.version>
-    <twill.version>0.4.0-incubating</twill.version>
+    <twill.version>0.5.0-incubating</twill.version>
     <dropwizard.metrics.version>3.1.0</dropwizard.metrics.version>
   </properties>
 
@@ -163,10 +164,6 @@
         <artifactId>twill-core</artifactId>
         <version>${twill.version}</version>
         <exclusions>
-          <exclusion>
-            <groupId>org.apache.kafka</groupId>
-            <artifactId>kafka_2.10</artifactId>
-          </exclusion>
           <exclusion>
             <groupId>io.netty</groupId>
             <artifactId>netty</artifactId>

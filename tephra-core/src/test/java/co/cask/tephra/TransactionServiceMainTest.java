@@ -63,7 +63,7 @@ public class TransactionServiceMainTest {
         t.start();
         // Wait for service to startup
         latch.await();
-        TransactionServiceClient.doMain(new TransactionServiceClient.Options(), true, conf);
+        TransactionServiceClient.doMain(new TransactionServiceClient.Options(), conf);
       } finally {
         main.stop();
         t.join();
