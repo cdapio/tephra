@@ -93,6 +93,11 @@ public class DefaultMetricsCollector extends TxMetricsCollector {
   }
 
   @Override
+  public void rate(String metricName, int count) {
+    metrics.meter(metricName).mark(count);
+  }
+
+  @Override
   protected void startUp() throws Exception {
     jmxReporter.start();
     reporter.start(reportPeriod, TimeUnit.SECONDS);

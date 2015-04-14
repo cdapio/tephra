@@ -297,6 +297,7 @@ public class TransactionManager extends AbstractService {
       public void doRun() {
         txMetricsCollector.gauge("committing.size", committingChangeSets.size());
         txMetricsCollector.gauge("committed.size", committedChangeSets.size());
+        txMetricsCollector.gauge("inprogress.size", inProgress.size());
         txMetricsCollector.gauge("invalid.size", invalidArray.length);
       }
 
@@ -305,6 +306,7 @@ public class TransactionManager extends AbstractService {
         // perform a final metrics emit
         txMetricsCollector.gauge("committing.size", committingChangeSets.size());
         txMetricsCollector.gauge("committed.size", committedChangeSets.size());
+        txMetricsCollector.gauge("inprogress.size", inProgress.size());
         txMetricsCollector.gauge("invalid.size", invalidArray.length);
       }
 
@@ -1127,7 +1129,8 @@ public class TransactionManager extends AbstractService {
     try {
       Stopwatch timer = new Stopwatch().start();
       currentLog.append(edit);
-      txMetricsCollector.histogram("append.edit", (int) timer.elapsedMillis());
+      txMetricsCollector.rate("wal.append.count");
+      txMetricsCollector.histogram("wal.append.latency", (int) timer.elapsedMillis());
     } catch (IOException ioe) {
       abortService("Error appending to transaction log", ioe);
     }
@@ -1137,7 +1140,8 @@ public class TransactionManager extends AbstractService {
     try {
       Stopwatch timer = new Stopwatch().start();
       currentLog.append(edits);
-      txMetricsCollector.histogram("append.edit", (int) timer.elapsedMillis());
+      txMetricsCollector.rate("wal.append.count", edits.size());
+      txMetricsCollector.histogram("wal.append.latency", (int) timer.elapsedMillis());
     } catch (IOException ioe) {
       abortService("Error appending to transaction log", ioe);
     }

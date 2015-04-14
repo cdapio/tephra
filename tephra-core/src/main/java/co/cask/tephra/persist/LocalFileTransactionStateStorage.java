@@ -17,6 +17,7 @@
 package co.cask.tephra.persist;
 
 import co.cask.tephra.TxConstants;
+import co.cask.tephra.metrics.MetricsCollector;
 import co.cask.tephra.snapshot.SnapshotCodecProvider;
 import com.google.common.base.Function;
 import com.google.common.base.Preconditions;
@@ -58,12 +59,15 @@ public class LocalFileTransactionStateStorage extends AbstractTransactionStateSt
   };
 
   private final String configuredSnapshotDir;
+  private final MetricsCollector metricsCollector;
   private File snapshotDir;
 
   @Inject
-  public LocalFileTransactionStateStorage(Configuration conf, SnapshotCodecProvider codecProvider) {
+  public LocalFileTransactionStateStorage(Configuration conf, SnapshotCodecProvider codecProvider,
+                                          MetricsCollector metricsCollector) {
     super(codecProvider);
     this.configuredSnapshotDir = conf.get(TxConstants.Manager.CFG_TX_SNAPSHOT_LOCAL_DIR);
+    this.metricsCollector = metricsCollector;
   }
 
   @Override
@@ -213,7 +217,7 @@ public class LocalFileTransactionStateStorage extends AbstractTransactionStateSt
       @Nullable
       @Override
       public TransactionLog apply(@Nullable TimestampedFilename input) {
-        return new LocalFileTransactionLog(input.getFile(), input.getTimestamp());
+        return new LocalFileTransactionLog(input.getFile(), input.getTimestamp(), metricsCollector);
       }
     });
   }
@@ -222,7 +226,7 @@ public class LocalFileTransactionStateStorage extends AbstractTransactionStateSt
   public TransactionLog createLog(long timestamp) throws IOException {
     File newLogFile = new File(snapshotDir, LOG_FILE_PREFIX + timestamp);
     LOG.info("Creating new transaction log at {}", newLogFile.getAbsolutePath());
-    return new LocalFileTransactionLog(newLogFile, timestamp);
+    return new LocalFileTransactionLog(newLogFile, timestamp, metricsCollector);
   }
 
   @Override

@@ -39,6 +39,11 @@ public class TxMetricsCollector extends AbstractIdleService implements MetricsCo
   }
 
   @Override
+  public void rate(String metricName, int count) {
+    // no-op
+  }
+
+  @Override
   public void histogram(String metricName, int value) {
     // no-op
   }

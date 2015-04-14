@@ -31,6 +31,8 @@ public interface MetricsCollector extends Service {
 
   void rate(String metricName);
 
+  void rate(String metricName, int count);
+
   void histogram(String metricName, int value);
 
   void configure(Configuration conf);

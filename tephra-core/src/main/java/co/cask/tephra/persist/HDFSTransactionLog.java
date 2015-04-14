@@ -16,6 +16,7 @@
 
 package co.cask.tephra.persist;
 
+import co.cask.tephra.metrics.MetricsCollector;
 import com.google.common.base.Throwables;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileStatus;
@@ -46,8 +47,8 @@ public class HDFSTransactionLog extends AbstractTransactionLog {
    * @param logPath Path to the log file.
    */
   public HDFSTransactionLog(final FileSystem fs, final Configuration hConf,
-                            final Path logPath, long timestamp) {
-    super(timestamp);
+                            final Path logPath, long timestamp, MetricsCollector metricsCollector) {
+    super(timestamp, metricsCollector);
     this.fs = fs;
     this.hConf = hConf;
     this.logPath = logPath;

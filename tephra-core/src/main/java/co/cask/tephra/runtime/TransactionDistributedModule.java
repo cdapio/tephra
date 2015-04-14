@@ -46,7 +46,7 @@ final class TransactionDistributedModule extends AbstractModule {
 
     bind(TransactionManager.class).in(Singleton.class);
     bind(TransactionSystemClient.class).to(TransactionServiceClient.class).in(Singleton.class);
-    bind(MetricsCollector.class).to(DefaultMetricsCollector.class);
+    bind(MetricsCollector.class).to(DefaultMetricsCollector.class).in(Singleton.class);
 
     install(new FactoryModuleBuilder()
         .implement(TransactionExecutor.class, DefaultTransactionExecutor.class)
