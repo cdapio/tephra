@@ -44,11 +44,14 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 
 import java.io.IOException;
+import java.util.Collection;
 
 import static org.junit.Assert.assertArrayEquals;
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
 /**
@@ -380,5 +383,17 @@ public class TransactionAwareHTableTest {
     // should now be val1
     assertArrayEquals(val1, cell.getValue());
     transactionContext.finish();
+
+    // verify change set that is being reported only on rows
+    txContext1.start();
+    txTable1.put(new Put(row1).add(TestBytes.family, col1, val1));
+    txTable1.put(new Put(row2).add(TestBytes.family, col2, val2));
+
+    Collection<byte[]> changeSet = txTable1.getTxChanges();
+    assertNotNull(changeSet);
+    assertEquals(2, changeSet.size());
+    assertTrue(changeSet.contains(txTable1.getChangeKey(row1, null, null)));
+    assertTrue(changeSet.contains(txTable1.getChangeKey(row2, null, null)));
+    txContext1.finish();
   }
 }
