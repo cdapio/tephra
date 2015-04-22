@@ -30,12 +30,16 @@ import com.google.common.collect.Sets;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.hbase.Cell;
+import org.apache.hadoop.hbase.CellUtil;
 import org.apache.hadoop.hbase.CoprocessorEnvironment;
 import org.apache.hadoop.hbase.HColumnDescriptor;
 import org.apache.hadoop.hbase.HConstants;
 import org.apache.hadoop.hbase.HTableDescriptor;
+import org.apache.hadoop.hbase.client.Delete;
+import org.apache.hadoop.hbase.client.Durability;
 import org.apache.hadoop.hbase.client.Get;
 import org.apache.hadoop.hbase.client.OperationWithAttributes;
+import org.apache.hadoop.hbase.client.Put;
 import org.apache.hadoop.hbase.client.Scan;
 import org.apache.hadoop.hbase.coprocessor.BaseRegionObserver;
 import org.apache.hadoop.hbase.coprocessor.ObserverContext;
@@ -49,6 +53,7 @@ import org.apache.hadoop.hbase.regionserver.ScanType;
 import org.apache.hadoop.hbase.regionserver.Store;
 import org.apache.hadoop.hbase.regionserver.StoreScanner;
 import org.apache.hadoop.hbase.regionserver.compactions.CompactionRequest;
+import org.apache.hadoop.hbase.regionserver.wal.WALEdit;
 import org.apache.hadoop.hbase.util.Bytes;
 
 import java.io.IOException;
@@ -148,6 +153,36 @@ public class TransactionProcessor extends BaseRegionObserver {
       Filter newFilter = Filters.combine(getTransactionFilter(tx, ScanType.USER_SCAN), get.getFilter());
       get.setFilter(newFilter);
     }
+  }
+
+  @Override
+  public void preDelete(ObserverContext<RegionCoprocessorEnvironment> e, Delete delete, WALEdit edit,
+                        Durability durability) throws IOException {
+    // Translate deletes into our own delete tombstones
+    // Since HBase deletes cannot be undone, we need to translate deletes into special puts, which allows
+    // us to rollback the changes (by a real delete) if the transaction fails
+
+    // Deletes that are part of a transaction rollback do not need special handling.
+    // They will never be rolled back, so are performed as normal HBase deletes.
+    if (delete.getAttribute(TxConstants.TX_ROLLBACK_ATTRIBUTE_KEY) != null) {
+      return;
+    }
+
+    // Other deletes are client-initiated and need to be translated into our own tombstones
+    // TODO: this should delegate to the DeleteStrategy implementation.
+    Put deleteMarkers = new Put(delete.getRow(), delete.getTimeStamp());
+    for (byte[] family : delete.getFamilyCellMap().keySet()) {
+      List<Cell> familyCells = delete.getFamilyCellMap().get(family);
+      int cellSize = familyCells.size();
+      for (int i = 0; i < cellSize; i++) {
+        Cell cell = familyCells.get(i);
+        deleteMarkers.add(CellUtil.cloneFamily(cell), CellUtil.cloneQualifier(cell), cell.getTimestamp(),
+            HConstants.EMPTY_BYTE_ARRAY);
+      }
+    }
+    e.getEnvironment().getRegion().put(deleteMarkers);
+    // skip normal delete handling
+    e.bypass();
   }
 
   @Override

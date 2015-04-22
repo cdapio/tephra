@@ -1,4 +1,4 @@
-/*
+ /*
  * Copyright © 2014 Cask Data, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not
@@ -44,13 +44,17 @@ import org.junit.Assert;
 import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.Collection;
+import java.util.Map;
 
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
@@ -60,6 +64,8 @@ import static org.junit.Assert.fail;
  * Tests for TransactionAwareHTables.
  */
 public class TransactionAwareHTableTest {
+  private static final Logger LOG = LoggerFactory.getLogger(TransactionAwareHTableTest.class);
+
   private static HBaseTestingUtility testUtil;
   private static HBaseAdmin hBaseAdmin;
   private static TransactionStateStorage txStateStorage;
@@ -70,10 +76,13 @@ public class TransactionAwareHTableTest {
 
   private static final class TestBytes {
     private static final byte[] table = Bytes.toBytes("testtable");
-    private static final byte[] family = Bytes.toBytes("testfamily");
-    private static final byte[] qualifier = Bytes.toBytes("testqualifier");
-    private static final byte[] row = Bytes.toBytes("testrow");
-    private static final byte[] value = Bytes.toBytes("testvalue");
+    private static final byte[] family = Bytes.toBytes("f1");
+    private static final byte[] family2 = Bytes.toBytes("f2");
+    private static final byte[] qualifier = Bytes.toBytes("col1");
+    private static final byte[] qualifier2 = Bytes.toBytes("col2");
+    private static final byte[] row = Bytes.toBytes("row");
+    private static final byte[] value = Bytes.toBytes("value");
+    private static final byte[] value2 = Bytes.toBytes("value2");
   }
 
   @BeforeClass
@@ -96,7 +105,7 @@ public class TransactionAwareHTableTest {
 
   @Before
   public void setupBeforeTest() throws Exception {
-    HTable hTable = createTable(TestBytes.table, TestBytes.family);
+    HTable hTable = createTable(TestBytes.table, new byte[][] {TestBytes.family});
     transactionAwareHTable = new TransactionAwareHTable(hTable);
     transactionContext = new TransactionContext(new InMemoryTxSystemClient(txManager), transactionAwareHTable);
   }
@@ -107,11 +116,13 @@ public class TransactionAwareHTableTest {
     hBaseAdmin.deleteTable(TestBytes.table);
   }
 
-  private HTable createTable(byte[] tableName, byte[] columnFamily) throws Exception {
+  private HTable createTable(byte[] tableName, byte[][] columnFamilies) throws Exception {
     HTableDescriptor desc = new HTableDescriptor(TableName.valueOf(tableName));
-    HColumnDescriptor columnDesc = new HColumnDescriptor(columnFamily);
-    columnDesc.setMaxVersions(Integer.MAX_VALUE);
-    desc.addFamily(columnDesc);
+    for (byte[] family : columnFamilies) {
+      HColumnDescriptor columnDesc = new HColumnDescriptor(family);
+      columnDesc.setMaxVersions(Integer.MAX_VALUE);
+      desc.addFamily(columnDesc);
+    }
     desc.addCoprocessor(TransactionProcessor.class.getName());
     hBaseAdmin.createTable(desc);
     testUtil.waitTableAvailable(tableName, 5000);
@@ -164,29 +175,142 @@ public class TransactionAwareHTableTest {
    */
   @Test
   public void testValidTransactionalDelete() throws Exception {
-    transactionContext.start();
-    Put put = new Put(TestBytes.row);
-    put.add(TestBytes.family, TestBytes.qualifier, TestBytes.value);
-    transactionAwareHTable.put(put);
-    transactionContext.finish();
+    HTable hTable = createTable(Bytes.toBytes("TestValidTransactionalDelete"),
+        new byte[][] {TestBytes.family, TestBytes.family2});
+    try {
+      TransactionAwareHTable txTable = new TransactionAwareHTable(hTable);
+      TransactionContext txContext = new TransactionContext(new InMemoryTxSystemClient(txManager), txTable);
 
-    transactionContext.start();
-    Result result = transactionAwareHTable.get(new Get(TestBytes.row));
-    transactionContext.finish();
-    byte[] value = result.getValue(TestBytes.family, TestBytes.qualifier);
-    assertArrayEquals(TestBytes.value, value);
+      txContext.start();
+      Put put = new Put(TestBytes.row);
+      put.add(TestBytes.family, TestBytes.qualifier, TestBytes.value);
+      put.add(TestBytes.family2, TestBytes.qualifier, TestBytes.value2);
+      txTable.put(put);
+      txContext.finish();
 
-    transactionContext.start();
-    Delete delete = new Delete(TestBytes.row);
-    transactionAwareHTable.delete(delete);
+      txContext.start();
+      Result result = txTable.get(new Get(TestBytes.row));
+      txContext.finish();
+      byte[] value = result.getValue(TestBytes.family, TestBytes.qualifier);
+      assertArrayEquals(TestBytes.value, value);
+      value = result.getValue(TestBytes.family2, TestBytes.qualifier);
+      assertArrayEquals(TestBytes.value2, value);
 
-    transactionContext.finish();
+      // test full row delete
+      txContext.start();
+      Delete delete = new Delete(TestBytes.row);
+      txTable.delete(delete);
+      txContext.finish();
 
-    transactionContext.start();
-    result = transactionAwareHTable.get(new Get(TestBytes.row));
-    transactionContext.finish();
-    value = result.getValue(TestBytes.family, TestBytes.qualifier);
-    assertNull(value);
+      txContext.start();
+      result = txTable.get(new Get(TestBytes.row));
+      txContext.finish();
+      assertTrue(result.isEmpty());
+
+      // test column delete
+      // load 10 rows
+      txContext.start();
+      int rowCount = 10;
+      for (int i = 0; i < rowCount; i++) {
+        Put p = new Put(Bytes.toBytes("row" + i));
+        for (int j = 0; j < 10; j++) {
+          p.add(TestBytes.family, Bytes.toBytes(j), TestBytes.value);
+        }
+        txTable.put(p);
+      }
+      txContext.finish();
+
+      // verify loaded rows
+      txContext.start();
+      for (int i = 0; i < rowCount; i++) {
+        Get g = new Get(Bytes.toBytes("row" + i));
+        Result r = txTable.get(g);
+        assertFalse(r.isEmpty());
+        for (int j = 0; j < 10; j++) {
+          assertArrayEquals(TestBytes.value, r.getValue(TestBytes.family, Bytes.toBytes(j)));
+        }
+      }
+      txContext.finish();
+
+      // delete odds columns from odd rows and even columns from even rows
+      txContext.start();
+      for (int i = 0; i < rowCount; i++) {
+        Delete d = new Delete(Bytes.toBytes("row" + i));
+        for (int j = 0; j < 10; j++) {
+          if (i % 2 == j % 2) {
+            LOG.info("Deleting row={}, column={}", i, j);
+            d.deleteColumns(TestBytes.family, Bytes.toBytes(j));
+          }
+        }
+        txTable.delete(d);
+      }
+      txContext.finish();
+
+      // verify deleted columns
+      txContext.start();
+      for (int i = 0; i < rowCount; i++) {
+        Get g = new Get(Bytes.toBytes("row" + i));
+        Result r = txTable.get(g);
+        assertEquals(5, r.size());
+        for (Map.Entry<byte[], byte[]> entry : r.getFamilyMap(TestBytes.family).entrySet()) {
+          int col = Bytes.toInt(entry.getKey());
+          LOG.info("Got row={}, col={}", i, col);
+          // each row should only have the opposite mod (odd=even, even=odd)
+          assertNotEquals(i % 2, col % 2);
+          assertArrayEquals(TestBytes.value, entry.getValue());
+        }
+      }
+      txContext.finish();
+
+      // test family delete
+      // load 10 rows
+      txContext.start();
+      for (int i = 0; i < rowCount; i++) {
+        Put p = new Put(Bytes.toBytes("famrow" + i));
+        p.add(TestBytes.family, TestBytes.qualifier, TestBytes.value);
+        p.add(TestBytes.family2, TestBytes.qualifier2, TestBytes.value2);
+        txTable.put(p);
+      }
+      txContext.finish();
+
+      // verify all loaded rows
+      txContext.start();
+      for (int i = 0; i < rowCount; i++) {
+        Get g = new Get(Bytes.toBytes("famrow" + i));
+        Result r = txTable.get(g);
+        assertEquals(2, r.size());
+        assertArrayEquals(TestBytes.value, r.getValue(TestBytes.family, TestBytes.qualifier));
+        assertArrayEquals(TestBytes.value2, r.getValue(TestBytes.family2, TestBytes.qualifier2));
+      }
+      txContext.finish();
+
+      // delete family1 for even rows, family2 for odd rows
+      txContext.start();
+      for (int i = 0; i < rowCount; i++) {
+        Delete d = new Delete(Bytes.toBytes("famrow" + i));
+        d.deleteFamily((i % 2 == 0) ? TestBytes.family : TestBytes.family2);
+        txTable.delete(d);
+      }
+      txContext.finish();
+
+      // verify deleted families
+      txContext.start();
+      for (int i = 0; i < rowCount; i++) {
+        Get g = new Get(Bytes.toBytes("famrow" + i));
+        Result r = txTable.get(g);
+        assertEquals(1, r.size());
+        if (i % 2 == 0) {
+          assertNull(r.getValue(TestBytes.family, TestBytes.qualifier));
+          assertArrayEquals(TestBytes.value2, r.getValue(TestBytes.family2, TestBytes.qualifier2));
+        } else {
+          assertArrayEquals(TestBytes.value, r.getValue(TestBytes.family, TestBytes.qualifier));
+          assertNull(r.getValue(TestBytes.family2, TestBytes.qualifier2));
+        }
+      }
+      txContext.finish();
+    } finally {
+      hTable.close();
+    }
   }
 
   /**

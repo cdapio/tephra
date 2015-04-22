@@ -224,15 +224,18 @@ public class TransactionProcessorTest {
 
       byte[] row = Bytes.toBytes(1);
       for (int i = 4; i < V.length; i++) {
-        if (i != 5) {
-          Put p = new Put(row);
-          p.add(familyBytes, columnBytes, V[i], Bytes.toBytes(V[i]));
-          region.put(p);
-        }
+        Put p = new Put(row);
+        p.add(familyBytes, columnBytes, V[i], Bytes.toBytes(V[i]));
+        region.put(p);
       }
 
       // delete from the third entry back
-      Delete d = new Delete(row, V[5]);
+      // take that cell's timestamp + 1 to simulate a delete in a new tx
+      long deleteTs = V[5] + 1;
+      Delete d = new Delete(row, deleteTs);
+      LOG.info("Issuing delete at timestamp " + deleteTs);
+      // row deletes are not yet supported (TransactionAwareHTable normally handles this)
+      d.deleteColumns(familyBytes, columnBytes);
       region.delete(d);
 
       List<Cell> results = Lists.newArrayList();
@@ -249,7 +252,9 @@ public class TransactionProcessorTest {
       RegionScanner regionScanner = region.getScanner(scan);
       // should be only one row
       assertFalse(regionScanner.next(results));
-      assertKeyValueMatches(results, 1, new long[]{V[8], V[6]});
+      assertKeyValueMatches(results, 1,
+          new long[]{V[8], V[6], deleteTs},
+          new byte[][]{Bytes.toBytes(V[8]), Bytes.toBytes(V[6]), new byte[0]});
     } finally {
       region.close();
     }
@@ -386,12 +391,21 @@ public class TransactionProcessorTest {
   }
 
   private void assertKeyValueMatches(List<Cell> results, int index, long[] versions) {
+    byte[][] values = new byte[versions.length][];
+    for (int i = 0; i < versions.length; i++) {
+      values[i] = Bytes.toBytes(versions[i]);
+    }
+    assertKeyValueMatches(results, index, versions, values);
+  }
+
+  private void assertKeyValueMatches(List<Cell> results, int index, long[] versions, byte[][] values) {
     assertEquals(versions.length, results.size());
+    assertEquals(values.length, results.size());
     for (int i = 0; i < versions.length; i++) {
       Cell kv = results.get(i);
       assertArrayEquals(Bytes.toBytes(index), kv.getRow());
       assertEquals(versions[i], kv.getTimestamp());
-      assertArrayEquals(Bytes.toBytes(versions[i]), kv.getValue());
+      assertArrayEquals(values[i], kv.getValue());
     }
   }
 

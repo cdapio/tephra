@@ -25,6 +25,7 @@ import com.google.protobuf.Service;
 import com.google.protobuf.ServiceException;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.Cell;
+import org.apache.hadoop.hbase.CellUtil;
 import org.apache.hadoop.hbase.HTableDescriptor;
 import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.client.Append;
@@ -133,6 +134,7 @@ public class TransactionAwareHTable extends AbstractTransactionAwareTable
         byte[] qualifier = change.getQualifier();
         long transactionTimestamp = tx.getWritePointer();
         Delete rollbackDelete = new Delete(row);
+        rollbackDelete.setAttribute(TxConstants.TX_ROLLBACK_ATTRIBUTE_KEY, new byte[0]);
         switch (conflictLevel) {
           case ROW:
             // issue family delete for the tx write pointer
@@ -332,7 +334,7 @@ public class TransactionAwareHTable extends AbstractTransactionAwareTable
     if (tx == null) {
       throw new IOException("Transaction not started");
     }
-    put(transactionalizeAction(delete));
+    hTable.delete(transactionalizeAction(delete));
   }
 
   @Override
@@ -340,12 +342,12 @@ public class TransactionAwareHTable extends AbstractTransactionAwareTable
     if (tx == null) {
       throw new IOException("Transaction not started");
     }
-    List<Put> transactionalizedPuts = new ArrayList<Put>(deletes.size());
+    List<Delete> transactionalizedDeletes = new ArrayList<Delete>(deletes.size());
     for (Delete delete : deletes) {
-      Put txPut = transactionalizeAction(delete);
-      transactionalizedPuts.add(txPut);
+      Delete txDelete = transactionalizeAction(delete);
+      transactionalizedDeletes.add(txDelete);
     }
-    hTable.put(transactionalizedPuts);
+    hTable.delete(transactionalizedDeletes);
   }
 
   @Override
@@ -539,11 +541,11 @@ public class TransactionAwareHTable extends AbstractTransactionAwareTable
     return txPut;
   }
 
-  private Put transactionalizeAction(Delete delete) throws IOException {
+  private Delete transactionalizeAction(Delete delete) throws IOException {
     long transactionTimestamp = tx.getWritePointer();
 
     byte[] deleteRow = delete.getRow();
-    Put txPut = new Put(deleteRow, transactionTimestamp);
+    Delete txDelete = new Delete(deleteRow, transactionTimestamp);
 
     Map<byte[], List<Cell>> familyToDelete = delete.getFamilyCellMap();
     if (familyToDelete.isEmpty()) {
@@ -553,7 +555,7 @@ public class TransactionAwareHTable extends AbstractTransactionAwareTable
       for (Map.Entry<byte[], NavigableMap<byte[], byte[]>> familyEntry : resultMap.entrySet()) {
         NavigableMap<byte[], byte[]> familyColumns = result.getFamilyMap(familyEntry.getKey());
         for (Map.Entry<byte[], byte[]> column : familyColumns.entrySet()) {
-          txPut.add(familyEntry.getKey(), column.getKey(), transactionTimestamp, new byte[0]);
+          txDelete.deleteColumns(familyEntry.getKey(), column.getKey(), transactionTimestamp);
           addToChangeSet(deleteRow, familyEntry.getKey(), column.getKey());
         }
       }
@@ -561,23 +563,28 @@ public class TransactionAwareHTable extends AbstractTransactionAwareTable
       for (Map.Entry<byte [], List<Cell>> familyEntry : familyToDelete.entrySet()) {
         byte[] family = familyEntry.getKey();
         List<Cell> entries = familyEntry.getValue();
-        if (entries.isEmpty()) {
-          Result result = get(new Get(delete.getRow()));
+        boolean isFamilyDelete = false;
+        if (entries.size() == 1) {
+          Cell cell = entries.get(0);
+          isFamilyDelete = CellUtil.isDeleteFamily(cell);
+        }
+        if (isFamilyDelete) {
+          Result result = get(new Get(delete.getRow()).addFamily(family));
           // Delete entire family
           NavigableMap<byte[], byte[]> familyColumns = result.getFamilyMap(family);
           for (Map.Entry<byte[], byte[]> column : familyColumns.entrySet()) {
-            txPut.add(family, column.getKey(), transactionTimestamp, new byte[0]);
+            txDelete.deleteColumns(family, column.getKey(), transactionTimestamp);
             addToChangeSet(deleteRow, family, column.getKey());
           }
         } else {
           for (Cell value : entries) {
-            txPut.add(value.getFamily(), value.getQualifier(), transactionTimestamp, new byte[0]);
+            txDelete.deleteColumns(value.getFamily(), value.getQualifier(), transactionTimestamp);
             addToChangeSet(deleteRow, value.getFamily(), value.getQualifier());
           }
         }
       }
     }
-    return txPut;
+    return txDelete;
   }
 
   private List<? extends Row> transactionalizeActions(List<? extends Row> actions) throws IOException {
