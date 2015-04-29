@@ -26,11 +26,6 @@ import org.apache.hadoop.conf.Configuration;
 public class ConfigurationFactory implements Provider<Configuration> {
   private static class ConfigurationProviderFactory extends HBaseVersionSpecificFactory<ConfigurationProvider> {
     @Override
-    protected String getHBase94Classname() {
-      return "co.cask.tephra.hbase94.HBase94ConfigurationProvider";
-    }
-
-    @Override
     protected String getHBase96Classname() {
       return "co.cask.tephra.hbase96.HBase96ConfigurationProvider";
     }

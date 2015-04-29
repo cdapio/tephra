@@ -101,16 +101,8 @@ build system's equivalent configuration), in order to make use of Tephra classes
     <version>0.3.0</version>
   </dependency>
 
-Since the HBase APIs have changed between version 0.94.x and 0.96.x, you will need to select the
+Since the HBase APIs have changed between versions, you will need to select the
 appropriate HBase compatibility library.
-
-For HBase 0.94.x::
-
-  <dependency>
-    <groupId>co.cask.tephra</groupId>
-    <artifactId>tephra-hbase-compat-0.94</artifactId>
-    <version>0.3.0</version>
-  </dependency>
 
 For HBase 0.96.x::
 
@@ -223,13 +215,6 @@ In addition to the transaction server, Tephra requires an HBase coprocessor to b
 tables where transactional reads and writes will be performed.  
 
 To configure the coprocessor on all HBase tables, add the following to ``hbase-site.xml``.
-
-For HBase 0.94::
-
-  <property>
-    <name>hbase.coprocessor.region.classes</name>
-    <value>co.cask.tephra.hbase94.coprocessor.TransactionProcessor</value>
-  </property>
 
 For HBase 0.96::
 
