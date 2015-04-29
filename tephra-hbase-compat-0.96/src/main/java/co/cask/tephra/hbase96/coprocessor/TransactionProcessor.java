@@ -61,6 +61,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.NavigableSet;
 import java.util.Set;
 
 /**
@@ -148,6 +149,7 @@ public class TransactionProcessor extends BaseRegionObserver {
     throws IOException {
     Transaction tx = getFromOperation(get);
     if (tx != null) {
+      projectFamilyDeletes(get);
       get.setMaxVersions();
       get.setTimeRange(TxUtils.getOldestVisibleTimestamp(ttlByFamily, tx), TxUtils.getMaxVisibleTimestamp(tx));
       Filter newFilter = Filters.combine(getTransactionFilter(tx, ScanType.USER_SCAN), get.getFilter());
@@ -173,11 +175,15 @@ public class TransactionProcessor extends BaseRegionObserver {
     Put deleteMarkers = new Put(delete.getRow(), delete.getTimeStamp());
     for (byte[] family : delete.getFamilyCellMap().keySet()) {
       List<Cell> familyCells = delete.getFamilyCellMap().get(family);
-      int cellSize = familyCells.size();
-      for (int i = 0; i < cellSize; i++) {
-        Cell cell = familyCells.get(i);
-        deleteMarkers.add(CellUtil.cloneFamily(cell), CellUtil.cloneQualifier(cell), cell.getTimestamp(),
-            HConstants.EMPTY_BYTE_ARRAY);
+      if (isFamilyDelete(familyCells)) {
+        deleteMarkers.add(family, TxConstants.FAMILY_DELETE_QUALIFIER, HConstants.EMPTY_BYTE_ARRAY);
+      } else {
+        int cellSize = familyCells.size();
+        for (int i = 0; i < cellSize; i++) {
+          Cell cell = familyCells.get(i);
+          deleteMarkers.add(family, CellUtil.cloneQualifier(cell), cell.getTimestamp(),
+                  HConstants.EMPTY_BYTE_ARRAY);
+        }
       }
     }
     e.getEnvironment().getRegion().put(deleteMarkers);
@@ -185,17 +191,56 @@ public class TransactionProcessor extends BaseRegionObserver {
     e.bypass();
   }
 
+  private boolean isFamilyDelete(List<Cell> familyCells) {
+    return familyCells.size() == 1 && CellUtil.isDeleteFamily(familyCells.get(0));
+  }
+
   @Override
   public RegionScanner preScannerOpen(ObserverContext<RegionCoprocessorEnvironment> e, Scan scan, RegionScanner s)
     throws IOException {
     Transaction tx = getFromOperation(scan);
     if (tx != null) {
+      projectFamilyDeletes(scan);
       scan.setMaxVersions();
       scan.setTimeRange(TxUtils.getOldestVisibleTimestamp(ttlByFamily, tx), TxUtils.getMaxVisibleTimestamp(tx));
       Filter newFilter = Filters.combine(getTransactionFilter(tx, ScanType.USER_SCAN), scan.getFilter());
       scan.setFilter(newFilter);
     }
     return s;
+  }
+
+  /**
+   * Ensures that family delete markers are present in the columns requested for any scan operation.
+   * @param scan The original scan request
+   * @return The modified scan request with the family delete qualifiers represented
+   */
+  private Scan projectFamilyDeletes(Scan scan) {
+    for (Map.Entry<byte[], NavigableSet<byte[]>> entry : scan.getFamilyMap().entrySet()) {
+      NavigableSet<byte[]> columns = entry.getValue();
+      // wildcard scans will automatically include the delete marker, so only need to add it when we have
+      // explicit columns listed
+      if (columns != null && !columns.isEmpty()) {
+        scan.addColumn(entry.getKey(), TxConstants.FAMILY_DELETE_QUALIFIER);
+      }
+    }
+    return scan;
+  }
+
+  /**
+   * Ensures that family delete markers are present in the columns requested for any get operation.
+   * @param get The original get request
+   * @return The modified get request with the family delete qualifiers represented
+   */
+  private Get projectFamilyDeletes(Get get) {
+    for (Map.Entry<byte[], NavigableSet<byte[]>> entry : get.getFamilyMap().entrySet()) {
+      NavigableSet<byte[]> columns = entry.getValue();
+      // wildcard scans will automatically include the delete marker, so only need to add it when we have
+      // explicit columns listed
+      if (columns != null && !columns.isEmpty()) {
+        get.addColumn(entry.getKey(), TxConstants.FAMILY_DELETE_QUALIFIER);
+      }
+    }
+    return get;
   }
 
   @Override
