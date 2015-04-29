@@ -16,6 +16,7 @@
 
 package co.cask.tephra.persist;
 
+import co.cask.tephra.metrics.MetricsCollector;
 import com.google.common.collect.Lists;
 import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.io.Writable;
@@ -40,6 +41,7 @@ public abstract class AbstractTransactionLog implements TransactionLog {
   private static final Logger LOG = LoggerFactory.getLogger(AbstractTransactionLog.class);
 
   private final AtomicLong logSequence = new AtomicLong();
+  private final MetricsCollector metricsCollector;
   protected long timestamp;
   private volatile boolean initialized;
   private volatile boolean closed;
@@ -47,8 +49,9 @@ public abstract class AbstractTransactionLog implements TransactionLog {
   private List<Entry> pendingWrites = Lists.newLinkedList();
   private TransactionLogWriter writer;
 
-  public AbstractTransactionLog(long timestamp) {
+  public AbstractTransactionLog(long timestamp, MetricsCollector metricsCollector) {
     this.timestamp = timestamp;
+    this.metricsCollector = metricsCollector;
   }
 
   /**
@@ -151,6 +154,7 @@ public abstract class AbstractTransactionLog implements TransactionLog {
     // writes out pending entries to the HLog
     TransactionLogWriter tmpWriter = null;
     long latestSeq = 0;
+    int entryCount = 0;
     synchronized (this) {
       if (closed) {
         return;
@@ -162,6 +166,7 @@ public abstract class AbstractTransactionLog implements TransactionLog {
       // write out all accumulated Entries to hdfs.
       for (Entry e : currentPending) {
         tmpWriter.append(e);
+        entryCount++;
         latestSeq = Math.max(latestSeq, e.getKey().get());
       }
     }
@@ -169,6 +174,7 @@ public abstract class AbstractTransactionLog implements TransactionLog {
     // someone else might have already synced our edits, avoid double syncing
     if (lastSynced < latestSeq) {
       tmpWriter.sync();
+      metricsCollector.histogram("wal.sync.size", entryCount);
       syncedUpTo.compareAndSet(lastSynced, latestSeq);
     }
   }

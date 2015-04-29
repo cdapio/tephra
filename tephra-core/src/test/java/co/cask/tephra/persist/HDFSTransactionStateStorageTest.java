@@ -17,6 +17,7 @@
 package co.cask.tephra.persist;
 
 import co.cask.tephra.TxConstants;
+import co.cask.tephra.metrics.TxMetricsCollector;
 import co.cask.tephra.snapshot.SnapshotCodecProvider;
 import co.cask.tephra.snapshot.SnapshotCodecV2;
 import org.apache.hadoop.conf.Configuration;
@@ -66,6 +67,6 @@ public class HDFSTransactionStateStorageTest extends AbstractTransactionStateSto
 
   @Override
   protected AbstractTransactionStateStorage getStorage(Configuration conf) {
-    return new HDFSTransactionStateStorage(conf, new SnapshotCodecProvider(conf));
+    return new HDFSTransactionStateStorage(conf, new SnapshotCodecProvider(conf), new TxMetricsCollector());
   }
 }

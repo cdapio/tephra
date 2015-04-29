@@ -103,6 +103,7 @@
     <slf4j.version>1.7.5</slf4j.version>
     <thrift.version>0.9.0</thrift.version>
     <twill.version>0.4.0-incubating</twill.version>
+    <dropwizard.metrics.version>3.1.0</dropwizard.metrics.version>
   </properties>
 
   <dependencyManagement>
@@ -190,6 +191,11 @@
         <groupId>org.apache.twill</groupId>
         <artifactId>twill-zookeeper</artifactId>
         <version>${twill.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>io.dropwizard.metrics</groupId>
+        <artifactId>metrics-core</artifactId>
+        <version>${dropwizard.metrics.version}</version>
       </dependency>
 
       <!-- Hadoop dependencies -->

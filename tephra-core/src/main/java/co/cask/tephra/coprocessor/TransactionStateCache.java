@@ -17,6 +17,7 @@
 package co.cask.tephra.coprocessor;
 
 import co.cask.tephra.TxConstants;
+import co.cask.tephra.metrics.TxMetricsCollector;
 import co.cask.tephra.persist.HDFSTransactionStateStorage;
 import co.cask.tephra.persist.TransactionSnapshot;
 import co.cask.tephra.persist.TransactionStateStorage;
@@ -85,7 +86,10 @@ public class TransactionStateCache extends AbstractIdleService implements Config
     try {
       Configuration conf = getSnapshotConfiguration();
       if (conf != null) {
-        this.storage = new HDFSTransactionStateStorage(conf, new SnapshotCodecProvider(conf));
+        // Since this is only used for background loading of transaction snapshots, we use the no-op metrics collector,
+        // as there are no relevant metrics to report
+        this.storage = new HDFSTransactionStateStorage(conf, new SnapshotCodecProvider(conf),
+            new TxMetricsCollector());
         this.storage.startAndWait();
         this.snapshotRefreshFrequency = conf.getLong(TxConstants.Manager.CFG_TX_SNAPSHOT_INTERVAL,
                                                      TxConstants.Manager.DEFAULT_TX_SNAPSHOT_INTERVAL) * 1000;

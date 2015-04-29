@@ -22,6 +22,8 @@ import co.cask.tephra.TransactionExecutorFactory;
 import co.cask.tephra.TransactionManager;
 import co.cask.tephra.TransactionSystemClient;
 import co.cask.tephra.inmemory.InMemoryTxSystemClient;
+import co.cask.tephra.metrics.DefaultMetricsCollector;
+import co.cask.tephra.metrics.MetricsCollector;
 import co.cask.tephra.persist.LocalFileTransactionStateStorage;
 import co.cask.tephra.persist.TransactionStateStorage;
 import co.cask.tephra.snapshot.SnapshotCodecProvider;
@@ -45,6 +47,7 @@ final class TransactionLocalModule extends AbstractModule {
 
     bind(TransactionManager.class).in(Singleton.class);
     bind(TransactionSystemClient.class).to(InMemoryTxSystemClient.class).in(Singleton.class);
+    bind(MetricsCollector.class).to(DefaultMetricsCollector.class);
 
     install(new FactoryModuleBuilder()
               .implement(TransactionExecutor.class, DefaultTransactionExecutor.class)

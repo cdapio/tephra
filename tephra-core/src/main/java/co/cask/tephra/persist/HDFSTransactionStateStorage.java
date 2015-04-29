@@ -17,6 +17,8 @@
 package co.cask.tephra.persist;
 
 import co.cask.tephra.TxConstants;
+import co.cask.tephra.metrics.MetricsCollector;
+import co.cask.tephra.metrics.TxMetricsCollector;
 import co.cask.tephra.snapshot.SnapshotCodecProvider;
 import co.cask.tephra.util.ConfigurationFactory;
 import com.google.common.base.Function;
@@ -68,17 +70,19 @@ public class HDFSTransactionStateStorage extends AbstractTransactionStateStorage
   // buffer size used for HDFS reads and writes
   private static final int BUFFER_SIZE = 16384;
 
+  private final Configuration hConf;
+  private final String configuredSnapshotDir;
+  private final MetricsCollector metricsCollector;
   private FileSystem fs;
-  private Configuration hConf;
-  private String configuredSnapshotDir;
   private Path snapshotDir;
 
   @Inject
-  public HDFSTransactionStateStorage(Configuration hConf,
-                                     SnapshotCodecProvider codecProvider) {
+  public HDFSTransactionStateStorage(Configuration hConf, SnapshotCodecProvider codecProvider,
+                                     MetricsCollector metricsCollector) {
     super(codecProvider);
     this.hConf = hConf;
-    configuredSnapshotDir = hConf.get(TxConstants.Manager.CFG_TX_SNAPSHOT_DIR);
+    this.configuredSnapshotDir = hConf.get(TxConstants.Manager.CFG_TX_SNAPSHOT_DIR);
+    this.metricsCollector = metricsCollector;
   }
 
   @Override
@@ -237,7 +241,7 @@ public class HDFSTransactionStateStorage extends AbstractTransactionStateStorage
   }
 
   private TransactionLog openLog(Path path, long timestamp) {
-    return new HDFSTransactionLog(fs, hConf, path, timestamp);
+    return new HDFSTransactionLog(fs, hConf, path, timestamp, metricsCollector);
   }
 
   @Override
@@ -374,8 +378,10 @@ public class HDFSTransactionStateStorage extends AbstractTransactionStateStorage
 
     Configuration config = new ConfigurationFactory().get();
 
+    // Use the no-op metrics collector.  We are being run as a command line tool, so there are no relevant metrics
+    // to report
     HDFSTransactionStateStorage storage =
-      new HDFSTransactionStateStorage(config, new SnapshotCodecProvider(config));
+      new HDFSTransactionStateStorage(config, new SnapshotCodecProvider(config), new TxMetricsCollector());
     storage.startAndWait();
     try {
       switch (mode) {
