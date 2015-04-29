@@ -549,14 +549,20 @@ public class TransactionAwareHTable extends AbstractTransactionAwareTable
 
     Map<byte[], List<Cell>> familyToDelete = delete.getFamilyCellMap();
     if (familyToDelete.isEmpty()) {
-      Result result = get(new Get(delete.getRow()));
-      // Delete everything
-      NavigableMap<byte[], NavigableMap<byte[], byte[]>> resultMap = result.getNoVersionMap();
-      for (Map.Entry<byte[], NavigableMap<byte[], byte[]>> familyEntry : resultMap.entrySet()) {
-        NavigableMap<byte[], byte[]> familyColumns = result.getFamilyMap(familyEntry.getKey());
-        for (Map.Entry<byte[], byte[]> column : familyColumns.entrySet()) {
-          txDelete.deleteColumns(familyEntry.getKey(), column.getKey(), transactionTimestamp);
-          addToChangeSet(deleteRow, familyEntry.getKey(), column.getKey());
+      // perform a row delete is we are using row-level conflict detection
+      if (conflictLevel == TxConstants.ConflictDetection.ROW) {
+        // no need to identify individual columns deleted
+        addToChangeSet(deleteRow, null, null);
+      } else {
+        Result result = get(new Get(delete.getRow()));
+        // Delete everything
+        NavigableMap<byte[], NavigableMap<byte[], byte[]>> resultMap = result.getNoVersionMap();
+        for (Map.Entry<byte[], NavigableMap<byte[], byte[]>> familyEntry : resultMap.entrySet()) {
+          NavigableMap<byte[], byte[]> familyColumns = result.getFamilyMap(familyEntry.getKey());
+          for (Map.Entry<byte[], byte[]> column : familyColumns.entrySet()) {
+            txDelete.deleteColumns(familyEntry.getKey(), column.getKey(), transactionTimestamp);
+            addToChangeSet(deleteRow, familyEntry.getKey(), column.getKey());
+          }
         }
       }
     } else {
@@ -569,12 +575,18 @@ public class TransactionAwareHTable extends AbstractTransactionAwareTable
           isFamilyDelete = CellUtil.isDeleteFamily(cell);
         }
         if (isFamilyDelete) {
-          Result result = get(new Get(delete.getRow()).addFamily(family));
-          // Delete entire family
-          NavigableMap<byte[], byte[]> familyColumns = result.getFamilyMap(family);
-          for (Map.Entry<byte[], byte[]> column : familyColumns.entrySet()) {
-            txDelete.deleteColumns(family, column.getKey(), transactionTimestamp);
-            addToChangeSet(deleteRow, family, column.getKey());
+          if (conflictLevel == TxConstants.ConflictDetection.ROW) {
+            // no need to identify individual columns deleted
+            txDelete.deleteFamily(family);
+            addToChangeSet(deleteRow, null, null);
+          } else {
+            Result result = get(new Get(delete.getRow()).addFamily(family));
+            // Delete entire family
+            NavigableMap<byte[], byte[]> familyColumns = result.getFamilyMap(family);
+            for (Map.Entry<byte[], byte[]> column : familyColumns.entrySet()) {
+              txDelete.deleteColumns(family, column.getKey(), transactionTimestamp);
+              addToChangeSet(deleteRow, family, column.getKey());
+            }
           }
         } else {
           for (Cell value : entries) {

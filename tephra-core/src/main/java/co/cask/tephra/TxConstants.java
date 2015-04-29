@@ -87,6 +87,11 @@ public class TxConstants {
    */
   public static final String TX_ROLLBACK_ATTRIBUTE_KEY = "cask.tx.rollback";
 
+  /**
+   * Column qualifier used for a special delete marker tombstone, which identifies an entire column family as deleted.
+   */
+  public static final byte[] FAMILY_DELETE_QUALIFIER = new byte[0];
+
   // Constants for monitoring status
   public static final String STATUS_OK = "OK";
   public static final String STATUS_NOTOK = "NOTOK";
