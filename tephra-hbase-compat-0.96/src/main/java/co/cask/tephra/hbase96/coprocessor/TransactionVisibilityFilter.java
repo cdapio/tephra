@@ -21,6 +21,7 @@ import co.cask.tephra.TxConstants;
 import com.google.common.collect.Maps;
 import org.apache.hadoop.hbase.Cell;
 import org.apache.hadoop.hbase.CellUtil;
+import org.apache.hadoop.hbase.HConstants;
 import org.apache.hadoop.hbase.filter.Filter;
 import org.apache.hadoop.hbase.filter.FilterBase;
 import org.apache.hadoop.hbase.regionserver.ScanType;
@@ -50,6 +51,8 @@ public class TransactionVisibilityFilter extends FilterBase {
   // since we traverse KVs in order, cache the current oldest TS to avoid map lookups per KV
   private byte[] currentFamily = new byte[0];
   private long currentOldestTs;
+
+  private DeleteTracker deleteTracker = new DeleteTracker();
 
   /**
    * Creates a new {@link Filter} for returning data only from visible transactions.
@@ -99,6 +102,7 @@ public class TransactionVisibilityFilter extends FilterBase {
       currentFamily = CellUtil.cloneFamily(cell);
       Long familyOldestTs = oldestTsByFamily.get(currentFamily);
       currentOldestTs = familyOldestTs != null ? familyOldestTs : 0;
+      deleteTracker.reset();
     }
     // need to apply TTL for the column family here
     long kvTimestamp = cell.getTimestamp();
@@ -106,6 +110,19 @@ public class TransactionVisibilityFilter extends FilterBase {
       // passed TTL for this column, seek to next
       return ReturnCode.NEXT_COL;
     } else if (tx.isVisible(kvTimestamp)) {
+      if (deleteTracker.isFamilyDelete(cell)) {
+        deleteTracker.addFamilyDelete(cell);
+        if (clearDeletes) {
+          return ReturnCode.NEXT_COL;
+        } else {
+          return ReturnCode.INCLUDE_AND_NEXT_COL;
+        }
+      }
+      // check if masked by family delete
+      if (deleteTracker.isDeleted(cell)) {
+        return ReturnCode.NEXT_COL;
+      }
+      // check for column delete
       if (cell.getValueLength() == 0 && !allowEmptyValues) {
         if (clearDeletes) {
           // skip "deleted" cell
@@ -128,7 +145,33 @@ public class TransactionVisibilityFilter extends FilterBase {
   }
 
   @Override
+  public void reset() {
+    deleteTracker.reset();
+  }
+
+  @Override
   public byte[] toByteArray() throws IOException {
     return super.toByteArray();
+  }
+
+  private static final class DeleteTracker {
+    private long familyDeleteTs;
+
+    public boolean isFamilyDelete(Cell cell) {
+      return CellUtil.matchingQualifier(cell, TxConstants.FAMILY_DELETE_QUALIFIER) &&
+              CellUtil.matchingValue(cell, HConstants.EMPTY_BYTE_ARRAY);
+    }
+
+    public void addFamilyDelete(Cell delete) {
+      this.familyDeleteTs = delete.getTimestamp();
+    }
+
+    public boolean isDeleted(Cell cell) {
+      return cell.getTimestamp() < familyDeleteTs;
+    }
+
+    public void reset() {
+      this.familyDeleteTs = 0;
+    }
   }
 }

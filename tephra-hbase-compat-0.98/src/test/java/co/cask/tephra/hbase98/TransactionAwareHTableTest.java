@@ -37,6 +37,8 @@ import org.apache.hadoop.hbase.client.HBaseAdmin;
 import org.apache.hadoop.hbase.client.HTable;
 import org.apache.hadoop.hbase.client.Put;
 import org.apache.hadoop.hbase.client.Result;
+import org.apache.hadoop.hbase.client.ResultScanner;
+import org.apache.hadoop.hbase.client.Scan;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.junit.After;
 import org.junit.AfterClass;
@@ -81,6 +83,8 @@ public class TransactionAwareHTableTest {
     private static final byte[] qualifier = Bytes.toBytes("col1");
     private static final byte[] qualifier2 = Bytes.toBytes("col2");
     private static final byte[] row = Bytes.toBytes("row");
+    private static final byte[] row2 = Bytes.toBytes("row2");
+    private static final byte[] row3 = Bytes.toBytes("row3");
     private static final byte[] value = Bytes.toBytes("value");
     private static final byte[] value2 = Bytes.toBytes("value2");
   }
@@ -179,7 +183,7 @@ public class TransactionAwareHTableTest {
   @Test
   public void testValidTransactionalDelete() throws Exception {
     HTable hTable = createTable(Bytes.toBytes("TestValidTransactionalDelete"),
-        new byte[][] {TestBytes.family, TestBytes.family2});
+            new byte[][]{TestBytes.family, TestBytes.family2});
     try {
       TransactionAwareHTable txTable = new TransactionAwareHTable(hTable);
       TransactionContext txContext = new TransactionContext(new InMemoryTxSystemClient(txManager), txTable);
@@ -333,7 +337,7 @@ public class TransactionAwareHTableTest {
     Result result = transactionAwareHTable.get(new Get(TestBytes.row));
     transactionContext.finish();
     byte[] value = result.getValue(TestBytes.family, TestBytes.qualifier);
-    Assert.assertArrayEquals(TestBytes.value, value);
+    assertArrayEquals(TestBytes.value, value);
 
     transactionContext.start();
     Delete delete = new Delete(TestBytes.row);
@@ -344,7 +348,159 @@ public class TransactionAwareHTableTest {
     result = transactionAwareHTable.get(new Get(TestBytes.row));
     transactionContext.finish();
     value = result.getValue(TestBytes.family, TestBytes.qualifier);
-    Assert.assertArrayEquals(TestBytes.value, value);
+    assertArrayEquals(TestBytes.value, value);
+  }
+
+  @Test
+  public void testRowDelete() throws Exception {
+    HTable hTable = createTable(Bytes.toBytes("TestRowDelete"), new byte[][] {TestBytes.family, TestBytes.family2});
+    TransactionAwareHTable txTable = new TransactionAwareHTable(hTable, TxConstants.ConflictDetection.ROW);
+    try {
+      TransactionContext txContext = new TransactionContext(new InMemoryTxSystemClient(txManager), txTable);
+
+      // Test 1: full row delete
+      txContext.start();
+      txTable.put(new Put(TestBytes.row)
+              .add(TestBytes.family, TestBytes.qualifier, TestBytes.value)
+              .add(TestBytes.family, TestBytes.qualifier2, TestBytes.value2)
+              .add(TestBytes.family2, TestBytes.qualifier, TestBytes.value)
+              .add(TestBytes.family2, TestBytes.qualifier2, TestBytes.value2));
+      txContext.finish();
+
+      txContext.start();
+      Get get = new Get(TestBytes.row);
+      Result result = txTable.get(get);
+      assertFalse(result.isEmpty());
+      assertArrayEquals(TestBytes.value, result.getValue(TestBytes.family, TestBytes.qualifier));
+      assertArrayEquals(TestBytes.value2, result.getValue(TestBytes.family, TestBytes.qualifier2));
+      assertArrayEquals(TestBytes.value, result.getValue(TestBytes.family2, TestBytes.qualifier));
+      assertArrayEquals(TestBytes.value2, result.getValue(TestBytes.family2, TestBytes.qualifier2));
+      txContext.finish();
+
+      // delete entire row
+      txContext.start();
+      txTable.delete(new Delete(TestBytes.row));
+      txContext.finish();
+
+      // verify row is now empty
+      txContext.start();
+      result = txTable.get(new Get(TestBytes.row));
+      assertTrue(result.isEmpty());
+
+      // verify row is empty for explicit column retrieval
+      result = txTable.get(new Get(TestBytes.row)
+              .addColumn(TestBytes.family, TestBytes.qualifier)
+              .addFamily(TestBytes.family2));
+      assertTrue(result.isEmpty());
+
+      // verify row is empty for scan
+      ResultScanner scanner = txTable.getScanner(new Scan(TestBytes.row));
+      assertNull(scanner.next());
+      scanner.close();
+
+      // verify row is empty for scan with explicit column
+      scanner = txTable.getScanner(new Scan(TestBytes.row).addColumn(TestBytes.family2, TestBytes.qualifier2));
+      assertNull(scanner.next());
+      scanner.close();
+      txContext.finish();
+
+      // write swapped values to one column per family
+      txContext.start();
+      txTable.put(new Put(TestBytes.row)
+              .add(TestBytes.family, TestBytes.qualifier, TestBytes.value2)
+              .add(TestBytes.family2, TestBytes.qualifier2, TestBytes.value));
+      txContext.finish();
+
+      // verify new values appear
+      txContext.start();
+      result = txTable.get(new Get(TestBytes.row));
+      assertFalse(result.isEmpty());
+      assertEquals(2, result.size());
+      assertArrayEquals(TestBytes.value2, result.getValue(TestBytes.family, TestBytes.qualifier));
+      assertArrayEquals(TestBytes.value, result.getValue(TestBytes.family2, TestBytes.qualifier2));
+
+      scanner = txTable.getScanner(new Scan(TestBytes.row));
+      Result result1 = scanner.next();
+      assertNotNull(result1);
+      assertFalse(result1.isEmpty());
+      assertEquals(2, result1.size());
+      assertArrayEquals(TestBytes.value2, result.getValue(TestBytes.family, TestBytes.qualifier));
+      assertArrayEquals(TestBytes.value, result.getValue(TestBytes.family2, TestBytes.qualifier2));
+      scanner.close();
+      txContext.finish();
+
+      // Test 2: delete of first column family
+      txContext.start();
+      txTable.put(new Put(TestBytes.row2)
+              .add(TestBytes.family, TestBytes.qualifier, TestBytes.value)
+              .add(TestBytes.family, TestBytes.qualifier2, TestBytes.value2)
+              .add(TestBytes.family2, TestBytes.qualifier, TestBytes.value)
+              .add(TestBytes.family2, TestBytes.qualifier2, TestBytes.value2));
+      txContext.finish();
+
+      txContext.start();
+      txTable.delete(new Delete(TestBytes.row2).deleteFamily(TestBytes.family));
+      txContext.finish();
+
+      txContext.start();
+      Result fam1Result = txTable.get(new Get(TestBytes.row2));
+      assertFalse(fam1Result.isEmpty());
+      assertEquals(2, fam1Result.size());
+      assertArrayEquals(TestBytes.value, fam1Result.getValue(TestBytes.family2, TestBytes.qualifier));
+      assertArrayEquals(TestBytes.value2, fam1Result.getValue(TestBytes.family2, TestBytes.qualifier2));
+      txContext.finish();
+
+      // Test 3: delete of second column family
+      txContext.start();
+      txTable.put(new Put(TestBytes.row3)
+              .add(TestBytes.family, TestBytes.qualifier, TestBytes.value)
+              .add(TestBytes.family, TestBytes.qualifier2, TestBytes.value2)
+              .add(TestBytes.family2, TestBytes.qualifier, TestBytes.value)
+              .add(TestBytes.family2, TestBytes.qualifier2, TestBytes.value2));
+      txContext.finish();
+
+      txContext.start();
+      txTable.delete(new Delete(TestBytes.row3).deleteFamily(TestBytes.family2));
+      txContext.finish();
+
+      txContext.start();
+      Result fam2Result = txTable.get(new Get(TestBytes.row3));
+      assertFalse(fam2Result.isEmpty());
+      assertEquals(2, fam2Result.size());
+      assertArrayEquals(TestBytes.value, fam2Result.getValue(TestBytes.family, TestBytes.qualifier));
+      assertArrayEquals(TestBytes.value2, fam2Result.getValue(TestBytes.family, TestBytes.qualifier2));
+      txContext.finish();
+
+      // Test 4: delete specific rows in a range
+      txContext.start();
+      for (int i = 0; i < 10; i++) {
+        txTable.put(new Put(Bytes.toBytes("z" + i))
+                .add(TestBytes.family, TestBytes.qualifier, Bytes.toBytes(i))
+                .add(TestBytes.family2, TestBytes.qualifier2, Bytes.toBytes(i)));
+      }
+      txContext.finish();
+
+      txContext.start();
+      // delete odd rows
+      for (int i = 1; i < 10; i += 2) {
+        txTable.delete(new Delete(Bytes.toBytes("z" + i)));
+      }
+      txContext.finish();
+
+      txContext.start();
+      int cnt = 0;
+      ResultScanner zScanner = txTable.getScanner(new Scan(Bytes.toBytes("z0")));
+      Result res;
+      while ((res = zScanner.next()) != null) {
+        assertFalse(res.isEmpty());
+        assertArrayEquals(Bytes.toBytes("z" + cnt), res.getRow());
+        assertArrayEquals(Bytes.toBytes(cnt), res.getValue(TestBytes.family, TestBytes.qualifier));
+        assertArrayEquals(Bytes.toBytes(cnt), res.getValue(TestBytes.family2, TestBytes.qualifier2));
+        cnt += 2;
+      }
+    } finally {
+      txTable.close();
+    }
   }
 
   /**

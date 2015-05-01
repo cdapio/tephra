@@ -492,15 +492,20 @@ to a user:
 Known Issues and Limitations
 ----------------------------
 
-- Currently, ``Delete`` operations are implemented by writing a empty value (empty ``byte[]``) to the
-  column.  This is necessary so that the changes can be rolled back in the case of a transaction
-  failure -- normal HBase ``Delete`` operations cannot be undone.
-- Invalid transactions are not cleared from the exclusion list.  When a transaction is
+- Currently, column family ``Delete`` operations are implemented by writing a cell with an empty
+  qualifier (empty ``byte[]``) and empty value (empty ``byte[]``).  This is done in place of
+  native HBase ``Delete`` operations so the delete marker can be rolled back in the event of
+  a transaction failure -- normal HBase ``Delete`` operations cannot be undone.  However, this
+  means that applications that store data in a column with an empty qualifier will not be able to
+  store empty values, and will not be able to transactionally delete that column.
+- Column ``Delete`` operations are implemented by writing a empty value (empty ``byte[]``) to the
+  column.  This means that applications will not be able to store empty values to columns.
+- Invalid transactions are not automatically cleared from the exclusion list.  When a transaction is
   invalidated, either from timing out or being invalidated by the client due to a failure to rollback
   changes, its transaction ID is added to a list of excluded transactions.  Data from invalidated
   transactions will be dropped by the ``TransactionProcessor`` coprocessor on HBase region flush
-  and compaction operations.  Currently, however, the transaction ID is not removed from the list
-  of excluded transaction IDs.
+  and compaction operations.  Currently, however, transaction IDs can only be manually removed
+  from the list of excluded transaction IDs, using the ``co.cask.tephra.TransactionAdmin`` tool.
 
 
 How to Contribute
