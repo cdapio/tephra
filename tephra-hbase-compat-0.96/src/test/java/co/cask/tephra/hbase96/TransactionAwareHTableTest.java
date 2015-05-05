@@ -85,6 +85,7 @@ public class TransactionAwareHTableTest {
     private static final byte[] row = Bytes.toBytes("row");
     private static final byte[] row2 = Bytes.toBytes("row2");
     private static final byte[] row3 = Bytes.toBytes("row3");
+    private static final byte[] row4 = Bytes.toBytes("row4");
     private static final byte[] value = Bytes.toBytes("value");
     private static final byte[] value2 = Bytes.toBytes("value2");
   }
@@ -494,6 +495,19 @@ public class TransactionAwareHTableTest {
         assertArrayEquals(Bytes.toBytes(cnt), res.getValue(TestBytes.family2, TestBytes.qualifier2));
         cnt += 2;
       }
+
+      // Test 5: delete prior writes in the same transaction
+      txContext.start();
+      txTable.put(new Put(TestBytes.row4)
+          .add(TestBytes.family, TestBytes.qualifier, TestBytes.value)
+          .add(TestBytes.family2, TestBytes.qualifier2, TestBytes.value2));
+      txTable.delete(new Delete(TestBytes.row4));
+      txContext.finish();
+
+      txContext.start();
+      Result row4Result = txTable.get(new Get(TestBytes.row4));
+      assertTrue(row4Result.isEmpty());
+      txContext.finish();
     } finally {
       txTable.close();
     }
