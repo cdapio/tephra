@@ -380,6 +380,24 @@ public class TransactionServiceClient implements TransactionSystemClient {
   }
 
   @Override
+  public Transaction checkpoint(final Transaction tx) throws TransactionNotInProgressException {
+    try {
+      return this.execute(
+          new Operation<Transaction>("checkpoint") {
+            @Override
+            Transaction execute(TransactionServiceThriftClient client) throws Exception {
+              return client.checkpoint(tx);
+            }
+          }
+      );
+    } catch (TransactionNotInProgressException te) {
+      throw te;
+    } catch (Exception e) {
+      throw Throwables.propagate(e);
+    }
+  }
+
+  @Override
   public InputStream getSnapshotInputStream() throws TransactionCouldNotTakeSnapshotException {
     try {
       return this.execute(

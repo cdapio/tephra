@@ -34,9 +34,12 @@ import java.util.Set;
  */
 public class TransactionEdit implements Writable {
   // provides serde for current version
+  // V4 adds CHECKPOINT edit type
+  private static final TransactionEditCodec CODEC_V4 = new TransactionEditCodecV3();
+  private static final byte V4 = -4;
+  // provides serde for old but still supported version, should not be used for writing
   private static final TransactionEditCodec CODEC_V3 = new TransactionEditCodecV3();
   private static final byte V3 = -3;
-  // provides serde for old but still supported version, should not be used for writing
   private static final TransactionEditCodec CODEC_V2 = new TransactionEditCodecV2();
   private static final byte V2 = -2;
   private static final TransactionEditCodec CODEC_V1 = new TransactionEditCodecV1();
@@ -46,7 +49,7 @@ public class TransactionEdit implements Writable {
    * The possible state changes for a transaction.
    */
   public enum State {
-    INPROGRESS, COMMITTING, COMMITTED, INVALID, ABORTED, MOVE_WATERMARK, TRUNCATE_INVALID_TX
+    INPROGRESS, COMMITTING, COMMITTED, INVALID, ABORTED, MOVE_WATERMARK, TRUNCATE_INVALID_TX, CHECKPOINT
   }
 
   private long writePointer;
@@ -66,6 +69,8 @@ public class TransactionEdit implements Writable {
   private TransactionType type;
   private Set<Long> truncateInvalidTx;
   private long truncateInvalidTxTime;
+  private long parentWritePointer;
+  private long[] checkpointPointers;
 
   // for Writable
   public TransactionEdit() {
@@ -76,7 +81,8 @@ public class TransactionEdit implements Writable {
   // package private for testing
   TransactionEdit(long writePointer, long visibilityUpperBound, State state, long expirationDate,
                   Set<ChangeId> changes, long commitPointer, boolean canCommit, TransactionType type,
-                  Set<Long> truncateInvalidTx, long truncateInvalidTxTime) {
+                  Set<Long> truncateInvalidTx, long truncateInvalidTxTime, long parentWritePointer,
+                  long[] checkpointPointers) {
     this.writePointer = writePointer;
     this.visibilityUpperBound = visibilityUpperBound;
     this.state = state;
@@ -87,6 +93,8 @@ public class TransactionEdit implements Writable {
     this.type = type;
     this.truncateInvalidTx = truncateInvalidTx != null ? truncateInvalidTx : Collections.<Long>emptySet();
     this.truncateInvalidTxTime = truncateInvalidTxTime;
+    this.parentWritePointer = parentWritePointer;
+    this.checkpointPointers = checkpointPointers;
   }
 
   /**
@@ -164,19 +172,35 @@ public class TransactionEdit implements Writable {
   }
 
   /**
+   * Returns the parent write pointer for a checkpoint operation.  This is only populated for edits of type
+   * {@link State#CHECKPOINT}
+   */
+  public long getParentWritePointer() {
+    return parentWritePointer;
+  }
+
+  /**
+   * Returns the checkpoint write pointers for the edit.  This is only populated for edits of type
+   * {@link State#ABORTED}.
+   */
+  public long[] getCheckpointPointers() {
+    return checkpointPointers;
+  }
+
+  /**
    * Creates a new instance in the {@link State#INPROGRESS} state.
    */
   public static TransactionEdit createStarted(long writePointer, long visibilityUpperBound,
                                               long expirationDate, TransactionType type) {
     return new TransactionEdit(writePointer, visibilityUpperBound, State.INPROGRESS,
-                               expirationDate, null, 0L, false, type, null, 0L);
+                               expirationDate, null, 0L, false, type, null, 0L, 0L, null);
   }
 
   /**
    * Creates a new instance in the {@link State#COMMITTING} state.
    */
   public static TransactionEdit createCommitting(long writePointer, Set<ChangeId> changes) {
-    return new TransactionEdit(writePointer, 0L, State.COMMITTING, 0L, changes, 0L, false, null, null, 0L);
+    return new TransactionEdit(writePointer, 0L, State.COMMITTING, 0L, changes, 0L, false, null, null, 0L, 0L, null);
   }
 
   /**
@@ -185,35 +209,37 @@ public class TransactionEdit implements Writable {
   public static TransactionEdit createCommitted(long writePointer, Set<ChangeId> changes, long nextWritePointer,
                                                 boolean canCommit) {
     return new TransactionEdit(writePointer, 0L, State.COMMITTED, 0L, changes, nextWritePointer, canCommit, null, 
-                               null, 0L);
+                               null, 0L, 0L, null);
   }
 
   /**
    * Creates a new instance in the {@link State#ABORTED} state.
    */
-  public static TransactionEdit createAborted(long writePointer, TransactionType type) {
-    return new TransactionEdit(writePointer, 0L, State.ABORTED, 0L, null, 0L, false, type, null, 0L);
+  public static TransactionEdit createAborted(long writePointer, TransactionType type, long[] checkpointPointers) {
+    return new TransactionEdit(writePointer, 0L, State.ABORTED, 0L, null, 0L, false, type, null, 0L, 0L,
+        checkpointPointers);
   }
 
   /**
    * Creates a new instance in the {@link State#INVALID} state.
    */
   public static TransactionEdit createInvalid(long writePointer) {
-    return new TransactionEdit(writePointer, 0L, State.INVALID, 0L, null, 0L, false, null, null, 0L);
+    return new TransactionEdit(writePointer, 0L, State.INVALID, 0L, null, 0L, false, null, null, 0L, 0L, null);
   }
 
   /**
    * Creates a new instance in the {@link State#MOVE_WATERMARK} state.
    */
   public static TransactionEdit createMoveWatermark(long writePointer) {
-    return new TransactionEdit(writePointer, 0L, State.MOVE_WATERMARK, 0L, null, 0L, false, null, null, 0L);
+    return new TransactionEdit(writePointer, 0L, State.MOVE_WATERMARK, 0L, null, 0L, false, null, null, 0L, 0L, null);
   }
 
   /**
    * Creates a new instance in the {@link State#TRUNCATE_INVALID_TX} state.
    */
   public static TransactionEdit createTruncateInvalidTx(Set<Long> truncateInvalidTx) {
-    return new TransactionEdit(0L, 0L, State.TRUNCATE_INVALID_TX, 0L, null, 0L, false, null, truncateInvalidTx, 0L);
+    return new TransactionEdit(0L, 0L, State.TRUNCATE_INVALID_TX, 0L, null, 0L, false, null, truncateInvalidTx,
+        0L, 0L, null);
   }
 
   /**
@@ -221,18 +247,29 @@ public class TransactionEdit implements Writable {
    */
   public static TransactionEdit createTruncateInvalidTxBefore(long truncateInvalidTxTime) {
     return new TransactionEdit(0L, 0L, State.TRUNCATE_INVALID_TX, 0L, null, 0L, false, null, null, 
-                               truncateInvalidTxTime);
+                               truncateInvalidTxTime, 0L, null);
+  }
+
+  /**
+   * Creates a new instance in the {@link State#CHECKPOINT} state.
+   */
+  public static TransactionEdit createCheckpoint(long writePointer, long parentWritePointer) {
+    return new TransactionEdit(writePointer, 0L, State.CHECKPOINT, 0L, null, 0L, false, null, null, 0L,
+        parentWritePointer, null);
   }
 
   @Override
   public void write(DataOutput out) throws IOException {
-    CODEC_V3.encode(this, out);
+    CODEC_V4.encode(this, out);
   }
 
   @Override
   public void readFields(DataInput in) throws IOException {
     byte version = in.readByte();
     switch (version) {
+      case V4:
+        CODEC_V4.decode(this, in);
+        break;
       case V3:
         CODEC_V3.decode(this, in);
         break;
@@ -267,13 +304,15 @@ public class TransactionEdit implements Writable {
       Objects.equal(this.canCommit, that.canCommit) &&
       Objects.equal(this.type, that.type) &&
       Objects.equal(this.truncateInvalidTx, that.truncateInvalidTx) &&
-      Objects.equal(this.truncateInvalidTxTime, that.truncateInvalidTxTime);
+      Objects.equal(this.truncateInvalidTxTime, that.truncateInvalidTxTime) &&
+      Objects.equal(this.parentWritePointer, that.parentWritePointer) &&
+      Objects.equal(this.checkpointPointers, that.checkpointPointers);
   }
   
   @Override
   public final int hashCode() {
     return Objects.hashCode(writePointer, visibilityUpperBound, commitPointer, expirationDate, state, changes,
-                            canCommit, type);
+                            canCommit, type, parentWritePointer, checkpointPointers);
   }
 
   @Override
@@ -289,6 +328,8 @@ public class TransactionEdit implements Writable {
       .add("type", type)
       .add("truncateInvalidTx", truncateInvalidTx)
       .add("truncateInvalidTxTime", truncateInvalidTxTime)
+      .add("parentWritePointer", parentWritePointer)
+      .add("checkpointPointers", checkpointPointers)
       .toString();
   }
 
@@ -470,7 +511,7 @@ public class TransactionEdit implements Writable {
 
     @Override
     public void encode(TransactionEdit src, DataOutput out) throws IOException {
-      out.writeByte(V3);
+      writeVersion(out);
       out.writeLong(src.writePointer);
       // use ordinal for predictable size, though this does not support evolution
       out.writeInt(src.state.ordinal());
@@ -504,6 +545,42 @@ public class TransactionEdit implements Writable {
         }
       }
       out.writeLong(src.truncateInvalidTxTime);
+    }
+
+    protected void writeVersion(DataOutput out) throws IOException {
+      out.writeByte(V3);
+    }
+  }
+
+  static class TransactionEditCodeV4 extends TransactionEditCodecV3 {
+    @Override
+    public void decode(TransactionEdit dest, DataInput in) throws IOException {
+      super.decode(dest, in);
+      dest.parentWritePointer = in.readLong();
+      int checkpointPointersLen = in.readInt();
+      dest.checkpointPointers = new long[checkpointPointersLen];
+      for (int i = 0; i < checkpointPointersLen; i++) {
+        dest.checkpointPointers[i] = in.readLong();
+      }
+    }
+
+    @Override
+    public void encode(TransactionEdit src, DataOutput out) throws IOException {
+      super.encode(src, out);
+      out.writeLong(src.parentWritePointer);
+      if (src.checkpointPointers == null) {
+        out.writeInt(0);
+      } else {
+        out.writeInt(src.checkpointPointers.length);
+        for (int i = 0; i < src.checkpointPointers.length; i++) {
+          out.writeLong(src.checkpointPointers[i]);
+        }
+      }
+    }
+
+    @Override
+    protected void writeVersion(DataOutput out) throws IOException {
+      out.writeByte(V4);
     }
   }
 }

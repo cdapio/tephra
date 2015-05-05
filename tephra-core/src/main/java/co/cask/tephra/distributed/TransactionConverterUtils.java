@@ -30,13 +30,15 @@ public final class TransactionConverterUtils {
   public static TTransaction wrap(Transaction tx) {
     return new TTransaction(tx.getWritePointer(), tx.getReadPointer(),
                             Longs.asList(tx.getInvalids()), Longs.asList(tx.getInProgress()),
-                            tx.getFirstShortInProgress(), getTTransactionType(tx.getType()));
+                            tx.getFirstShortInProgress(), getTTransactionType(tx.getType()),
+                            tx.getCurrentWritePointer(), Longs.asList(tx.getCheckpointWritePointers()));
   }
 
   public static Transaction unwrap(TTransaction thriftTx) {
-    return new Transaction(thriftTx.getReadPointer(), thriftTx.getWritePointer(),
+    return new Transaction(thriftTx.getReadPointer(), thriftTx.getWritePointer(), thriftTx.getCurrentWritePointer(),
                            Longs.toArray(thriftTx.getInvalids()), Longs.toArray(thriftTx.getInProgress()),
-                           thriftTx.getFirstShort(), getTransactionType(thriftTx.getType()));
+                           thriftTx.getFirstShort(), getTransactionType(thriftTx.getType()),
+                           Longs.toArray(thriftTx.getCheckpointWritePointers()));
   }
 
   private static TransactionType getTransactionType(TTransactionType tType) {

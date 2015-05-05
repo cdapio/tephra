@@ -18,6 +18,8 @@ package co.cask.tephra;
 
 import co.cask.tephra.snapshot.DefaultSnapshotCodec;
 import co.cask.tephra.snapshot.SnapshotCodecV2;
+import co.cask.tephra.snapshot.SnapshotCodecV3;
+import co.cask.tephra.snapshot.SnapshotCodecV4;
 
 import java.util.concurrent.TimeUnit;
 
@@ -94,6 +96,11 @@ public class TxConstants {
    * Column qualifier used for a special delete marker tombstone, which identifies an entire column family as deleted.
    */
   public static final byte[] FAMILY_DELETE_QUALIFIER = new byte[0];
+
+  /**
+   * Attribute key used to exclude the transaction's current write pointer from reads.
+   */
+  public static final String TX_EXCLUDE_CURRENT_WRITE = "cask.tx.exclude.current";
 
   // Constants for monitoring status
   public static final String STATUS_OK = "OK";
@@ -305,7 +312,7 @@ public class TxConstants {
      */
     public static final String CFG_TX_SNAPHOT_CODEC_CLASSES = "data.tx.snapshot.codecs";
     public static final Class[] DEFAULT_TX_SNAPHOT_CODEC_CLASSES = 
-      { DefaultSnapshotCodec.class, SnapshotCodecV2.class };
+      { DefaultSnapshotCodec.class, SnapshotCodecV2.class, SnapshotCodecV3.class, SnapshotCodecV4.class };
   }
 
 }

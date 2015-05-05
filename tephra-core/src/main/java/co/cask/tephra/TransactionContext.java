@@ -58,6 +58,15 @@ public class TransactionContext {
     }
   }
 
+  /**
+   * Starts a new transaction.  Calling this will initiate a new transaction using the {@link TransactionSystemClient},
+   * and pass the returned transaction to {@link TransactionAware#startTx(Transaction)} for each registered
+   * TransactionAware.  If an exception is encountered, the transaction will be aborted and a
+   * {@code TransactionFailureException} wrapping the root cause will be thrown.
+   *
+   * @throws TransactionFailureException if an exception occurs starting the transaction with any registered
+   *     TransactionAware
+   */
   public void start() throws TransactionFailureException {
     currentTx = txClient.startShort();
     for (TransactionAware txAware : txAwares) {
@@ -73,6 +82,14 @@ public class TransactionContext {
     }
   }
 
+  /**
+   * Commits the current transaction.  This will: check for any conflicts, based on the change set aggregated from
+   * all registered {@link TransactionAware} instances; flush any pending writes from the {@code TransactionAware}s;
+   * commit the current transaction with the {@link TransactionSystemClient}; and clear the current transaction state.
+   *
+   * @throws TransactionConflictException if a conflict is detected with a recently committed transaction
+   * @throws TransactionFailureException if an error occurs while committing
+   */
   public void finish() throws TransactionFailureException {
     Preconditions.checkState(currentTx != null, "Cannot finish tx that has not been started");
     // each of these steps will abort and rollback the tx in case if errors, and throw an exception
@@ -83,8 +100,50 @@ public class TransactionContext {
     currentTx = null;
   }
 
+  /**
+   * Aborts the given transaction, and rolls back all data set changes. If rollback fails,
+   * the transaction is invalidated. If an exception is caught during rollback, the exception
+   * is rethrown wrapped in a TransactionFailureException, after all remaining TransactionAwares have
+   * completed rollback.
+   *
+   * @throws TransactionFailureException for any exception that is encountered.
+   */
   public void abort() throws TransactionFailureException {
     abort(null);
+  }
+
+  /**
+   * Checkpoints the current transaction by flushing any pending writes for the registered {@link TransactionAware}
+   * instances, and obtaining a new current write pointer for the transaction.  By performing a checkpoint,
+   * the client can ensure that all previous writes were flushed and are visible.  By default, the current write
+   * pointer for the transaction is also visible.  The current write pointer can be excluded from read
+   * operations by setting an attribute with the key {@link TxConstants#TX_EXCLUDE_CURRENT_WRITE} on the
+   * {@code Get} or {@code Scan} operation.  After the checkpoint operation is performed, the updated
+   * {@link Transaction} instance will be passed to {@link TransactionAware#startTx(Transaction)} for each
+   * registered {@code TransactionAware} instance.
+   *
+   * @throws TransactionFailureException if an error occurs while performing the checkpoint
+   */
+  public void checkpoint() throws TransactionFailureException {
+    Preconditions.checkState(currentTx != null, "Cannot checkpoint tx that has not been started");
+    persist();
+    try {
+      currentTx = txClient.checkpoint(currentTx);
+      // update the current transaction with all TransactionAwares
+      for (TransactionAware txAware : txAwares) {
+        txAware.startTx(currentTx);
+      }
+    } catch (TransactionNotInProgressException e) {
+      String message = String.format("Transaction %d is not in progress.", currentTx.getWritePointer());
+      LOG.warn(message, e);
+      abort(new TransactionFailureException(message, e));
+      // abort will throw that exception
+    } catch (Throwable e) {
+      String message = String.format("Exception from checkpoint for transaction %d.", currentTx.getWritePointer());
+      LOG.warn(message, e);
+      abort(new TransactionFailureException(message, e));
+      // abort will throw that exception
+    }
   }
 
   /**
@@ -99,7 +158,7 @@ public class TransactionContext {
   /**
    * Aborts the given transaction, and rolls back all data set changes. If rollback fails,
    * the transaction is invalidated. If an exception is caught during rollback, the exception
-   * is rethrown wrapped into a TransactionFailureException, after all remaining datasets have
+   * is rethrown wrapped into a TransactionFailureException, after all remaining TransactionAwares have
    * completed rollback. If an existing exception is passed in, that exception is thrown in either
    * case, whether the rollback is successful or not. In other words, this method always throws the
    * first exception that it encounters.

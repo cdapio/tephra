@@ -367,7 +367,7 @@ public abstract class AbstractTransactionStateStorageTest {
       long time1 = System.currentTimeMillis();
       long wp1 = time1 * TxConstants.MAX_TX_PER_MS;
       TransactionEdit edit1 = TransactionEdit.createStarted(wp1, wp1 - 10, time1 + 100000, TransactionType.LONG);
-      TransactionEdit edit2 = TransactionEdit.createAborted(wp1, TransactionType.LONG);
+      TransactionEdit edit2 = TransactionEdit.createAborted(wp1, TransactionType.LONG, null);
 
       long time2 = time1 + 100;
       long wp2 = time2 * TxConstants.MAX_TX_PER_MS;
@@ -378,7 +378,7 @@ public abstract class AbstractTransactionStateStorageTest {
       long wp3 = time3 * TxConstants.MAX_TX_PER_MS;
       TransactionEdit edit5 = TransactionEdit.createStarted(wp3, wp3 - 10, time3 + 100000, TransactionType.LONG);
       TransactionEdit edit6 = TransactionEdit.createInvalid(wp3);
-      TransactionEdit edit7 = TransactionEdit.createAborted(wp3, TransactionType.LONG);
+      TransactionEdit edit7 = TransactionEdit.createAborted(wp3, TransactionType.LONG, null);
       
       // write transaction edits
       TransactionLog log = storage.createLog(time1);
@@ -580,7 +580,7 @@ public abstract class AbstractTransactionStateStorageTest {
           edits.add(TransactionEdit.createInvalid(writePointer));
           break;
         case ABORTED:
-          edits.add(TransactionEdit.createAborted(writePointer, TransactionType.SHORT));
+          edits.add(TransactionEdit.createAborted(writePointer, TransactionType.SHORT, null));
           break;
         case MOVE_WATERMARK:
           edits.add(TransactionEdit.createMoveWatermark(writePointer));

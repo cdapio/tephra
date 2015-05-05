@@ -84,6 +84,11 @@ public class InMemoryTxSystemClient implements TransactionSystemClient {
   }
 
   @Override
+  public Transaction checkpoint(Transaction tx) throws TransactionNotInProgressException {
+    return txManager.checkpoint(tx);
+  }
+
+  @Override
   public InputStream getSnapshotInputStream() throws TransactionCouldNotTakeSnapshotException {
     try {
       ByteArrayOutputStream out = new ByteArrayOutputStream();

@@ -22,24 +22,29 @@
  */
 package co.cask.tephra.distributed.thrift;
 
-import org.apache.thrift.EncodingUtils;
-import org.apache.thrift.protocol.TTupleProtocol;
 import org.apache.thrift.scheme.IScheme;
 import org.apache.thrift.scheme.SchemeFactory;
 import org.apache.thrift.scheme.StandardScheme;
+
 import org.apache.thrift.scheme.TupleScheme;
+import org.apache.thrift.protocol.TTupleProtocol;
+import org.apache.thrift.protocol.TProtocolException;
+import org.apache.thrift.EncodingUtils;
+import org.apache.thrift.TException;
+import java.util.List;
+import java.util.ArrayList;
+import java.util.Map;
+import java.util.HashMap;
+import java.util.EnumMap;
+import java.util.Set;
+import java.util.HashSet;
+import java.util.EnumSet;
+import java.util.Collections;
+import java.util.BitSet;
+import java.nio.ByteBuffer;
+import java.util.Arrays;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.nio.ByteBuffer;
-import java.util.BitSet;
-import java.util.Collections;
-import java.util.EnumMap;
-import java.util.EnumSet;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Set;
 
 public class TTransactionServer {
 
@@ -71,6 +76,8 @@ public class TTransactionServer {
 
     public int invalidTxSize() throws org.apache.thrift.TException;
 
+    public TTransaction checkpoint(TTransaction tx) throws TTransactionNotInProgressException, org.apache.thrift.TException;
+
   }
 
   public interface AsyncIface {
@@ -100,6 +107,8 @@ public class TTransactionServer {
     public void truncateInvalidTxBefore(long time, org.apache.thrift.async.AsyncMethodCallback<AsyncClient.truncateInvalidTxBefore_call> resultHandler) throws org.apache.thrift.TException;
 
     public void invalidTxSize(org.apache.thrift.async.AsyncMethodCallback<AsyncClient.invalidTxSize_call> resultHandler) throws org.apache.thrift.TException;
+
+    public void checkpoint(TTransaction tx, org.apache.thrift.async.AsyncMethodCallback<AsyncClient.checkpoint_call> resultHandler) throws org.apache.thrift.TException;
 
   }
 
@@ -421,6 +430,32 @@ public class TTransactionServer {
         return result.success;
       }
       throw new org.apache.thrift.TApplicationException(org.apache.thrift.TApplicationException.MISSING_RESULT, "invalidTxSize failed: unknown result");
+    }
+
+    public TTransaction checkpoint(TTransaction tx) throws TTransactionNotInProgressException, org.apache.thrift.TException
+    {
+      send_checkpoint(tx);
+      return recv_checkpoint();
+    }
+
+    public void send_checkpoint(TTransaction tx) throws org.apache.thrift.TException
+    {
+      checkpoint_args args = new checkpoint_args();
+      args.setTx(tx);
+      sendBase("checkpoint", args);
+    }
+
+    public TTransaction recv_checkpoint() throws TTransactionNotInProgressException, org.apache.thrift.TException
+    {
+      checkpoint_result result = new checkpoint_result();
+      receiveBase(result, "checkpoint");
+      if (result.isSetSuccess()) {
+        return result.success;
+      }
+      if (result.e != null) {
+        throw result.e;
+      }
+      throw new org.apache.thrift.TApplicationException(org.apache.thrift.TApplicationException.MISSING_RESULT, "checkpoint failed: unknown result");
     }
 
   }
@@ -842,6 +877,38 @@ public class TTransactionServer {
       }
     }
 
+    public void checkpoint(TTransaction tx, org.apache.thrift.async.AsyncMethodCallback<checkpoint_call> resultHandler) throws org.apache.thrift.TException {
+      checkReady();
+      checkpoint_call method_call = new checkpoint_call(tx, resultHandler, this, ___protocolFactory, ___transport);
+      this.___currentMethod = method_call;
+      ___manager.call(method_call);
+    }
+
+    public static class checkpoint_call extends org.apache.thrift.async.TAsyncMethodCall {
+      private TTransaction tx;
+      public checkpoint_call(TTransaction tx, org.apache.thrift.async.AsyncMethodCallback<checkpoint_call> resultHandler, org.apache.thrift.async.TAsyncClient client, org.apache.thrift.protocol.TProtocolFactory protocolFactory, org.apache.thrift.transport.TNonblockingTransport transport) throws org.apache.thrift.TException {
+        super(client, protocolFactory, transport, resultHandler, false);
+        this.tx = tx;
+      }
+
+      public void write_args(org.apache.thrift.protocol.TProtocol prot) throws org.apache.thrift.TException {
+        prot.writeMessageBegin(new org.apache.thrift.protocol.TMessage("checkpoint", org.apache.thrift.protocol.TMessageType.CALL, 0));
+        checkpoint_args args = new checkpoint_args();
+        args.setTx(tx);
+        args.write(prot);
+        prot.writeMessageEnd();
+      }
+
+      public TTransaction getResult() throws TTransactionNotInProgressException, org.apache.thrift.TException {
+        if (getState() != org.apache.thrift.async.TAsyncMethodCall.State.RESPONSE_READ) {
+          throw new IllegalStateException("Method call not finished!");
+        }
+        org.apache.thrift.transport.TMemoryInputTransport memoryTransport = new org.apache.thrift.transport.TMemoryInputTransport(getFrameBuffer().array());
+        org.apache.thrift.protocol.TProtocol prot = client.getProtocolFactory().getProtocol(memoryTransport);
+        return (new Client(prot)).recv_checkpoint();
+      }
+    }
+
   }
 
   public static class Processor<I extends Iface> extends org.apache.thrift.TBaseProcessor<I> implements org.apache.thrift.TProcessor {
@@ -868,6 +935,7 @@ public class TTransactionServer {
       processMap.put("truncateInvalidTx", new truncateInvalidTx());
       processMap.put("truncateInvalidTxBefore", new truncateInvalidTxBefore());
       processMap.put("invalidTxSize", new invalidTxSize());
+      processMap.put("checkpoint", new checkpoint());
       return processMap;
     }
 
@@ -1145,6 +1213,30 @@ public class TTransactionServer {
         invalidTxSize_result result = new invalidTxSize_result();
         result.success = iface.invalidTxSize();
         result.setSuccessIsSet(true);
+        return result;
+      }
+    }
+
+    public static class checkpoint<I extends Iface> extends org.apache.thrift.ProcessFunction<I, checkpoint_args> {
+      public checkpoint() {
+        super("checkpoint");
+      }
+
+      public checkpoint_args getEmptyArgsInstance() {
+        return new checkpoint_args();
+      }
+
+      protected boolean isOneway() {
+        return false;
+      }
+
+      public checkpoint_result getResult(I iface, checkpoint_args args) throws org.apache.thrift.TException {
+        checkpoint_result result = new checkpoint_result();
+        try {
+          result.success = iface.checkpoint(args.tx);
+        } catch (TTransactionNotInProgressException e) {
+          result.e = e;
+        }
         return result;
       }
     }
@@ -3472,13 +3564,13 @@ public class TTransactionServer {
             case 2: // CHANGES
               if (schemeField.type == org.apache.thrift.protocol.TType.SET) {
                 {
-                  org.apache.thrift.protocol.TSet _set16 = iprot.readSetBegin();
-                  struct.changes = new HashSet<ByteBuffer>(2*_set16.size);
-                  for (int _i17 = 0; _i17 < _set16.size; ++_i17)
+                  org.apache.thrift.protocol.TSet _set24 = iprot.readSetBegin();
+                  struct.changes = new HashSet<ByteBuffer>(2*_set24.size);
+                  for (int _i25 = 0; _i25 < _set24.size; ++_i25)
                   {
-                    ByteBuffer _elem18; // required
-                    _elem18 = iprot.readBinary();
-                    struct.changes.add(_elem18);
+                    ByteBuffer _elem26; // required
+                    _elem26 = iprot.readBinary();
+                    struct.changes.add(_elem26);
                   }
                   iprot.readSetEnd();
                 }
@@ -3511,9 +3603,9 @@ public class TTransactionServer {
           oprot.writeFieldBegin(CHANGES_FIELD_DESC);
           {
             oprot.writeSetBegin(new org.apache.thrift.protocol.TSet(org.apache.thrift.protocol.TType.STRING, struct.changes.size()));
-            for (ByteBuffer _iter19 : struct.changes)
+            for (ByteBuffer _iter27 : struct.changes)
             {
-              oprot.writeBinary(_iter19);
+              oprot.writeBinary(_iter27);
             }
             oprot.writeSetEnd();
           }
@@ -3550,9 +3642,9 @@ public class TTransactionServer {
         if (struct.isSetChanges()) {
           {
             oprot.writeI32(struct.changes.size());
-            for (ByteBuffer _iter20 : struct.changes)
+            for (ByteBuffer _iter28 : struct.changes)
             {
-              oprot.writeBinary(_iter20);
+              oprot.writeBinary(_iter28);
             }
           }
         }
@@ -3569,13 +3661,13 @@ public class TTransactionServer {
         }
         if (incoming.get(1)) {
           {
-            org.apache.thrift.protocol.TSet _set21 = new org.apache.thrift.protocol.TSet(org.apache.thrift.protocol.TType.STRING, iprot.readI32());
-            struct.changes = new HashSet<ByteBuffer>(2*_set21.size);
-            for (int _i22 = 0; _i22 < _set21.size; ++_i22)
+            org.apache.thrift.protocol.TSet _set29 = new org.apache.thrift.protocol.TSet(org.apache.thrift.protocol.TType.STRING, iprot.readI32());
+            struct.changes = new HashSet<ByteBuffer>(2*_set29.size);
+            for (int _i30 = 0; _i30 < _set29.size; ++_i30)
             {
-              ByteBuffer _elem23; // required
-              _elem23 = iprot.readBinary();
-              struct.changes.add(_elem23);
+              ByteBuffer _elem31; // required
+              _elem31 = iprot.readBinary();
+              struct.changes.add(_elem31);
             }
           }
           struct.setChangesIsSet(true);
@@ -8291,13 +8383,13 @@ public class TTransactionServer {
             case 1: // TXNS
               if (schemeField.type == org.apache.thrift.protocol.TType.SET) {
                 {
-                  org.apache.thrift.protocol.TSet _set24 = iprot.readSetBegin();
-                  struct.txns = new HashSet<Long>(2*_set24.size);
-                  for (int _i25 = 0; _i25 < _set24.size; ++_i25)
+                  org.apache.thrift.protocol.TSet _set32 = iprot.readSetBegin();
+                  struct.txns = new HashSet<Long>(2*_set32.size);
+                  for (int _i33 = 0; _i33 < _set32.size; ++_i33)
                   {
-                    long _elem26; // required
-                    _elem26 = iprot.readI64();
-                    struct.txns.add(_elem26);
+                    long _elem34; // required
+                    _elem34 = iprot.readI64();
+                    struct.txns.add(_elem34);
                   }
                   iprot.readSetEnd();
                 }
@@ -8325,9 +8417,9 @@ public class TTransactionServer {
           oprot.writeFieldBegin(TXNS_FIELD_DESC);
           {
             oprot.writeSetBegin(new org.apache.thrift.protocol.TSet(org.apache.thrift.protocol.TType.I64, struct.txns.size()));
-            for (long _iter27 : struct.txns)
+            for (long _iter35 : struct.txns)
             {
-              oprot.writeI64(_iter27);
+              oprot.writeI64(_iter35);
             }
             oprot.writeSetEnd();
           }
@@ -8358,9 +8450,9 @@ public class TTransactionServer {
         if (struct.isSetTxns()) {
           {
             oprot.writeI32(struct.txns.size());
-            for (long _iter28 : struct.txns)
+            for (long _iter36 : struct.txns)
             {
-              oprot.writeI64(_iter28);
+              oprot.writeI64(_iter36);
             }
           }
         }
@@ -8372,13 +8464,13 @@ public class TTransactionServer {
         BitSet incoming = iprot.readBitSet(1);
         if (incoming.get(0)) {
           {
-            org.apache.thrift.protocol.TSet _set29 = new org.apache.thrift.protocol.TSet(org.apache.thrift.protocol.TType.I64, iprot.readI32());
-            struct.txns = new HashSet<Long>(2*_set29.size);
-            for (int _i30 = 0; _i30 < _set29.size; ++_i30)
+            org.apache.thrift.protocol.TSet _set37 = new org.apache.thrift.protocol.TSet(org.apache.thrift.protocol.TType.I64, iprot.readI32());
+            struct.txns = new HashSet<Long>(2*_set37.size);
+            for (int _i38 = 0; _i38 < _set37.size; ++_i38)
             {
-              long _elem31; // required
-              _elem31 = iprot.readI64();
-              struct.txns.add(_elem31);
+              long _elem39; // required
+              _elem39 = iprot.readI64();
+              struct.txns.add(_elem39);
             }
           }
           struct.setTxnsIsSet(true);
@@ -10154,6 +10246,826 @@ public class TTransactionServer {
         if (incoming.get(0)) {
           struct.success = iprot.readI32();
           struct.setSuccessIsSet(true);
+        }
+      }
+    }
+
+  }
+
+  public static class checkpoint_args implements org.apache.thrift.TBase<checkpoint_args, checkpoint_args._Fields>, java.io.Serializable, Cloneable   {
+    private static final org.apache.thrift.protocol.TStruct STRUCT_DESC = new org.apache.thrift.protocol.TStruct("checkpoint_args");
+
+    private static final org.apache.thrift.protocol.TField TX_FIELD_DESC = new org.apache.thrift.protocol.TField("tx", org.apache.thrift.protocol.TType.STRUCT, (short)1);
+
+    private static final Map<Class<? extends IScheme>, SchemeFactory> schemes = new HashMap<Class<? extends IScheme>, SchemeFactory>();
+    static {
+      schemes.put(StandardScheme.class, new checkpoint_argsStandardSchemeFactory());
+      schemes.put(TupleScheme.class, new checkpoint_argsTupleSchemeFactory());
+    }
+
+    public TTransaction tx; // required
+
+    /** The set of fields this struct contains, along with convenience methods for finding and manipulating them. */
+    public enum _Fields implements org.apache.thrift.TFieldIdEnum {
+      TX((short)1, "tx");
+
+      private static final Map<String, _Fields> byName = new HashMap<String, _Fields>();
+
+      static {
+        for (_Fields field : EnumSet.allOf(_Fields.class)) {
+          byName.put(field.getFieldName(), field);
+        }
+      }
+
+      /**
+       * Find the _Fields constant that matches fieldId, or null if its not found.
+       */
+      public static _Fields findByThriftId(int fieldId) {
+        switch(fieldId) {
+          case 1: // TX
+            return TX;
+          default:
+            return null;
+        }
+      }
+
+      /**
+       * Find the _Fields constant that matches fieldId, throwing an exception
+       * if it is not found.
+       */
+      public static _Fields findByThriftIdOrThrow(int fieldId) {
+        _Fields fields = findByThriftId(fieldId);
+        if (fields == null) throw new IllegalArgumentException("Field " + fieldId + " doesn't exist!");
+        return fields;
+      }
+
+      /**
+       * Find the _Fields constant that matches name, or null if its not found.
+       */
+      public static _Fields findByName(String name) {
+        return byName.get(name);
+      }
+
+      private final short _thriftId;
+      private final String _fieldName;
+
+      _Fields(short thriftId, String fieldName) {
+        _thriftId = thriftId;
+        _fieldName = fieldName;
+      }
+
+      public short getThriftFieldId() {
+        return _thriftId;
+      }
+
+      public String getFieldName() {
+        return _fieldName;
+      }
+    }
+
+    // isset id assignments
+    public static final Map<_Fields, org.apache.thrift.meta_data.FieldMetaData> metaDataMap;
+    static {
+      Map<_Fields, org.apache.thrift.meta_data.FieldMetaData> tmpMap = new EnumMap<_Fields, org.apache.thrift.meta_data.FieldMetaData>(_Fields.class);
+      tmpMap.put(_Fields.TX, new org.apache.thrift.meta_data.FieldMetaData("tx", org.apache.thrift.TFieldRequirementType.DEFAULT, 
+          new org.apache.thrift.meta_data.StructMetaData(org.apache.thrift.protocol.TType.STRUCT, TTransaction.class)));
+      metaDataMap = Collections.unmodifiableMap(tmpMap);
+      org.apache.thrift.meta_data.FieldMetaData.addStructMetaDataMap(checkpoint_args.class, metaDataMap);
+    }
+
+    public checkpoint_args() {
+    }
+
+    public checkpoint_args(
+      TTransaction tx)
+    {
+      this();
+      this.tx = tx;
+    }
+
+    /**
+     * Performs a deep copy on <i>other</i>.
+     */
+    public checkpoint_args(checkpoint_args other) {
+      if (other.isSetTx()) {
+        this.tx = new TTransaction(other.tx);
+      }
+    }
+
+    public checkpoint_args deepCopy() {
+      return new checkpoint_args(this);
+    }
+
+    @Override
+    public void clear() {
+      this.tx = null;
+    }
+
+    public TTransaction getTx() {
+      return this.tx;
+    }
+
+    public checkpoint_args setTx(TTransaction tx) {
+      this.tx = tx;
+      return this;
+    }
+
+    public void unsetTx() {
+      this.tx = null;
+    }
+
+    /** Returns true if field tx is set (has been assigned a value) and false otherwise */
+    public boolean isSetTx() {
+      return this.tx != null;
+    }
+
+    public void setTxIsSet(boolean value) {
+      if (!value) {
+        this.tx = null;
+      }
+    }
+
+    public void setFieldValue(_Fields field, Object value) {
+      switch (field) {
+      case TX:
+        if (value == null) {
+          unsetTx();
+        } else {
+          setTx((TTransaction)value);
+        }
+        break;
+
+      }
+    }
+
+    public Object getFieldValue(_Fields field) {
+      switch (field) {
+      case TX:
+        return getTx();
+
+      }
+      throw new IllegalStateException();
+    }
+
+    /** Returns true if field corresponding to fieldID is set (has been assigned a value) and false otherwise */
+    public boolean isSet(_Fields field) {
+      if (field == null) {
+        throw new IllegalArgumentException();
+      }
+
+      switch (field) {
+      case TX:
+        return isSetTx();
+      }
+      throw new IllegalStateException();
+    }
+
+    @Override
+    public boolean equals(Object that) {
+      if (that == null)
+        return false;
+      if (that instanceof checkpoint_args)
+        return this.equals((checkpoint_args)that);
+      return false;
+    }
+
+    public boolean equals(checkpoint_args that) {
+      if (that == null)
+        return false;
+
+      boolean this_present_tx = true && this.isSetTx();
+      boolean that_present_tx = true && that.isSetTx();
+      if (this_present_tx || that_present_tx) {
+        if (!(this_present_tx && that_present_tx))
+          return false;
+        if (!this.tx.equals(that.tx))
+          return false;
+      }
+
+      return true;
+    }
+
+    @Override
+    public int hashCode() {
+      return 0;
+    }
+
+    public int compareTo(checkpoint_args other) {
+      if (!getClass().equals(other.getClass())) {
+        return getClass().getName().compareTo(other.getClass().getName());
+      }
+
+      int lastComparison = 0;
+      checkpoint_args typedOther = (checkpoint_args)other;
+
+      lastComparison = Boolean.valueOf(isSetTx()).compareTo(typedOther.isSetTx());
+      if (lastComparison != 0) {
+        return lastComparison;
+      }
+      if (isSetTx()) {
+        lastComparison = org.apache.thrift.TBaseHelper.compareTo(this.tx, typedOther.tx);
+        if (lastComparison != 0) {
+          return lastComparison;
+        }
+      }
+      return 0;
+    }
+
+    public _Fields fieldForId(int fieldId) {
+      return _Fields.findByThriftId(fieldId);
+    }
+
+    public void read(org.apache.thrift.protocol.TProtocol iprot) throws org.apache.thrift.TException {
+      schemes.get(iprot.getScheme()).getScheme().read(iprot, this);
+    }
+
+    public void write(org.apache.thrift.protocol.TProtocol oprot) throws org.apache.thrift.TException {
+      schemes.get(oprot.getScheme()).getScheme().write(oprot, this);
+    }
+
+    @Override
+    public String toString() {
+      StringBuilder sb = new StringBuilder("checkpoint_args(");
+      boolean first = true;
+
+      sb.append("tx:");
+      if (this.tx == null) {
+        sb.append("null");
+      } else {
+        sb.append(this.tx);
+      }
+      first = false;
+      sb.append(")");
+      return sb.toString();
+    }
+
+    public void validate() throws org.apache.thrift.TException {
+      // check for required fields
+      // check for sub-struct validity
+      if (tx != null) {
+        tx.validate();
+      }
+    }
+
+    private void writeObject(java.io.ObjectOutputStream out) throws java.io.IOException {
+      try {
+        write(new org.apache.thrift.protocol.TCompactProtocol(new org.apache.thrift.transport.TIOStreamTransport(out)));
+      } catch (org.apache.thrift.TException te) {
+        throw new java.io.IOException(te);
+      }
+    }
+
+    private void readObject(java.io.ObjectInputStream in) throws java.io.IOException, ClassNotFoundException {
+      try {
+        read(new org.apache.thrift.protocol.TCompactProtocol(new org.apache.thrift.transport.TIOStreamTransport(in)));
+      } catch (org.apache.thrift.TException te) {
+        throw new java.io.IOException(te);
+      }
+    }
+
+    private static class checkpoint_argsStandardSchemeFactory implements SchemeFactory {
+      public checkpoint_argsStandardScheme getScheme() {
+        return new checkpoint_argsStandardScheme();
+      }
+    }
+
+    private static class checkpoint_argsStandardScheme extends StandardScheme<checkpoint_args> {
+
+      public void read(org.apache.thrift.protocol.TProtocol iprot, checkpoint_args struct) throws org.apache.thrift.TException {
+        org.apache.thrift.protocol.TField schemeField;
+        iprot.readStructBegin();
+        while (true)
+        {
+          schemeField = iprot.readFieldBegin();
+          if (schemeField.type == org.apache.thrift.protocol.TType.STOP) { 
+            break;
+          }
+          switch (schemeField.id) {
+            case 1: // TX
+              if (schemeField.type == org.apache.thrift.protocol.TType.STRUCT) {
+                struct.tx = new TTransaction();
+                struct.tx.read(iprot);
+                struct.setTxIsSet(true);
+              } else { 
+                org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
+              }
+              break;
+            default:
+              org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
+          }
+          iprot.readFieldEnd();
+        }
+        iprot.readStructEnd();
+
+        // check for required fields of primitive type, which can't be checked in the validate method
+        struct.validate();
+      }
+
+      public void write(org.apache.thrift.protocol.TProtocol oprot, checkpoint_args struct) throws org.apache.thrift.TException {
+        struct.validate();
+
+        oprot.writeStructBegin(STRUCT_DESC);
+        if (struct.tx != null) {
+          oprot.writeFieldBegin(TX_FIELD_DESC);
+          struct.tx.write(oprot);
+          oprot.writeFieldEnd();
+        }
+        oprot.writeFieldStop();
+        oprot.writeStructEnd();
+      }
+
+    }
+
+    private static class checkpoint_argsTupleSchemeFactory implements SchemeFactory {
+      public checkpoint_argsTupleScheme getScheme() {
+        return new checkpoint_argsTupleScheme();
+      }
+    }
+
+    private static class checkpoint_argsTupleScheme extends TupleScheme<checkpoint_args> {
+
+      @Override
+      public void write(org.apache.thrift.protocol.TProtocol prot, checkpoint_args struct) throws org.apache.thrift.TException {
+        TTupleProtocol oprot = (TTupleProtocol) prot;
+        BitSet optionals = new BitSet();
+        if (struct.isSetTx()) {
+          optionals.set(0);
+        }
+        oprot.writeBitSet(optionals, 1);
+        if (struct.isSetTx()) {
+          struct.tx.write(oprot);
+        }
+      }
+
+      @Override
+      public void read(org.apache.thrift.protocol.TProtocol prot, checkpoint_args struct) throws org.apache.thrift.TException {
+        TTupleProtocol iprot = (TTupleProtocol) prot;
+        BitSet incoming = iprot.readBitSet(1);
+        if (incoming.get(0)) {
+          struct.tx = new TTransaction();
+          struct.tx.read(iprot);
+          struct.setTxIsSet(true);
+        }
+      }
+    }
+
+  }
+
+  public static class checkpoint_result implements org.apache.thrift.TBase<checkpoint_result, checkpoint_result._Fields>, java.io.Serializable, Cloneable   {
+    private static final org.apache.thrift.protocol.TStruct STRUCT_DESC = new org.apache.thrift.protocol.TStruct("checkpoint_result");
+
+    private static final org.apache.thrift.protocol.TField SUCCESS_FIELD_DESC = new org.apache.thrift.protocol.TField("success", org.apache.thrift.protocol.TType.STRUCT, (short)0);
+    private static final org.apache.thrift.protocol.TField E_FIELD_DESC = new org.apache.thrift.protocol.TField("e", org.apache.thrift.protocol.TType.STRUCT, (short)1);
+
+    private static final Map<Class<? extends IScheme>, SchemeFactory> schemes = new HashMap<Class<? extends IScheme>, SchemeFactory>();
+    static {
+      schemes.put(StandardScheme.class, new checkpoint_resultStandardSchemeFactory());
+      schemes.put(TupleScheme.class, new checkpoint_resultTupleSchemeFactory());
+    }
+
+    public TTransaction success; // required
+    public TTransactionNotInProgressException e; // required
+
+    /** The set of fields this struct contains, along with convenience methods for finding and manipulating them. */
+    public enum _Fields implements org.apache.thrift.TFieldIdEnum {
+      SUCCESS((short)0, "success"),
+      E((short)1, "e");
+
+      private static final Map<String, _Fields> byName = new HashMap<String, _Fields>();
+
+      static {
+        for (_Fields field : EnumSet.allOf(_Fields.class)) {
+          byName.put(field.getFieldName(), field);
+        }
+      }
+
+      /**
+       * Find the _Fields constant that matches fieldId, or null if its not found.
+       */
+      public static _Fields findByThriftId(int fieldId) {
+        switch(fieldId) {
+          case 0: // SUCCESS
+            return SUCCESS;
+          case 1: // E
+            return E;
+          default:
+            return null;
+        }
+      }
+
+      /**
+       * Find the _Fields constant that matches fieldId, throwing an exception
+       * if it is not found.
+       */
+      public static _Fields findByThriftIdOrThrow(int fieldId) {
+        _Fields fields = findByThriftId(fieldId);
+        if (fields == null) throw new IllegalArgumentException("Field " + fieldId + " doesn't exist!");
+        return fields;
+      }
+
+      /**
+       * Find the _Fields constant that matches name, or null if its not found.
+       */
+      public static _Fields findByName(String name) {
+        return byName.get(name);
+      }
+
+      private final short _thriftId;
+      private final String _fieldName;
+
+      _Fields(short thriftId, String fieldName) {
+        _thriftId = thriftId;
+        _fieldName = fieldName;
+      }
+
+      public short getThriftFieldId() {
+        return _thriftId;
+      }
+
+      public String getFieldName() {
+        return _fieldName;
+      }
+    }
+
+    // isset id assignments
+    public static final Map<_Fields, org.apache.thrift.meta_data.FieldMetaData> metaDataMap;
+    static {
+      Map<_Fields, org.apache.thrift.meta_data.FieldMetaData> tmpMap = new EnumMap<_Fields, org.apache.thrift.meta_data.FieldMetaData>(_Fields.class);
+      tmpMap.put(_Fields.SUCCESS, new org.apache.thrift.meta_data.FieldMetaData("success", org.apache.thrift.TFieldRequirementType.DEFAULT, 
+          new org.apache.thrift.meta_data.StructMetaData(org.apache.thrift.protocol.TType.STRUCT, TTransaction.class)));
+      tmpMap.put(_Fields.E, new org.apache.thrift.meta_data.FieldMetaData("e", org.apache.thrift.TFieldRequirementType.DEFAULT, 
+          new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.STRUCT)));
+      metaDataMap = Collections.unmodifiableMap(tmpMap);
+      org.apache.thrift.meta_data.FieldMetaData.addStructMetaDataMap(checkpoint_result.class, metaDataMap);
+    }
+
+    public checkpoint_result() {
+    }
+
+    public checkpoint_result(
+      TTransaction success,
+      TTransactionNotInProgressException e)
+    {
+      this();
+      this.success = success;
+      this.e = e;
+    }
+
+    /**
+     * Performs a deep copy on <i>other</i>.
+     */
+    public checkpoint_result(checkpoint_result other) {
+      if (other.isSetSuccess()) {
+        this.success = new TTransaction(other.success);
+      }
+      if (other.isSetE()) {
+        this.e = new TTransactionNotInProgressException(other.e);
+      }
+    }
+
+    public checkpoint_result deepCopy() {
+      return new checkpoint_result(this);
+    }
+
+    @Override
+    public void clear() {
+      this.success = null;
+      this.e = null;
+    }
+
+    public TTransaction getSuccess() {
+      return this.success;
+    }
+
+    public checkpoint_result setSuccess(TTransaction success) {
+      this.success = success;
+      return this;
+    }
+
+    public void unsetSuccess() {
+      this.success = null;
+    }
+
+    /** Returns true if field success is set (has been assigned a value) and false otherwise */
+    public boolean isSetSuccess() {
+      return this.success != null;
+    }
+
+    public void setSuccessIsSet(boolean value) {
+      if (!value) {
+        this.success = null;
+      }
+    }
+
+    public TTransactionNotInProgressException getE() {
+      return this.e;
+    }
+
+    public checkpoint_result setE(TTransactionNotInProgressException e) {
+      this.e = e;
+      return this;
+    }
+
+    public void unsetE() {
+      this.e = null;
+    }
+
+    /** Returns true if field e is set (has been assigned a value) and false otherwise */
+    public boolean isSetE() {
+      return this.e != null;
+    }
+
+    public void setEIsSet(boolean value) {
+      if (!value) {
+        this.e = null;
+      }
+    }
+
+    public void setFieldValue(_Fields field, Object value) {
+      switch (field) {
+      case SUCCESS:
+        if (value == null) {
+          unsetSuccess();
+        } else {
+          setSuccess((TTransaction)value);
+        }
+        break;
+
+      case E:
+        if (value == null) {
+          unsetE();
+        } else {
+          setE((TTransactionNotInProgressException)value);
+        }
+        break;
+
+      }
+    }
+
+    public Object getFieldValue(_Fields field) {
+      switch (field) {
+      case SUCCESS:
+        return getSuccess();
+
+      case E:
+        return getE();
+
+      }
+      throw new IllegalStateException();
+    }
+
+    /** Returns true if field corresponding to fieldID is set (has been assigned a value) and false otherwise */
+    public boolean isSet(_Fields field) {
+      if (field == null) {
+        throw new IllegalArgumentException();
+      }
+
+      switch (field) {
+      case SUCCESS:
+        return isSetSuccess();
+      case E:
+        return isSetE();
+      }
+      throw new IllegalStateException();
+    }
+
+    @Override
+    public boolean equals(Object that) {
+      if (that == null)
+        return false;
+      if (that instanceof checkpoint_result)
+        return this.equals((checkpoint_result)that);
+      return false;
+    }
+
+    public boolean equals(checkpoint_result that) {
+      if (that == null)
+        return false;
+
+      boolean this_present_success = true && this.isSetSuccess();
+      boolean that_present_success = true && that.isSetSuccess();
+      if (this_present_success || that_present_success) {
+        if (!(this_present_success && that_present_success))
+          return false;
+        if (!this.success.equals(that.success))
+          return false;
+      }
+
+      boolean this_present_e = true && this.isSetE();
+      boolean that_present_e = true && that.isSetE();
+      if (this_present_e || that_present_e) {
+        if (!(this_present_e && that_present_e))
+          return false;
+        if (!this.e.equals(that.e))
+          return false;
+      }
+
+      return true;
+    }
+
+    @Override
+    public int hashCode() {
+      return 0;
+    }
+
+    public int compareTo(checkpoint_result other) {
+      if (!getClass().equals(other.getClass())) {
+        return getClass().getName().compareTo(other.getClass().getName());
+      }
+
+      int lastComparison = 0;
+      checkpoint_result typedOther = (checkpoint_result)other;
+
+      lastComparison = Boolean.valueOf(isSetSuccess()).compareTo(typedOther.isSetSuccess());
+      if (lastComparison != 0) {
+        return lastComparison;
+      }
+      if (isSetSuccess()) {
+        lastComparison = org.apache.thrift.TBaseHelper.compareTo(this.success, typedOther.success);
+        if (lastComparison != 0) {
+          return lastComparison;
+        }
+      }
+      lastComparison = Boolean.valueOf(isSetE()).compareTo(typedOther.isSetE());
+      if (lastComparison != 0) {
+        return lastComparison;
+      }
+      if (isSetE()) {
+        lastComparison = org.apache.thrift.TBaseHelper.compareTo(this.e, typedOther.e);
+        if (lastComparison != 0) {
+          return lastComparison;
+        }
+      }
+      return 0;
+    }
+
+    public _Fields fieldForId(int fieldId) {
+      return _Fields.findByThriftId(fieldId);
+    }
+
+    public void read(org.apache.thrift.protocol.TProtocol iprot) throws org.apache.thrift.TException {
+      schemes.get(iprot.getScheme()).getScheme().read(iprot, this);
+    }
+
+    public void write(org.apache.thrift.protocol.TProtocol oprot) throws org.apache.thrift.TException {
+      schemes.get(oprot.getScheme()).getScheme().write(oprot, this);
+      }
+
+    @Override
+    public String toString() {
+      StringBuilder sb = new StringBuilder("checkpoint_result(");
+      boolean first = true;
+
+      sb.append("success:");
+      if (this.success == null) {
+        sb.append("null");
+      } else {
+        sb.append(this.success);
+      }
+      first = false;
+      if (!first) sb.append(", ");
+      sb.append("e:");
+      if (this.e == null) {
+        sb.append("null");
+      } else {
+        sb.append(this.e);
+      }
+      first = false;
+      sb.append(")");
+      return sb.toString();
+    }
+
+    public void validate() throws org.apache.thrift.TException {
+      // check for required fields
+      // check for sub-struct validity
+      if (success != null) {
+        success.validate();
+      }
+    }
+
+    private void writeObject(java.io.ObjectOutputStream out) throws java.io.IOException {
+      try {
+        write(new org.apache.thrift.protocol.TCompactProtocol(new org.apache.thrift.transport.TIOStreamTransport(out)));
+      } catch (org.apache.thrift.TException te) {
+        throw new java.io.IOException(te);
+      }
+    }
+
+    private void readObject(java.io.ObjectInputStream in) throws java.io.IOException, ClassNotFoundException {
+      try {
+        read(new org.apache.thrift.protocol.TCompactProtocol(new org.apache.thrift.transport.TIOStreamTransport(in)));
+      } catch (org.apache.thrift.TException te) {
+        throw new java.io.IOException(te);
+      }
+    }
+
+    private static class checkpoint_resultStandardSchemeFactory implements SchemeFactory {
+      public checkpoint_resultStandardScheme getScheme() {
+        return new checkpoint_resultStandardScheme();
+      }
+    }
+
+    private static class checkpoint_resultStandardScheme extends StandardScheme<checkpoint_result> {
+
+      public void read(org.apache.thrift.protocol.TProtocol iprot, checkpoint_result struct) throws org.apache.thrift.TException {
+        org.apache.thrift.protocol.TField schemeField;
+        iprot.readStructBegin();
+        while (true)
+        {
+          schemeField = iprot.readFieldBegin();
+          if (schemeField.type == org.apache.thrift.protocol.TType.STOP) { 
+            break;
+          }
+          switch (schemeField.id) {
+            case 0: // SUCCESS
+              if (schemeField.type == org.apache.thrift.protocol.TType.STRUCT) {
+                struct.success = new TTransaction();
+                struct.success.read(iprot);
+                struct.setSuccessIsSet(true);
+              } else { 
+                org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
+              }
+              break;
+            case 1: // E
+              if (schemeField.type == org.apache.thrift.protocol.TType.STRUCT) {
+                struct.e = new TTransactionNotInProgressException();
+                struct.e.read(iprot);
+                struct.setEIsSet(true);
+              } else { 
+                org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
+              }
+              break;
+            default:
+              org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
+          }
+          iprot.readFieldEnd();
+        }
+        iprot.readStructEnd();
+
+        // check for required fields of primitive type, which can't be checked in the validate method
+        struct.validate();
+      }
+
+      public void write(org.apache.thrift.protocol.TProtocol oprot, checkpoint_result struct) throws org.apache.thrift.TException {
+        struct.validate();
+
+        oprot.writeStructBegin(STRUCT_DESC);
+        if (struct.success != null) {
+          oprot.writeFieldBegin(SUCCESS_FIELD_DESC);
+          struct.success.write(oprot);
+          oprot.writeFieldEnd();
+        }
+        if (struct.e != null) {
+          oprot.writeFieldBegin(E_FIELD_DESC);
+          struct.e.write(oprot);
+          oprot.writeFieldEnd();
+        }
+        oprot.writeFieldStop();
+        oprot.writeStructEnd();
+      }
+
+    }
+
+    private static class checkpoint_resultTupleSchemeFactory implements SchemeFactory {
+      public checkpoint_resultTupleScheme getScheme() {
+        return new checkpoint_resultTupleScheme();
+      }
+    }
+
+    private static class checkpoint_resultTupleScheme extends TupleScheme<checkpoint_result> {
+
+      @Override
+      public void write(org.apache.thrift.protocol.TProtocol prot, checkpoint_result struct) throws org.apache.thrift.TException {
+        TTupleProtocol oprot = (TTupleProtocol) prot;
+        BitSet optionals = new BitSet();
+        if (struct.isSetSuccess()) {
+          optionals.set(0);
+        }
+        if (struct.isSetE()) {
+          optionals.set(1);
+        }
+        oprot.writeBitSet(optionals, 2);
+        if (struct.isSetSuccess()) {
+          struct.success.write(oprot);
+        }
+        if (struct.isSetE()) {
+          struct.e.write(oprot);
+        }
+      }
+
+      @Override
+      public void read(org.apache.thrift.protocol.TProtocol prot, checkpoint_result struct) throws org.apache.thrift.TException {
+        TTupleProtocol iprot = (TTupleProtocol) prot;
+        BitSet incoming = iprot.readBitSet(2);
+        if (incoming.get(0)) {
+          struct.success = new TTransaction();
+          struct.success.read(iprot);
+          struct.setSuccessIsSet(true);
+        }
+        if (incoming.get(1)) {
+          struct.e = new TTransactionNotInProgressException();
+          struct.e.read(iprot);
+          struct.setEIsSet(true);
         }
       }
     }

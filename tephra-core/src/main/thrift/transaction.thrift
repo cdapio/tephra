@@ -26,6 +26,8 @@ struct TTransaction {
   4: list<i64> inProgress,
   5: i64 firstShort,
   6: TTransactionType type,
+  7: i64 currentWritePointer,
+  8: list<i64> checkpointWritePointers,
 }
 
 exception TTransactionNotInProgressException {
@@ -60,4 +62,5 @@ service TTransactionServer {
   TBoolean truncateInvalidTx(1: set<i64> txns),
   TBoolean truncateInvalidTxBefore(1: i64 time) throws (1: TInvalidTruncateTimeException e),
   i32 invalidTxSize(),
+  TTransaction checkpoint(1: TTransaction tx) throws (1: TTransactionNotInProgressException e),
 }

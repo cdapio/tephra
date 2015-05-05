@@ -22,21 +22,29 @@
  */
 package co.cask.tephra.distributed.thrift;
 
-import org.apache.thrift.EncodingUtils;
-import org.apache.thrift.protocol.TTupleProtocol;
 import org.apache.thrift.scheme.IScheme;
 import org.apache.thrift.scheme.SchemeFactory;
 import org.apache.thrift.scheme.StandardScheme;
-import org.apache.thrift.scheme.TupleScheme;
 
-import java.util.ArrayList;
-import java.util.BitSet;
-import java.util.Collections;
-import java.util.EnumMap;
-import java.util.EnumSet;
-import java.util.HashMap;
+import org.apache.thrift.scheme.TupleScheme;
+import org.apache.thrift.protocol.TTupleProtocol;
+import org.apache.thrift.protocol.TProtocolException;
+import org.apache.thrift.EncodingUtils;
+import org.apache.thrift.TException;
 import java.util.List;
+import java.util.ArrayList;
 import java.util.Map;
+import java.util.HashMap;
+import java.util.EnumMap;
+import java.util.Set;
+import java.util.HashSet;
+import java.util.EnumSet;
+import java.util.Collections;
+import java.util.BitSet;
+import java.nio.ByteBuffer;
+import java.util.Arrays;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class TTransaction implements org.apache.thrift.TBase<TTransaction, TTransaction._Fields>, java.io.Serializable, Cloneable {
   private static final org.apache.thrift.protocol.TStruct STRUCT_DESC = new org.apache.thrift.protocol.TStruct("TTransaction");
@@ -47,6 +55,8 @@ public class TTransaction implements org.apache.thrift.TBase<TTransaction, TTran
   private static final org.apache.thrift.protocol.TField IN_PROGRESS_FIELD_DESC = new org.apache.thrift.protocol.TField("inProgress", org.apache.thrift.protocol.TType.LIST, (short)4);
   private static final org.apache.thrift.protocol.TField FIRST_SHORT_FIELD_DESC = new org.apache.thrift.protocol.TField("firstShort", org.apache.thrift.protocol.TType.I64, (short)5);
   private static final org.apache.thrift.protocol.TField TYPE_FIELD_DESC = new org.apache.thrift.protocol.TField("type", org.apache.thrift.protocol.TType.I32, (short)6);
+  private static final org.apache.thrift.protocol.TField CURRENT_WRITE_POINTER_FIELD_DESC = new org.apache.thrift.protocol.TField("currentWritePointer", org.apache.thrift.protocol.TType.I64, (short)7);
+  private static final org.apache.thrift.protocol.TField CHECKPOINT_WRITE_POINTERS_FIELD_DESC = new org.apache.thrift.protocol.TField("checkpointWritePointers", org.apache.thrift.protocol.TType.LIST, (short)8);
 
   private static final Map<Class<? extends IScheme>, SchemeFactory> schemes = new HashMap<Class<? extends IScheme>, SchemeFactory>();
   static {
@@ -64,6 +74,8 @@ public class TTransaction implements org.apache.thrift.TBase<TTransaction, TTran
    * @see TTransactionType
    */
   public TTransactionType type; // required
+  public long currentWritePointer; // required
+  public List<Long> checkpointWritePointers; // required
 
   /** The set of fields this struct contains, along with convenience methods for finding and manipulating them. */
   public enum _Fields implements org.apache.thrift.TFieldIdEnum {
@@ -76,7 +88,9 @@ public class TTransaction implements org.apache.thrift.TBase<TTransaction, TTran
      * 
      * @see TTransactionType
      */
-    TYPE((short)6, "type");
+    TYPE((short)6, "type"),
+    CURRENT_WRITE_POINTER((short)7, "currentWritePointer"),
+    CHECKPOINT_WRITE_POINTERS((short)8, "checkpointWritePointers");
 
     private static final Map<String, _Fields> byName = new HashMap<String, _Fields>();
 
@@ -103,6 +117,10 @@ public class TTransaction implements org.apache.thrift.TBase<TTransaction, TTran
           return FIRST_SHORT;
         case 6: // TYPE
           return TYPE;
+        case 7: // CURRENT_WRITE_POINTER
+          return CURRENT_WRITE_POINTER;
+        case 8: // CHECKPOINT_WRITE_POINTERS
+          return CHECKPOINT_WRITE_POINTERS;
         default:
           return null;
       }
@@ -146,6 +164,7 @@ public class TTransaction implements org.apache.thrift.TBase<TTransaction, TTran
   private static final int __WRITEPOINTER_ISSET_ID = 0;
   private static final int __READPOINTER_ISSET_ID = 1;
   private static final int __FIRSTSHORT_ISSET_ID = 2;
+  private static final int __CURRENTWRITEPOINTER_ISSET_ID = 3;
   private byte __isset_bitfield = 0;
   public static final Map<_Fields, org.apache.thrift.meta_data.FieldMetaData> metaDataMap;
   static {
@@ -164,6 +183,11 @@ public class TTransaction implements org.apache.thrift.TBase<TTransaction, TTran
         new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.I64)));
     tmpMap.put(_Fields.TYPE, new org.apache.thrift.meta_data.FieldMetaData("type", org.apache.thrift.TFieldRequirementType.DEFAULT, 
         new org.apache.thrift.meta_data.EnumMetaData(org.apache.thrift.protocol.TType.ENUM, TTransactionType.class)));
+    tmpMap.put(_Fields.CURRENT_WRITE_POINTER, new org.apache.thrift.meta_data.FieldMetaData("currentWritePointer", org.apache.thrift.TFieldRequirementType.DEFAULT, 
+        new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.I64)));
+    tmpMap.put(_Fields.CHECKPOINT_WRITE_POINTERS, new org.apache.thrift.meta_data.FieldMetaData("checkpointWritePointers", org.apache.thrift.TFieldRequirementType.DEFAULT, 
+        new org.apache.thrift.meta_data.ListMetaData(org.apache.thrift.protocol.TType.LIST, 
+            new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.I64))));
     metaDataMap = Collections.unmodifiableMap(tmpMap);
     org.apache.thrift.meta_data.FieldMetaData.addStructMetaDataMap(TTransaction.class, metaDataMap);
   }
@@ -177,7 +201,9 @@ public class TTransaction implements org.apache.thrift.TBase<TTransaction, TTran
     List<Long> invalids,
     List<Long> inProgress,
     long firstShort,
-    TTransactionType type)
+    TTransactionType type,
+    long currentWritePointer,
+    List<Long> checkpointWritePointers)
   {
     this();
     this.writePointer = writePointer;
@@ -189,6 +215,9 @@ public class TTransaction implements org.apache.thrift.TBase<TTransaction, TTran
     this.firstShort = firstShort;
     setFirstShortIsSet(true);
     this.type = type;
+    this.currentWritePointer = currentWritePointer;
+    setCurrentWritePointerIsSet(true);
+    this.checkpointWritePointers = checkpointWritePointers;
   }
 
   /**
@@ -216,6 +245,14 @@ public class TTransaction implements org.apache.thrift.TBase<TTransaction, TTran
     if (other.isSetType()) {
       this.type = other.type;
     }
+    this.currentWritePointer = other.currentWritePointer;
+    if (other.isSetCheckpointWritePointers()) {
+      List<Long> __this__checkpointWritePointers = new ArrayList<Long>();
+      for (Long other_element : other.checkpointWritePointers) {
+        __this__checkpointWritePointers.add(other_element);
+      }
+      this.checkpointWritePointers = __this__checkpointWritePointers;
+    }
   }
 
   public TTransaction deepCopy() {
@@ -233,6 +270,9 @@ public class TTransaction implements org.apache.thrift.TBase<TTransaction, TTran
     setFirstShortIsSet(false);
     this.firstShort = 0;
     this.type = null;
+    setCurrentWritePointerIsSet(false);
+    this.currentWritePointer = 0;
+    this.checkpointWritePointers = null;
   }
 
   public long getWritePointer() {
@@ -414,6 +454,68 @@ public class TTransaction implements org.apache.thrift.TBase<TTransaction, TTran
     }
   }
 
+  public long getCurrentWritePointer() {
+    return this.currentWritePointer;
+  }
+
+  public TTransaction setCurrentWritePointer(long currentWritePointer) {
+    this.currentWritePointer = currentWritePointer;
+    setCurrentWritePointerIsSet(true);
+    return this;
+  }
+
+  public void unsetCurrentWritePointer() {
+    __isset_bitfield = EncodingUtils.clearBit(__isset_bitfield, __CURRENTWRITEPOINTER_ISSET_ID);
+  }
+
+  /** Returns true if field currentWritePointer is set (has been assigned a value) and false otherwise */
+  public boolean isSetCurrentWritePointer() {
+    return EncodingUtils.testBit(__isset_bitfield, __CURRENTWRITEPOINTER_ISSET_ID);
+  }
+
+  public void setCurrentWritePointerIsSet(boolean value) {
+    __isset_bitfield = EncodingUtils.setBit(__isset_bitfield, __CURRENTWRITEPOINTER_ISSET_ID, value);
+  }
+
+  public int getCheckpointWritePointersSize() {
+    return (this.checkpointWritePointers == null) ? 0 : this.checkpointWritePointers.size();
+  }
+
+  public java.util.Iterator<Long> getCheckpointWritePointersIterator() {
+    return (this.checkpointWritePointers == null) ? null : this.checkpointWritePointers.iterator();
+  }
+
+  public void addToCheckpointWritePointers(long elem) {
+    if (this.checkpointWritePointers == null) {
+      this.checkpointWritePointers = new ArrayList<Long>();
+    }
+    this.checkpointWritePointers.add(elem);
+  }
+
+  public List<Long> getCheckpointWritePointers() {
+    return this.checkpointWritePointers;
+  }
+
+  public TTransaction setCheckpointWritePointers(List<Long> checkpointWritePointers) {
+    this.checkpointWritePointers = checkpointWritePointers;
+    return this;
+  }
+
+  public void unsetCheckpointWritePointers() {
+    this.checkpointWritePointers = null;
+  }
+
+  /** Returns true if field checkpointWritePointers is set (has been assigned a value) and false otherwise */
+  public boolean isSetCheckpointWritePointers() {
+    return this.checkpointWritePointers != null;
+  }
+
+  public void setCheckpointWritePointersIsSet(boolean value) {
+    if (!value) {
+      this.checkpointWritePointers = null;
+    }
+  }
+
   public void setFieldValue(_Fields field, Object value) {
     switch (field) {
     case WRITE_POINTER:
@@ -428,7 +530,7 @@ public class TTransaction implements org.apache.thrift.TBase<TTransaction, TTran
       if (value == null) {
         unsetReadPointer();
       } else {
-        setReadPointer((Long) value);
+        setReadPointer((Long)value);
       }
       break;
 
@@ -436,7 +538,7 @@ public class TTransaction implements org.apache.thrift.TBase<TTransaction, TTran
       if (value == null) {
         unsetInvalids();
       } else {
-        setInvalids((List<Long>) value);
+        setInvalids((List<Long>)value);
       }
       break;
 
@@ -444,7 +546,7 @@ public class TTransaction implements org.apache.thrift.TBase<TTransaction, TTran
       if (value == null) {
         unsetInProgress();
       } else {
-        setInProgress((List<Long>) value);
+        setInProgress((List<Long>)value);
       }
       break;
 
@@ -452,7 +554,7 @@ public class TTransaction implements org.apache.thrift.TBase<TTransaction, TTran
       if (value == null) {
         unsetFirstShort();
       } else {
-        setFirstShort((Long) value);
+        setFirstShort((Long)value);
       }
       break;
 
@@ -460,7 +562,23 @@ public class TTransaction implements org.apache.thrift.TBase<TTransaction, TTran
       if (value == null) {
         unsetType();
       } else {
-        setType((TTransactionType) value);
+        setType((TTransactionType)value);
+      }
+      break;
+
+    case CURRENT_WRITE_POINTER:
+      if (value == null) {
+        unsetCurrentWritePointer();
+      } else {
+        setCurrentWritePointer((Long)value);
+      }
+      break;
+
+    case CHECKPOINT_WRITE_POINTERS:
+      if (value == null) {
+        unsetCheckpointWritePointers();
+      } else {
+        setCheckpointWritePointers((List<Long>)value);
       }
       break;
 
@@ -487,6 +605,12 @@ public class TTransaction implements org.apache.thrift.TBase<TTransaction, TTran
     case TYPE:
       return getType();
 
+    case CURRENT_WRITE_POINTER:
+      return Long.valueOf(getCurrentWritePointer());
+
+    case CHECKPOINT_WRITE_POINTERS:
+      return getCheckpointWritePointers();
+
     }
     throw new IllegalStateException();
   }
@@ -510,6 +634,10 @@ public class TTransaction implements org.apache.thrift.TBase<TTransaction, TTran
       return isSetFirstShort();
     case TYPE:
       return isSetType();
+    case CURRENT_WRITE_POINTER:
+      return isSetCurrentWritePointer();
+    case CHECKPOINT_WRITE_POINTERS:
+      return isSetCheckpointWritePointers();
     }
     throw new IllegalStateException();
   }
@@ -578,6 +706,24 @@ public class TTransaction implements org.apache.thrift.TBase<TTransaction, TTran
       if (!(this_present_type && that_present_type))
         return false;
       if (!this.type.equals(that.type))
+        return false;
+    }
+
+    boolean this_present_currentWritePointer = true;
+    boolean that_present_currentWritePointer = true;
+    if (this_present_currentWritePointer || that_present_currentWritePointer) {
+      if (!(this_present_currentWritePointer && that_present_currentWritePointer))
+        return false;
+      if (this.currentWritePointer != that.currentWritePointer)
+        return false;
+    }
+
+    boolean this_present_checkpointWritePointers = true && this.isSetCheckpointWritePointers();
+    boolean that_present_checkpointWritePointers = true && that.isSetCheckpointWritePointers();
+    if (this_present_checkpointWritePointers || that_present_checkpointWritePointers) {
+      if (!(this_present_checkpointWritePointers && that_present_checkpointWritePointers))
+        return false;
+      if (!this.checkpointWritePointers.equals(that.checkpointWritePointers))
         return false;
     }
 
@@ -657,6 +803,26 @@ public class TTransaction implements org.apache.thrift.TBase<TTransaction, TTran
         return lastComparison;
       }
     }
+    lastComparison = Boolean.valueOf(isSetCurrentWritePointer()).compareTo(typedOther.isSetCurrentWritePointer());
+    if (lastComparison != 0) {
+      return lastComparison;
+    }
+    if (isSetCurrentWritePointer()) {
+      lastComparison = org.apache.thrift.TBaseHelper.compareTo(this.currentWritePointer, typedOther.currentWritePointer);
+      if (lastComparison != 0) {
+        return lastComparison;
+      }
+    }
+    lastComparison = Boolean.valueOf(isSetCheckpointWritePointers()).compareTo(typedOther.isSetCheckpointWritePointers());
+    if (lastComparison != 0) {
+      return lastComparison;
+    }
+    if (isSetCheckpointWritePointers()) {
+      lastComparison = org.apache.thrift.TBaseHelper.compareTo(this.checkpointWritePointers, typedOther.checkpointWritePointers);
+      if (lastComparison != 0) {
+        return lastComparison;
+      }
+    }
     return 0;
   }
 
@@ -710,6 +876,18 @@ public class TTransaction implements org.apache.thrift.TBase<TTransaction, TTran
       sb.append("null");
     } else {
       sb.append(this.type);
+    }
+    first = false;
+    if (!first) sb.append(", ");
+    sb.append("currentWritePointer:");
+    sb.append(this.currentWritePointer);
+    first = false;
+    if (!first) sb.append(", ");
+    sb.append("checkpointWritePointers:");
+    if (this.checkpointWritePointers == null) {
+      sb.append("null");
+    } else {
+      sb.append(this.checkpointWritePointers);
     }
     first = false;
     sb.append(")");
@@ -825,6 +1003,32 @@ public class TTransaction implements org.apache.thrift.TBase<TTransaction, TTran
               org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
             }
             break;
+          case 7: // CURRENT_WRITE_POINTER
+            if (schemeField.type == org.apache.thrift.protocol.TType.I64) {
+              struct.currentWritePointer = iprot.readI64();
+              struct.setCurrentWritePointerIsSet(true);
+            } else { 
+              org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
+            }
+            break;
+          case 8: // CHECKPOINT_WRITE_POINTERS
+            if (schemeField.type == org.apache.thrift.protocol.TType.LIST) {
+              {
+                org.apache.thrift.protocol.TList _list6 = iprot.readListBegin();
+                struct.checkpointWritePointers = new ArrayList<Long>(_list6.size);
+                for (int _i7 = 0; _i7 < _list6.size; ++_i7)
+                {
+                  long _elem8; // required
+                  _elem8 = iprot.readI64();
+                  struct.checkpointWritePointers.add(_elem8);
+                }
+                iprot.readListEnd();
+              }
+              struct.setCheckpointWritePointersIsSet(true);
+            } else { 
+              org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
+            }
+            break;
           default:
             org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
         }
@@ -850,9 +1054,9 @@ public class TTransaction implements org.apache.thrift.TBase<TTransaction, TTran
         oprot.writeFieldBegin(INVALIDS_FIELD_DESC);
         {
           oprot.writeListBegin(new org.apache.thrift.protocol.TList(org.apache.thrift.protocol.TType.I64, struct.invalids.size()));
-          for (long _iter6 : struct.invalids)
+          for (long _iter9 : struct.invalids)
           {
-            oprot.writeI64(_iter6);
+            oprot.writeI64(_iter9);
           }
           oprot.writeListEnd();
         }
@@ -862,9 +1066,9 @@ public class TTransaction implements org.apache.thrift.TBase<TTransaction, TTran
         oprot.writeFieldBegin(IN_PROGRESS_FIELD_DESC);
         {
           oprot.writeListBegin(new org.apache.thrift.protocol.TList(org.apache.thrift.protocol.TType.I64, struct.inProgress.size()));
-          for (long _iter7 : struct.inProgress)
+          for (long _iter10 : struct.inProgress)
           {
-            oprot.writeI64(_iter7);
+            oprot.writeI64(_iter10);
           }
           oprot.writeListEnd();
         }
@@ -876,6 +1080,21 @@ public class TTransaction implements org.apache.thrift.TBase<TTransaction, TTran
       if (struct.type != null) {
         oprot.writeFieldBegin(TYPE_FIELD_DESC);
         oprot.writeI32(struct.type.getValue());
+        oprot.writeFieldEnd();
+      }
+      oprot.writeFieldBegin(CURRENT_WRITE_POINTER_FIELD_DESC);
+      oprot.writeI64(struct.currentWritePointer);
+      oprot.writeFieldEnd();
+      if (struct.checkpointWritePointers != null) {
+        oprot.writeFieldBegin(CHECKPOINT_WRITE_POINTERS_FIELD_DESC);
+        {
+          oprot.writeListBegin(new org.apache.thrift.protocol.TList(org.apache.thrift.protocol.TType.I64, struct.checkpointWritePointers.size()));
+          for (long _iter11 : struct.checkpointWritePointers)
+          {
+            oprot.writeI64(_iter11);
+          }
+          oprot.writeListEnd();
+        }
         oprot.writeFieldEnd();
       }
       oprot.writeFieldStop();
@@ -914,7 +1133,13 @@ public class TTransaction implements org.apache.thrift.TBase<TTransaction, TTran
       if (struct.isSetType()) {
         optionals.set(5);
       }
-      oprot.writeBitSet(optionals, 6);
+      if (struct.isSetCurrentWritePointer()) {
+        optionals.set(6);
+      }
+      if (struct.isSetCheckpointWritePointers()) {
+        optionals.set(7);
+      }
+      oprot.writeBitSet(optionals, 8);
       if (struct.isSetWritePointer()) {
         oprot.writeI64(struct.writePointer);
       }
@@ -924,18 +1149,18 @@ public class TTransaction implements org.apache.thrift.TBase<TTransaction, TTran
       if (struct.isSetInvalids()) {
         {
           oprot.writeI32(struct.invalids.size());
-          for (long _iter8 : struct.invalids)
+          for (long _iter12 : struct.invalids)
           {
-            oprot.writeI64(_iter8);
+            oprot.writeI64(_iter12);
           }
         }
       }
       if (struct.isSetInProgress()) {
         {
           oprot.writeI32(struct.inProgress.size());
-          for (long _iter9 : struct.inProgress)
+          for (long _iter13 : struct.inProgress)
           {
-            oprot.writeI64(_iter9);
+            oprot.writeI64(_iter13);
           }
         }
       }
@@ -945,12 +1170,24 @@ public class TTransaction implements org.apache.thrift.TBase<TTransaction, TTran
       if (struct.isSetType()) {
         oprot.writeI32(struct.type.getValue());
       }
+      if (struct.isSetCurrentWritePointer()) {
+        oprot.writeI64(struct.currentWritePointer);
+      }
+      if (struct.isSetCheckpointWritePointers()) {
+        {
+          oprot.writeI32(struct.checkpointWritePointers.size());
+          for (long _iter14 : struct.checkpointWritePointers)
+          {
+            oprot.writeI64(_iter14);
+          }
+        }
+      }
     }
 
     @Override
     public void read(org.apache.thrift.protocol.TProtocol prot, TTransaction struct) throws org.apache.thrift.TException {
       TTupleProtocol iprot = (TTupleProtocol) prot;
-      BitSet incoming = iprot.readBitSet(6);
+      BitSet incoming = iprot.readBitSet(8);
       if (incoming.get(0)) {
         struct.writePointer = iprot.readI64();
         struct.setWritePointerIsSet(true);
@@ -961,26 +1198,26 @@ public class TTransaction implements org.apache.thrift.TBase<TTransaction, TTran
       }
       if (incoming.get(2)) {
         {
-          org.apache.thrift.protocol.TList _list10 = new org.apache.thrift.protocol.TList(org.apache.thrift.protocol.TType.I64, iprot.readI32());
-          struct.invalids = new ArrayList<Long>(_list10.size);
-          for (int _i11 = 0; _i11 < _list10.size; ++_i11)
+          org.apache.thrift.protocol.TList _list15 = new org.apache.thrift.protocol.TList(org.apache.thrift.protocol.TType.I64, iprot.readI32());
+          struct.invalids = new ArrayList<Long>(_list15.size);
+          for (int _i16 = 0; _i16 < _list15.size; ++_i16)
           {
-            long _elem12; // required
-            _elem12 = iprot.readI64();
-            struct.invalids.add(_elem12);
+            long _elem17; // required
+            _elem17 = iprot.readI64();
+            struct.invalids.add(_elem17);
           }
         }
         struct.setInvalidsIsSet(true);
       }
       if (incoming.get(3)) {
         {
-          org.apache.thrift.protocol.TList _list13 = new org.apache.thrift.protocol.TList(org.apache.thrift.protocol.TType.I64, iprot.readI32());
-          struct.inProgress = new ArrayList<Long>(_list13.size);
-          for (int _i14 = 0; _i14 < _list13.size; ++_i14)
+          org.apache.thrift.protocol.TList _list18 = new org.apache.thrift.protocol.TList(org.apache.thrift.protocol.TType.I64, iprot.readI32());
+          struct.inProgress = new ArrayList<Long>(_list18.size);
+          for (int _i19 = 0; _i19 < _list18.size; ++_i19)
           {
-            long _elem15; // required
-            _elem15 = iprot.readI64();
-            struct.inProgress.add(_elem15);
+            long _elem20; // required
+            _elem20 = iprot.readI64();
+            struct.inProgress.add(_elem20);
           }
         }
         struct.setInProgressIsSet(true);
@@ -992,6 +1229,23 @@ public class TTransaction implements org.apache.thrift.TBase<TTransaction, TTran
       if (incoming.get(5)) {
         struct.type = TTransactionType.findByValue(iprot.readI32());
         struct.setTypeIsSet(true);
+      }
+      if (incoming.get(6)) {
+        struct.currentWritePointer = iprot.readI64();
+        struct.setCurrentWritePointerIsSet(true);
+      }
+      if (incoming.get(7)) {
+        {
+          org.apache.thrift.protocol.TList _list21 = new org.apache.thrift.protocol.TList(org.apache.thrift.protocol.TType.I64, iprot.readI32());
+          struct.checkpointWritePointers = new ArrayList<Long>(_list21.size);
+          for (int _i22 = 0; _i22 < _list21.size; ++_i22)
+          {
+            long _elem23; // required
+            _elem23 = iprot.readI64();
+            struct.checkpointWritePointers.add(_elem23);
+          }
+        }
+        struct.setCheckpointWritePointersIsSet(true);
       }
     }
   }

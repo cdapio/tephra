@@ -127,31 +127,38 @@ public class TransactionAwareHTable extends AbstractTransactionAwareTable
   @Override
   protected boolean doRollback() throws Exception {
     try {
-      List<Delete> rollbackDeletes = new ArrayList<Delete>(changeSet.size());
-      for (ActionChange change : changeSet) {
-        byte[] row = change.getRow();
-        byte[] family = change.getFamily();
-        byte[] qualifier = change.getQualifier();
-        long transactionTimestamp = tx.getWritePointer();
-        Delete rollbackDelete = new Delete(row);
-        rollbackDelete.setAttribute(TxConstants.TX_ROLLBACK_ATTRIBUTE_KEY, new byte[0]);
-        switch (conflictLevel) {
-          case ROW:
-          case NONE:
-            // issue family delete for the tx write pointer
-            rollbackDelete.deleteFamilyVersion(change.getFamily(), transactionTimestamp);
-            break;
-          case COLUMN:
-            if (family != null && qualifier == null) {
-              rollbackDelete.deleteFamilyVersion(family, transactionTimestamp);
-            } else if (family != null && qualifier != null) {
-              rollbackDelete.deleteColumn(family, qualifier, transactionTimestamp);
-            }
-            break;
-          default:
-            throw new IllegalStateException("Unknown conflict detection level: " + conflictLevel);
+      // pre-size arraylist of deletes
+      int size = 0;
+      for (Set<ActionChange> cs : changeSets.values()) {
+        size += cs.size();
+      }
+      List<Delete> rollbackDeletes = new ArrayList<Delete>(size);
+      for (Map.Entry<Long, Set<ActionChange>> entry : changeSets.entrySet()) {
+        long transactionTimestamp = entry.getKey();
+        for (ActionChange change : entry.getValue()) {
+          byte[] row = change.getRow();
+          byte[] family = change.getFamily();
+          byte[] qualifier = change.getQualifier();
+          Delete rollbackDelete = new Delete(row);
+          rollbackDelete.setAttribute(TxConstants.TX_ROLLBACK_ATTRIBUTE_KEY, new byte[0]);
+          switch (conflictLevel) {
+            case ROW:
+            case NONE:
+              // issue family delete for the tx write pointer
+              rollbackDelete.deleteFamilyVersion(change.getFamily(), transactionTimestamp);
+              break;
+            case COLUMN:
+              if (family != null && qualifier == null) {
+                rollbackDelete.deleteFamilyVersion(family, transactionTimestamp);
+              } else if (family != null && qualifier != null) {
+                rollbackDelete.deleteColumn(family, qualifier, transactionTimestamp);
+              }
+              break;
+            default:
+              throw new IllegalStateException("Unknown conflict detection level: " + conflictLevel);
+          }
+          rollbackDeletes.add(rollbackDelete);
         }
-        rollbackDeletes.add(rollbackDelete);
       }
       hTable.delete(rollbackDeletes);
       return true;
@@ -162,7 +169,7 @@ public class TransactionAwareHTable extends AbstractTransactionAwareTable
         LOG.error("Could not flush HTable commits", e);
       }
       tx = null;
-      changeSet.clear();
+      changeSets.clear();
     }
   }
 
@@ -521,14 +528,14 @@ public class TransactionAwareHTable extends AbstractTransactionAwareTable
   }
 
   private Put transactionalizeAction(Put put) throws IOException {
-    Put txPut = new Put(put.getRow(), tx.getWritePointer());
+    Put txPut = new Put(put.getRow(), tx.getCurrentWritePointer());
     Set<Map.Entry<byte[], List<Cell>>> familyMap = put.getFamilyCellMap().entrySet();
     if (!familyMap.isEmpty()) {
       for (Map.Entry<byte[], List<Cell>> family : familyMap) {
         List<Cell> familyValues = family.getValue();
         if (!familyValues.isEmpty()) {
           for (Cell value : familyValues) {
-            txPut.add(value.getFamily(), value.getQualifier(), tx.getWritePointer(), value.getValue());
+            txPut.add(value.getFamily(), value.getQualifier(), tx.getCurrentWritePointer(), value.getValue());
             addToChangeSet(txPut.getRow(), value.getFamily(), value.getQualifier());
           }
         }
@@ -543,7 +550,7 @@ public class TransactionAwareHTable extends AbstractTransactionAwareTable
   }
 
   private Delete transactionalizeAction(Delete delete) throws IOException {
-    long transactionTimestamp = tx.getWritePointer();
+    long transactionTimestamp = tx.getCurrentWritePointer();
 
     byte[] deleteRow = delete.getRow();
     Delete txDelete = new Delete(deleteRow, transactionTimestamp);

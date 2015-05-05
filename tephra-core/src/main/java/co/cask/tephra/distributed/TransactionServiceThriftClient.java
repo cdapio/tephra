@@ -109,6 +109,10 @@ public class TransactionServiceThriftClient {
     return client.invalidateTx(tx);
   }
 
+  public Transaction checkpoint(Transaction tx) throws TException {
+    return TransactionConverterUtils.unwrap(client.checkpoint(TransactionConverterUtils.wrap(tx)));
+  }
+
   public InputStream getSnapshotStream() throws TException {
     ByteBuffer buffer = client.getSnapshot();
     if (buffer.hasArray()) {

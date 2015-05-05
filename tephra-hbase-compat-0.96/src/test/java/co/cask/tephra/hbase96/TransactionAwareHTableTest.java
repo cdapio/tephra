@@ -19,6 +19,7 @@ import co.cask.tephra.Transaction;
 import co.cask.tephra.TransactionConflictException;
 import co.cask.tephra.TransactionContext;
 import co.cask.tephra.TransactionManager;
+import co.cask.tephra.TransactionSystemClient;
 import co.cask.tephra.TxConstants;
 import co.cask.tephra.hbase96.coprocessor.TransactionProcessor;
 import co.cask.tephra.inmemory.InMemoryTxSystemClient;
@@ -36,6 +37,7 @@ import org.apache.hadoop.hbase.client.Delete;
 import org.apache.hadoop.hbase.client.Get;
 import org.apache.hadoop.hbase.client.HBaseAdmin;
 import org.apache.hadoop.hbase.client.HTable;
+import org.apache.hadoop.hbase.client.HTableInterface;
 import org.apache.hadoop.hbase.client.Put;
 import org.apache.hadoop.hbase.client.Result;
 import org.apache.hadoop.hbase.client.ResultScanner;
@@ -137,6 +139,7 @@ public class TransactionAwareHTableTest {
 
   /**
    * Test transactional put and get requests.
+   *
    * @throws Exception
    */
   @Test
@@ -157,6 +160,7 @@ public class TransactionAwareHTableTest {
 
   /**
    * Test aborted put requests, that must be rolled back.
+   *
    * @throws Exception
    */
   @Test
@@ -177,6 +181,7 @@ public class TransactionAwareHTableTest {
 
   /**
    * Test transactional delete operations.
+   *
    * @throws Exception
    */
   @Test
@@ -321,6 +326,7 @@ public class TransactionAwareHTableTest {
 
   /**
    * Test aborted transactional delete requests, that must be rolled back.
+   *
    * @throws Exception
    */
   @Test
@@ -516,6 +522,7 @@ public class TransactionAwareHTableTest {
 
   /**
    * Expect an exception since a transaction hasn't been started.
+   *
    * @throws Exception
    */
   @Test(expected = IOException.class)
@@ -750,5 +757,167 @@ public class TransactionAwareHTableTest {
     Result row3 = txTable2.get(new Get(TestBytes.row3));
     assertTrue(row3.isEmpty());
     txContext2.finish();
+  }
+
+  @Test
+  public void testCheckpoint() throws Exception {
+    // start a transaction, using checkpoints between writes
+    transactionContext.start();
+    transactionAwareHTable.put(new Put(TestBytes.row).add(TestBytes.family, TestBytes.qualifier, TestBytes.value));
+    Transaction origTx = transactionContext.getCurrentTransaction();
+    transactionContext.checkpoint();
+    Transaction postCheckpointTx = transactionContext.getCurrentTransaction();
+
+    assertEquals(origTx.getWritePointer(), postCheckpointTx.getWritePointer());
+    assertNotEquals(origTx.getCurrentWritePointer(), postCheckpointTx.getCurrentWritePointer());
+    long[] checkpointPtrs = postCheckpointTx.getCheckpointWritePointers();
+    assertEquals(1, checkpointPtrs.length);
+    assertEquals(postCheckpointTx.getCurrentWritePointer(), checkpointPtrs[0]);
+
+    transactionAwareHTable.put(new Put(TestBytes.row2).add(TestBytes.family, TestBytes.qualifier, TestBytes.value2));
+    transactionContext.checkpoint();
+    Transaction postCheckpointTx2 = transactionContext.getCurrentTransaction();
+
+    assertEquals(origTx.getWritePointer(), postCheckpointTx2.getWritePointer());
+    assertNotEquals(postCheckpointTx.getCurrentWritePointer(), postCheckpointTx2.getCurrentWritePointer());
+    long[] checkpointPtrs2 = postCheckpointTx2.getCheckpointWritePointers();
+    assertEquals(2, checkpointPtrs2.length);
+    assertEquals(postCheckpointTx.getCurrentWritePointer(), checkpointPtrs2[0]);
+    assertEquals(postCheckpointTx2.getCurrentWritePointer(), checkpointPtrs2[1]);
+
+    transactionAwareHTable.put(new Put(TestBytes.row3).add(TestBytes.family, TestBytes.qualifier, TestBytes.value));
+
+    // by default, all rows should be visible with Read-Your-Writes
+    verifyRow(transactionAwareHTable, TestBytes.row, TestBytes.value);
+    verifyRow(transactionAwareHTable, TestBytes.row2, TestBytes.value2);
+    verifyRow(transactionAwareHTable, TestBytes.row3, TestBytes.value);
+
+    // when disabling current write pointer, only the previous checkpoints should be visible
+    Get get = new Get(TestBytes.row);
+    get.setAttribute(TxConstants.TX_EXCLUDE_CURRENT_WRITE, new byte[]{ (byte) 1 });
+    verifyRow(transactionAwareHTable, get, TestBytes.value);
+    get = new Get(TestBytes.row2);
+    get.setAttribute(TxConstants.TX_EXCLUDE_CURRENT_WRITE, new byte[]{ (byte) 1 });
+    verifyRow(transactionAwareHTable, get, TestBytes.value2);
+    get = new Get(TestBytes.row3);
+    get.setAttribute(TxConstants.TX_EXCLUDE_CURRENT_WRITE, new byte[]{ (byte) 1 });
+    verifyRow(transactionAwareHTable, get, null);
+
+    // test scan results excluding current write pointer
+    Scan scan = new Scan();
+    scan.setAttribute(TxConstants.TX_EXCLUDE_CURRENT_WRITE, new byte[]{ (byte) 1 });
+    ResultScanner scanner = transactionAwareHTable.getScanner(scan);
+
+    Result row = scanner.next();
+    assertNotNull(row);
+    assertArrayEquals(TestBytes.row, row.getRow());
+    assertEquals(1, row.size());
+    assertArrayEquals(TestBytes.value, row.getValue(TestBytes.family, TestBytes.qualifier));
+
+    row = scanner.next();
+    assertNotNull(row);
+    assertArrayEquals(TestBytes.row2, row.getRow());
+    assertEquals(1, row.size());
+    assertArrayEquals(TestBytes.value2, row.getValue(TestBytes.family, TestBytes.qualifier));
+
+    row = scanner.next();
+    assertNull(row);
+    scanner.close();
+
+    // check that writes are still not visible to other clients
+    TransactionAwareHTable txTable2 = new TransactionAwareHTable(new HTable(conf, TestBytes.table));
+    TransactionContext txContext2 = new TransactionContext(new InMemoryTxSystemClient(txManager), txTable2);
+
+    txContext2.start();
+    verifyRow(txTable2, TestBytes.row, null);
+    verifyRow(txTable2, TestBytes.row2, null);
+    verifyRow(txTable2, TestBytes.row3, null);
+    txContext2.finish();
+
+    // commit transaction, verify writes are visible
+    transactionContext.finish();
+
+    txContext2.start();
+    verifyRow(txTable2, TestBytes.row, TestBytes.value);
+    verifyRow(txTable2, TestBytes.row2, TestBytes.value2);
+    verifyRow(txTable2, TestBytes.row3, TestBytes.value);
+    txContext2.finish();
+    txTable2.close();
+  }
+
+  @Test
+  public void testCheckpointRollback() throws Exception {
+    // start a transaction, using checkpoints between writes
+    transactionContext.start();
+    transactionAwareHTable.put(new Put(TestBytes.row).add(TestBytes.family, TestBytes.qualifier, TestBytes.value));
+    transactionContext.checkpoint();
+    transactionAwareHTable.put(new Put(TestBytes.row2).add(TestBytes.family, TestBytes.qualifier, TestBytes.value2));
+    transactionContext.checkpoint();
+    transactionAwareHTable.put(new Put(TestBytes.row3).add(TestBytes.family, TestBytes.qualifier, TestBytes.value));
+
+    transactionContext.abort();
+
+    transactionContext.start();
+    verifyRow(transactionAwareHTable, TestBytes.row, null);
+    verifyRow(transactionAwareHTable, TestBytes.row2, null);
+    verifyRow(transactionAwareHTable, TestBytes.row3, null);
+
+    Scan scan = new Scan();
+    ResultScanner scanner = transactionAwareHTable.getScanner(scan);
+    assertNull(scanner.next());
+    scanner.close();
+    transactionContext.finish();
+  }
+
+  @Test
+  public void testCheckpointInvalidate() throws Exception {
+    // start a transaction, using checkpoints between writes
+    transactionContext.start();
+    Transaction origTx = transactionContext.getCurrentTransaction();
+    transactionAwareHTable.put(new Put(TestBytes.row).add(TestBytes.family, TestBytes.qualifier, TestBytes.value));
+    transactionContext.checkpoint();
+    Transaction checkpointTx1 = transactionContext.getCurrentTransaction();
+    transactionAwareHTable.put(new Put(TestBytes.row2).add(TestBytes.family, TestBytes.qualifier, TestBytes.value2));
+    transactionContext.checkpoint();
+    Transaction checkpointTx2 = transactionContext.getCurrentTransaction();
+    transactionAwareHTable.put(new Put(TestBytes.row3).add(TestBytes.family, TestBytes.qualifier, TestBytes.value));
+
+    TransactionSystemClient txClient = new InMemoryTxSystemClient(txManager);
+    txClient.invalidate(transactionContext.getCurrentTransaction().getWritePointer());
+
+    // check that writes are not visible
+    TransactionAwareHTable txTable2 = new TransactionAwareHTable(new HTable(conf, TestBytes.table));
+    TransactionContext txContext2 = new TransactionContext(txClient, txTable2);
+    txContext2.start();
+    Transaction newTx = txContext2.getCurrentTransaction();
+
+    // all 3 writes pointers from the previous transaction should now be excluded
+    assertTrue(newTx.isExcluded(origTx.getCurrentWritePointer()));
+    assertTrue(newTx.isExcluded(checkpointTx1.getCurrentWritePointer()));
+    assertTrue(newTx.isExcluded(checkpointTx2.getCurrentWritePointer()));
+
+    verifyRow(txTable2, TestBytes.row, null);
+    verifyRow(txTable2, TestBytes.row2, null);
+    verifyRow(txTable2, TestBytes.row3, null);
+
+    Scan scan = new Scan();
+    ResultScanner scanner = txTable2.getScanner(scan);
+    assertNull(scanner.next());
+    scanner.close();
+    txContext2.finish();
+  }
+
+  private void verifyRow(HTableInterface table, byte[] rowkey, byte[] expectedValue) throws Exception {
+    verifyRow(table, new Get(rowkey), expectedValue);
+  }
+
+  private void verifyRow(HTableInterface table, Get get, byte[] expectedValue) throws Exception {
+    Result result = table.get(get);
+    if (expectedValue == null) {
+      assertTrue(result.isEmpty());
+    } else {
+      assertFalse(result.isEmpty());
+      assertArrayEquals(expectedValue, result.getValue(TestBytes.family, TestBytes.qualifier));
+    }
   }
 }

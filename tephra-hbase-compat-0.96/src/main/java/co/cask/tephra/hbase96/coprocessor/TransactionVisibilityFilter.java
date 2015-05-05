@@ -47,6 +47,8 @@ public class TransactionVisibilityFilter extends FilterBase {
   private final boolean clearDeletes;
   // optional sub-filter to apply to visible cells
   private final Filter cellFilter;
+  // whether cells written with the tx's current write pointer should be excluded from reads
+  private final boolean excludeCurrentWritePtr;
 
   // since we traverse KVs in order, cache the current oldest TS to avoid map lookups per KV
   private byte[] currentFamily = new byte[0];
@@ -82,6 +84,25 @@ public class TransactionVisibilityFilter extends FilterBase {
    */
   public TransactionVisibilityFilter(Transaction tx, Map<byte[], Long> ttlByFamily, boolean allowEmptyValues,
                                      ScanType scanType, @Nullable Filter cellFilter) {
+    this(tx, ttlByFamily, allowEmptyValues, scanType, cellFilter, false);
+  }
+
+  /**
+   * Creates a new {@link org.apache.hadoop.hbase.filter.Filter} for returning data only from visible transactions.
+   *
+   * @param tx the current transaction to apply.  Only data visible to this transaction will be returned.
+   * @param ttlByFamily map of time-to-live (TTL) (in milliseconds) by column family name
+   * @param allowEmptyValues if {@code true} cells with empty {@code byte[]} values will be returned, if {@code false}
+   *                         these will be interpreted as "delete" markers and the column will be filtered out
+   * @param scanType the type of scan operation being performed
+   * @param cellFilter if non-null, this filter will be applied to all cells visible to the current transaction, by
+   *                   calling {@link Filter#filterKeyValue(org.apache.hadoop.hbase.Cell)}.  If null, then
+   *                   {@link Filter.ReturnCode#INCLUDE_AND_NEXT_COL} will be returned instead.
+   * @param excludeCurrentWritePtr if true, cells written with the transaction's current write pointer will be filtered
+   *                               out from results returned by this filter.
+   */
+  public TransactionVisibilityFilter(Transaction tx, Map<byte[], Long> ttlByFamily, boolean allowEmptyValues,
+                                     ScanType scanType, @Nullable Filter cellFilter, boolean excludeCurrentWritePtr) {
     this.tx = tx;
     this.oldestTsByFamily = Maps.newTreeMap(Bytes.BYTES_COMPARATOR);
     for (Map.Entry<byte[], Long> ttlEntry : ttlByFamily.entrySet()) {
@@ -93,6 +114,7 @@ public class TransactionVisibilityFilter extends FilterBase {
     this.clearDeletes =
         scanType == ScanType.COMPACT_DROP_DELETES || scanType == ScanType.USER_SCAN;
     this.cellFilter = cellFilter;
+    this.excludeCurrentWritePtr = excludeCurrentWritePtr;
   }
 
   @Override
@@ -109,7 +131,7 @@ public class TransactionVisibilityFilter extends FilterBase {
     if (kvTimestamp < currentOldestTs) {
       // passed TTL for this column, seek to next
       return ReturnCode.NEXT_COL;
-    } else if (tx.isVisible(kvTimestamp)) {
+    } else if (tx.isVisible(kvTimestamp, excludeCurrentWritePtr)) {
       if (deleteTracker.isFamilyDelete(cell)) {
         deleteTracker.addFamilyDelete(cell);
         if (clearDeletes) {

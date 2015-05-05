@@ -18,6 +18,8 @@ package co.cask.tephra;
 
 import com.google.common.base.Charsets;
 import com.google.common.base.Objects;
+import com.google.common.collect.Maps;
+import com.google.common.collect.Sets;
 import com.google.common.primitives.Bytes;
 import com.google.common.primitives.UnsignedBytes;
 
@@ -25,7 +27,7 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
 
@@ -35,7 +37,8 @@ import java.util.TreeSet;
  */
 public abstract class AbstractTransactionAwareTable implements TransactionAware {
   protected final TransactionCodec txCodec;
-  protected final Set<ActionChange> changeSet;
+  // map of write pointers to change set assocaited with each
+  protected final Map<Long, Set<ActionChange>> changeSets;
   protected final TxConstants.ConflictDetection conflictLevel;
   protected Transaction tx;
   protected boolean allowNonTransactional;
@@ -44,7 +47,7 @@ public abstract class AbstractTransactionAwareTable implements TransactionAware 
     this.conflictLevel = conflictLevel;
     this.allowNonTransactional = allowNonTransactional;
     this.txCodec = new TransactionCodec();
-    this.changeSet = new HashSet<ActionChange>();
+    this.changeSets = Maps.newHashMap();
   }
 
   /**
@@ -75,8 +78,10 @@ public abstract class AbstractTransactionAwareTable implements TransactionAware 
     }
 
     Collection<byte[]> txChanges = new TreeSet<byte[]>(UnsignedBytes.lexicographicalComparator());
-    for (ActionChange change : changeSet) {
-      txChanges.add(getChangeKey(change.getRow(), change.getFamily(), change.getQualifier()));
+    for (Set<ActionChange> changeSet : changeSets.values()) {
+      for (ActionChange change : changeSet) {
+        txChanges.add(getChangeKey(change.getRow(), change.getFamily(), change.getQualifier()));
+      }
     }
     return txChanges;
   }
@@ -111,7 +116,7 @@ public abstract class AbstractTransactionAwareTable implements TransactionAware 
   @Override
   public void postTxCommit() {
     tx = null;
-    changeSet.clear();
+    changeSets.clear();
   }
 
   @Override
@@ -137,6 +142,12 @@ public abstract class AbstractTransactionAwareTable implements TransactionAware 
   protected abstract boolean doRollback() throws Exception;
 
   protected void addToChangeSet(byte[] row, byte[] family, byte[] qualifier) {
+    long currentWritePointer = tx.getCurrentWritePointer();
+    Set<ActionChange> changeSet = changeSets.get(currentWritePointer);
+    if (changeSet == null) {
+      changeSet = Sets.newHashSet();
+      changeSets.put(currentWritePointer, changeSet);
+    }
     switch (conflictLevel) {
       case ROW:
       case NONE:
