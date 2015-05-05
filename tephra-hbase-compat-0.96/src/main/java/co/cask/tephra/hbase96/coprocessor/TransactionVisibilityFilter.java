@@ -167,7 +167,7 @@ public class TransactionVisibilityFilter extends FilterBase {
     }
 
     public boolean isDeleted(Cell cell) {
-      return cell.getTimestamp() < familyDeleteTs;
+      return cell.getTimestamp() <= familyDeleteTs;
     }
 
     public void reset() {
