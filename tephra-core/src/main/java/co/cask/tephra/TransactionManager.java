@@ -156,6 +156,9 @@ public class TransactionManager extends AbstractService {
   private final Lock logReadLock = logLock.readLock();
   private final Lock logWriteLock = logLock.writeLock();
 
+  // fudge factor (in milliseconds) used when interpreting transactions as LONG based on expiration
+  // TODO: REMOVE WITH txnBackwardsCompatCheck()
+  private final long longTimeoutTolerance;
 
   public TransactionManager(Configuration config) {
     this(config, new NoOpTransactionStateStorage(new SnapshotCodecProvider(config)), new TxMetricsCollector());
@@ -176,6 +179,12 @@ public class TransactionManager extends AbstractService {
     // must always keep at least 1 snapshot
     snapshotRetainCount = Math.max(conf.getInt(TxConstants.Manager.CFG_TX_SNAPSHOT_RETAIN,
                                                TxConstants.Manager.DEFAULT_TX_SNAPSHOT_RETAIN), 1);
+
+    // intentionally not using a constant, as this config should not be exposed
+    // TODO: REMOVE WITH txnBackwardsCompatCheck()
+    longTimeoutTolerance = conf.getLong("data.tx.long.timeout.tolerance", 10000);
+
+    //
     this.txMetricsCollector = txMetricsCollector;
     clear();
   }
@@ -480,7 +489,7 @@ public class TransactionManager extends AbstractService {
     readPointer = snapshot.getReadPointer();
     lastWritePointer = snapshot.getWritePointer();
     invalid.addAll(snapshot.getInvalid());
-    inProgress.putAll(txnBackwardsCompatCheck(snapshot.getInProgress()));
+    inProgress.putAll(txnBackwardsCompatCheck(defaultLongTimeout, longTimeoutTolerance, snapshot.getInProgress()));
     committingChangeSets.putAll(snapshot.getCommittingChangeSets());
     committedChangeSets.putAll(snapshot.getCommittedChangeSets());
   }
@@ -490,13 +499,21 @@ public class TransactionManager extends AbstractService {
    * This is required for backwards compatibility, when long running transactions were represented
    * with expiration time -1. This can be removed when we stop supporting SnapshotCodec version 1.
    */
-  private Map<Long, InProgressTx> txnBackwardsCompatCheck(Map<Long, InProgressTx> inProgress) {
+  public static Map<Long, InProgressTx> txnBackwardsCompatCheck(int defaultLongTimeout, long longTimeoutTolerance,
+                                                                Map<Long, InProgressTx> inProgress) {
     for (Map.Entry<Long, InProgressTx> entry : inProgress.entrySet()) {
-      if (entry.getValue().getExpiration() < 0) {
-        long writePointer = entry.getKey();
-        long expiration = getTxExpirationFromWritePointer(writePointer, defaultLongTimeout);
+      long writePointer = entry.getKey();
+      long expiration = entry.getValue().getExpiration();
+      // LONG transactions will either have a negative expiration or expiration set to the long timeout
+      // use a fudge factor on the expiration check, since expiraton is set based on system time, not the write pointer
+      if (entry.getValue().getType() == null &&
+          (expiration < 0 ||
+              (getTxExpirationFromWritePointer(writePointer, defaultLongTimeout) - expiration
+                  < longTimeoutTolerance))) {
+        // handle null expiration
+        long newExpiration = getTxExpirationFromWritePointer(writePointer, defaultLongTimeout);
         InProgressTx compatTx =
-          new InProgressTx(entry.getValue().getVisibilityUpperBound(), expiration, TransactionType.LONG);
+          new InProgressTx(entry.getValue().getVisibilityUpperBound(), newExpiration, TransactionType.LONG);
         entry.setValue(compatTx);
       } else if (entry.getValue().getType() == null) {
         InProgressTx compatTx =
@@ -696,7 +713,7 @@ public class TransactionManager extends AbstractService {
     return currentTime + TimeUnit.SECONDS.toMillis(timeoutInSeconds);
   }
 
-  private static long getTxExpirationFromWritePointer(long writePointer, long timeoutInSeconds) {
+  public static long getTxExpirationFromWritePointer(long writePointer, long timeoutInSeconds) {
     return writePointer / TxConstants.MAX_TX_PER_MS + TimeUnit.SECONDS.toMillis(timeoutInSeconds);
   }
 
@@ -1251,6 +1268,15 @@ public class TransactionManager extends AbstractService {
     @Override
     public int hashCode() {
       return Objects.hashCode(visibilityUpperBound, expiration, type);
+    }
+
+    @Override
+    public String toString() {
+      return Objects.toStringHelper(this)
+          .add("visibilityUpperBound", visibilityUpperBound)
+          .add("expiration", expiration)
+          .add("type", type)
+          .toString();
     }
   }
 }
