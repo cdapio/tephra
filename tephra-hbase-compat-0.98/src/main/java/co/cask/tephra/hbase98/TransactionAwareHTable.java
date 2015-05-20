@@ -528,14 +528,14 @@ public class TransactionAwareHTable extends AbstractTransactionAwareTable
   }
 
   private Put transactionalizeAction(Put put) throws IOException {
-    Put txPut = new Put(put.getRow(), tx.getCurrentWritePointer());
+    Put txPut = new Put(put.getRow(), tx.getWritePointer());
     Set<Map.Entry<byte[], List<Cell>>> familyMap = put.getFamilyCellMap().entrySet();
     if (!familyMap.isEmpty()) {
       for (Map.Entry<byte[], List<Cell>> family : familyMap) {
         List<Cell> familyValues = family.getValue();
         if (!familyValues.isEmpty()) {
           for (Cell value : familyValues) {
-            txPut.add(value.getFamily(), value.getQualifier(), tx.getCurrentWritePointer(), value.getValue());
+            txPut.add(value.getFamily(), value.getQualifier(), tx.getWritePointer(), value.getValue());
             addToChangeSet(txPut.getRow(), value.getFamily(), value.getQualifier());
           }
         }
@@ -550,7 +550,7 @@ public class TransactionAwareHTable extends AbstractTransactionAwareTable
   }
 
   private Delete transactionalizeAction(Delete delete) throws IOException {
-    long transactionTimestamp = tx.getCurrentWritePointer();
+    long transactionTimestamp = tx.getWritePointer();
 
     byte[] deleteRow = delete.getRow();
     Delete txDelete = new Delete(deleteRow, transactionTimestamp);

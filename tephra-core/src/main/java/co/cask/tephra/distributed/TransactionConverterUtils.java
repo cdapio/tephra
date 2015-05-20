@@ -28,10 +28,10 @@ import com.google.common.primitives.Longs;
 public final class TransactionConverterUtils {
 
   public static TTransaction wrap(Transaction tx) {
-    return new TTransaction(tx.getWritePointer(), tx.getReadPointer(),
+    return new TTransaction(tx.getTransactionId(), tx.getReadPointer(),
                             Longs.asList(tx.getInvalids()), Longs.asList(tx.getInProgress()),
                             tx.getFirstShortInProgress(), getTTransactionType(tx.getType()),
-                            tx.getCurrentWritePointer(), Longs.asList(tx.getCheckpointWritePointers()));
+                            tx.getWritePointer(), Longs.asList(tx.getCheckpointWritePointers()));
   }
 
   public static Transaction unwrap(TTransaction thriftTx) {

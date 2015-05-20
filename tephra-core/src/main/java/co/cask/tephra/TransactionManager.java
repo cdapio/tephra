@@ -756,11 +756,11 @@ public class TransactionManager extends AbstractService {
         ensureAvailable();
         txid = getNextWritePointer();
         tx = createTransaction(txid, type);
-        addInProgressAndAdvance(tx.getWritePointer(), tx.getVisibilityUpperBound(), expiration, type);
+        addInProgressAndAdvance(tx.getTransactionId(), tx.getVisibilityUpperBound(), expiration, type);
       }
       // appending to WAL out of global lock for concurrent performance
       // we should still be able to arrive at the same state even if log entries are out of order
-      appendToLog(TransactionEdit.createStarted(tx.getWritePointer(), tx.getVisibilityUpperBound(), expiration, type));
+      appendToLog(TransactionEdit.createStarted(tx.getTransactionId(), tx.getVisibilityUpperBound(), expiration, type));
     } finally {
       this.logReadLock.unlock();
     }
@@ -783,15 +783,15 @@ public class TransactionManager extends AbstractService {
   public boolean canCommit(Transaction tx, Collection<byte[]> changeIds) throws TransactionNotInProgressException {
     txMetricsCollector.rate("canCommit");
     Stopwatch timer = new Stopwatch().start();
-    if (inProgress.get(tx.getWritePointer()) == null) {
+    if (inProgress.get(tx.getTransactionId()) == null) {
       // invalid transaction, either this has timed out and moved to invalid, or something else is wrong.
-      if (invalid.contains(tx.getWritePointer())) {
+      if (invalid.contains(tx.getTransactionId())) {
         throw new TransactionNotInProgressException(
           String.format("canCommit() is called for transaction %d that is not in progress (it is known to be invalid)",
-                        tx.getWritePointer()));
+                        tx.getTransactionId()));
       } else {
         throw new TransactionNotInProgressException(
-          String.format("canCommit() is called for transaction %d that is not in progress", tx.getWritePointer()));
+          String.format("canCommit() is called for transaction %d that is not in progress", tx.getTransactionId()));
       }
     }
 
@@ -808,9 +808,9 @@ public class TransactionManager extends AbstractService {
     try {
       synchronized (this) {
         ensureAvailable();
-        addCommittingChangeSet(tx.getWritePointer(), set);
+        addCommittingChangeSet(tx.getTransactionId(), set);
       }
-      appendToLog(TransactionEdit.createCommitting(tx.getWritePointer(), set));
+      appendToLog(TransactionEdit.createCommitting(tx.getTransactionId(), set));
     } finally {
       this.logReadLock.unlock();
     }
@@ -836,22 +836,22 @@ public class TransactionManager extends AbstractService {
         // we record commits at the first not-yet assigned transaction id to simplify clearing out change sets that
         // are no longer visible by any in-progress transactions
         commitPointer = lastWritePointer + 1;
-        if (inProgress.get(tx.getWritePointer()) == null) {
+        if (inProgress.get(tx.getTransactionId()) == null) {
           // invalid transaction, either this has timed out and moved to invalid, or something else is wrong.
-          if (invalid.contains(tx.getWritePointer())) {
+          if (invalid.contains(tx.getTransactionId())) {
             throw new TransactionNotInProgressException(
               String.format("canCommit() is called for transaction %d that is not in progress " +
-                              "(it is known to be invalid)", tx.getWritePointer()));
+                              "(it is known to be invalid)", tx.getTransactionId()));
           } else {
             throw new TransactionNotInProgressException(
-              String.format("canCommit() is called for transaction %d that is not in progress", tx.getWritePointer()));
+              String.format("canCommit() is called for transaction %d that is not in progress", tx.getTransactionId()));
           }
         }
 
         // these should be atomic
         // NOTE: whether we succeed or not we don't need to keep changes in committing state: same tx cannot
         //       be attempted to commit twice
-        changeSet = committingChangeSets.remove(tx.getWritePointer());
+        changeSet = committingChangeSets.remove(tx.getTransactionId());
 
         if (changeSet != null) {
           // double-checking if there are conflicts: someone may have committed since canCommit check
@@ -862,9 +862,9 @@ public class TransactionManager extends AbstractService {
           // no changes
           addToCommitted = false;
         }
-        doCommit(tx.getWritePointer(), changeSet, commitPointer, addToCommitted);
+        doCommit(tx.getTransactionId(), changeSet, commitPointer, addToCommitted);
       }
-      appendToLog(TransactionEdit.createCommitted(tx.getWritePointer(), changeSet, commitPointer, addToCommitted));
+      appendToLog(TransactionEdit.createCommitted(tx.getTransactionId(), changeSet, commitPointer, addToCommitted));
     } finally {
       this.logReadLock.unlock();
     }
@@ -916,9 +916,9 @@ public class TransactionManager extends AbstractService {
     try {
       synchronized (this) {
         ensureAvailable();
-        doAbort(tx.getWritePointer(), tx.getCheckpointWritePointers(), tx.getType());
+        doAbort(tx.getTransactionId(), tx.getCheckpointWritePointers(), tx.getType());
       }
-      appendToLog(TransactionEdit.createAborted(tx.getWritePointer(), tx.getType(), tx.getCheckpointWritePointers()));
+      appendToLog(TransactionEdit.createAborted(tx.getTransactionId(), tx.getType(), tx.getCheckpointWritePointers()));
       txMetricsCollector.histogram("abort.latency", (int) timer.elapsedMillis());
     } finally {
       this.logReadLock.unlock();
@@ -1093,7 +1093,7 @@ public class TransactionManager extends AbstractService {
     Stopwatch timer = new Stopwatch().start();
 
     Transaction checkpointedTx = null;
-    long txId = originalTx.getWritePointer();
+    long txId = originalTx.getTransactionId();
     long newWritePointer = 0;
     // guard against changes to the transaction log while processing
     this.logReadLock.lock();
@@ -1159,7 +1159,7 @@ public class TransactionManager extends AbstractService {
     for (Map.Entry<Long, Set<ChangeId>> changeSet : committedChangeSets.entrySet()) {
       // If commit time is greater than tx read-pointer,
       // basically not visible but committed means "tx committed after given tx was started"
-      if (changeSet.getKey() > tx.getWritePointer()) {
+      if (changeSet.getKey() > tx.getTransactionId()) {
         if (overlap(changeSet.getValue(), changeIds)) {
           return true;
         }

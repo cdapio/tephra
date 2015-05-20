@@ -98,9 +98,9 @@ public class TransactionManagerTest extends TransactionSystemTest {
       // run another transaction
       Transaction txx = txm.startShort();
       // verify the exclude
-      Assert.assertFalse(txx.isVisible(tx1.getWritePointer()));
-      Assert.assertFalse(txx.isVisible(tx2.getWritePointer()));
-      Assert.assertFalse(txx.isVisible(tx3.getWritePointer()));
+      Assert.assertFalse(txx.isVisible(tx1.getTransactionId()));
+      Assert.assertFalse(txx.isVisible(tx2.getTransactionId()));
+      Assert.assertFalse(txx.isVisible(tx3.getTransactionId()));
       // try to commit the last transaction that was started
       Assert.assertTrue(txm.canCommit(txx, Collections.singleton(new byte[] { 0x0a })));
       Assert.assertTrue(txm.commit(txx));
@@ -133,7 +133,7 @@ public class TransactionManagerTest extends TransactionSystemTest {
       // Only tx3 is invalid list as it was aborted and is long-running. tx1 is short one and it rolled back its changes
       // so it should NOT be in invalid list
       Assert.assertEquals(1, txm.getInvalidSize());
-      Assert.assertEquals(tx3.getWritePointer(), (long) txm.getCurrentState().getInvalid().iterator().next());
+      Assert.assertEquals(tx3.getTransactionId(), (long) txm.getCurrentState().getInvalid().iterator().next());
       Assert.assertEquals(1, txm.getExcludedListSize());
     } finally {
       txm.stopAndWait();
@@ -209,33 +209,34 @@ public class TransactionManagerTest extends TransactionSystemTest {
       tx6 = txm1.startShort();
 
       // invalidate tx1, tx2, tx5 and tx6
-      txm1.invalidate(tx1.getWritePointer());
-      txm1.invalidate(tx2.getWritePointer());
-      txm1.invalidate(tx5.getWritePointer());
-      txm1.invalidate(tx6.getWritePointer());
+      txm1.invalidate(tx1.getTransactionId());
+      txm1.invalidate(tx2.getTransactionId());
+      txm1.invalidate(tx5.getTransactionId());
+      txm1.invalidate(tx6.getTransactionId());
 
       // tx1, tx2, tx5 and tx6 should be in invalid list
       Assert.assertEquals(
-        ImmutableList.of(tx1.getWritePointer(), tx2.getWritePointer(), tx5.getWritePointer(), tx6.getWritePointer()),
+        ImmutableList.of(tx1.getTransactionId(), tx2.getTransactionId(), tx5.getTransactionId(),
+            tx6.getTransactionId()),
         txm1.getCurrentState().getInvalid()
       );
       
       // remove tx1 and tx6 from invalid list
-      Assert.assertTrue(txm1.truncateInvalidTx(ImmutableSet.of(tx1.getWritePointer(), tx6.getWritePointer())));
+      Assert.assertTrue(txm1.truncateInvalidTx(ImmutableSet.of(tx1.getTransactionId(), tx6.getTransactionId())));
       
       // only tx2 and tx5 should be in invalid list now
-      Assert.assertEquals(ImmutableList.of(tx2.getWritePointer(), tx5.getWritePointer()),
+      Assert.assertEquals(ImmutableList.of(tx2.getTransactionId(), tx5.getTransactionId()),
                           txm1.getCurrentState().getInvalid());
       
       // removing in-progress transactions should not have any effect
-      Assert.assertEquals(ImmutableSet.of(tx3.getWritePointer(), tx4.getWritePointer()),
+      Assert.assertEquals(ImmutableSet.of(tx3.getTransactionId(), tx4.getTransactionId()),
                           txm1.getCurrentState().getInProgress().keySet());
-      Assert.assertFalse(txm1.truncateInvalidTx(ImmutableSet.of(tx3.getWritePointer(), tx4.getWritePointer())));
+      Assert.assertFalse(txm1.truncateInvalidTx(ImmutableSet.of(tx3.getTransactionId(), tx4.getTransactionId())));
       // no change to in-progress
-      Assert.assertEquals(ImmutableSet.of(tx3.getWritePointer(), tx4.getWritePointer()),
+      Assert.assertEquals(ImmutableSet.of(tx3.getTransactionId(), tx4.getTransactionId()),
                           txm1.getCurrentState().getInProgress().keySet());
       // no change to invalid list
-      Assert.assertEquals(ImmutableList.of(tx2.getWritePointer(), tx5.getWritePointer()),
+      Assert.assertEquals(ImmutableList.of(tx2.getTransactionId(), tx5.getTransactionId()),
                           txm1.getCurrentState().getInvalid());
 
       // Test transaction edit logs replay
@@ -243,9 +244,9 @@ public class TransactionManagerTest extends TransactionSystemTest {
       // and all logs can be replayed.
       txm2 = new TransactionManager(testConf, storage, new TxMetricsCollector());
       txm2.startAndWait();
-      Assert.assertEquals(ImmutableList.of(tx2.getWritePointer(), tx5.getWritePointer()),
+      Assert.assertEquals(ImmutableList.of(tx2.getTransactionId(), tx5.getTransactionId()),
                           txm2.getCurrentState().getInvalid());
-      Assert.assertEquals(ImmutableSet.of(tx3.getWritePointer(), tx4.getWritePointer()),
+      Assert.assertEquals(ImmutableSet.of(tx3.getTransactionId(), tx4.getTransactionId()),
                           txm2.getCurrentState().getInProgress().keySet());
     } finally {
       txm1.stopAndWait();
@@ -289,14 +290,15 @@ public class TransactionManagerTest extends TransactionSystemTest {
       tx6 = txm1.startShort();
 
       // invalidate tx1, tx2, tx5 and tx6
-      txm1.invalidate(tx1.getWritePointer());
-      txm1.invalidate(tx2.getWritePointer());
-      txm1.invalidate(tx5.getWritePointer());
-      txm1.invalidate(tx6.getWritePointer());
+      txm1.invalidate(tx1.getTransactionId());
+      txm1.invalidate(tx2.getTransactionId());
+      txm1.invalidate(tx5.getTransactionId());
+      txm1.invalidate(tx6.getTransactionId());
 
       // tx1, tx2, tx5 and tx6 should be in invalid list
       Assert.assertEquals(
-        ImmutableList.of(tx1.getWritePointer(), tx2.getWritePointer(), tx5.getWritePointer(), tx6.getWritePointer()),
+        ImmutableList.of(tx1.getTransactionId(), tx2.getTransactionId(), tx5.getTransactionId(),
+            tx6.getTransactionId()),
         txm1.getCurrentState().getInvalid()
       );
 
@@ -304,11 +306,11 @@ public class TransactionManagerTest extends TransactionSystemTest {
       Assert.assertTrue(txm1.truncateInvalidTxBefore(timeBeforeTx3));
 
       // only tx5 and tx6 should be in invalid list now
-      Assert.assertEquals(ImmutableList.of(tx5.getWritePointer(), tx6.getWritePointer()),
+      Assert.assertEquals(ImmutableList.of(tx5.getTransactionId(), tx6.getTransactionId()),
                           txm1.getCurrentState().getInvalid());
 
       // removing invalid transactions before tx5 should throw exception since tx3 and tx4 are in-progress
-      Assert.assertEquals(ImmutableSet.of(tx3.getWritePointer(), tx4.getWritePointer()),
+      Assert.assertEquals(ImmutableSet.of(tx3.getTransactionId(), tx4.getTransactionId()),
                           txm1.getCurrentState().getInProgress().keySet());
       try {
         txm1.truncateInvalidTxBefore(timeBeforeTx5);
@@ -317,10 +319,10 @@ public class TransactionManagerTest extends TransactionSystemTest {
         // Expected exception
       }
       // no change to in-progress
-      Assert.assertEquals(ImmutableSet.of(tx3.getWritePointer(), tx4.getWritePointer()),
+      Assert.assertEquals(ImmutableSet.of(tx3.getTransactionId(), tx4.getTransactionId()),
                           txm1.getCurrentState().getInProgress().keySet());
       // no change to invalid list
-      Assert.assertEquals(ImmutableList.of(tx5.getWritePointer(), tx6.getWritePointer()),
+      Assert.assertEquals(ImmutableList.of(tx5.getTransactionId(), tx6.getTransactionId()),
                           txm1.getCurrentState().getInvalid());
 
       // Test transaction edit logs replay
@@ -328,9 +330,9 @@ public class TransactionManagerTest extends TransactionSystemTest {
       // and all logs can be replayed.
       txm2 = new TransactionManager(testConf, storage, new TxMetricsCollector());
       txm2.startAndWait();
-      Assert.assertEquals(ImmutableList.of(tx5.getWritePointer(), tx6.getWritePointer()),
+      Assert.assertEquals(ImmutableList.of(tx5.getTransactionId(), tx6.getTransactionId()),
                           txm2.getCurrentState().getInvalid());
-      Assert.assertEquals(ImmutableSet.of(tx3.getWritePointer(), tx4.getWritePointer()),
+      Assert.assertEquals(ImmutableSet.of(tx3.getTransactionId(), tx4.getTransactionId()),
                           txm2.getCurrentState().getInProgress().keySet());
     } finally {
       txm1.stopAndWait();

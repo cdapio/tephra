@@ -25,8 +25,8 @@ import java.util.Arrays;
 //       are available
 public class Transaction {
   private final long readPointer;
+  private final long txId;
   private final long writePointer;
-  private final long currentWritePointer;
   private final long[] invalids;
   private final long[] inProgress;
   private final long firstShortInProgress;
@@ -42,36 +42,36 @@ public class Transaction {
   /**
    * Creates a new short transaction.
    * @param readPointer read pointer for transaction
-   * @param writePointer write pointer for transaction. This uniquely identifies the transaction.
+   * @param txId unique identifier for the transaction
    * @param invalids list of invalid transactions to exclude while reading
    * @param inProgress list of in-progress transactions to exclude while reading
    * @param firstShortInProgress earliest in-progress short transaction
    */
-  public Transaction(long readPointer, long writePointer, long[] invalids, long[] inProgress,
+  public Transaction(long readPointer, long txId, long[] invalids, long[] inProgress,
                      long firstShortInProgress) {
-    this(readPointer, writePointer, invalids, inProgress, firstShortInProgress, TransactionType.SHORT);
+    this(readPointer, txId, invalids, inProgress, firstShortInProgress, TransactionType.SHORT);
   }
 
   /**
    * Creates a new transaction.
    * @param readPointer read pointer for transaction
-   * @param writePointer write pointer for transaction. This uniquely identifies the transaction.
+   * @param txId unique identifier for the transaction
    * @param invalids list of invalid transactions to exclude while reading
    * @param inProgress list of in-progress transactions to exclude while reading
    * @param firstShortInProgress earliest in-progress short transaction
    * @param type transaction type
    */
-  public Transaction(long readPointer, long writePointer, long[] invalids, long[] inProgress,
+  public Transaction(long readPointer, long txId, long[] invalids, long[] inProgress,
                      long firstShortInProgress, TransactionType type) {
-    this(readPointer, writePointer, writePointer, invalids, inProgress, firstShortInProgress, type, new long[0]);
+    this(readPointer, txId, txId, invalids, inProgress, firstShortInProgress, type, new long[0]);
   }
 
   /**
    * Creates a new transaction.
    * @param readPointer read pointer for transaction
-   * @param writePointer write pointer for transaction. This uniquely identifies the transaction.
-   * @param currentWritePointer the current pointer to be used for any writes.
-   *                      For new transactions, this will be the same as {@code writePointer}.  For checkpointed
+   * @param txId unique identifier for the transaction
+   * @param writePointer the current pointer to be used for any writes.
+   *                      For new transactions, this will be the same as {@code txId}.  For checkpointed
    *                      transactions, this will be the most recent write pointer issued.
    * @param invalids list of invalid transactions to exclude while reading
    * @param inProgress list of in-progress transactions to exclude while reading
@@ -79,11 +79,11 @@ public class Transaction {
    * @param type transaction type
    * @param checkpointPointers the list of writer pointers added from checkpoints on the transaction
    */
-  public Transaction(long readPointer, long writePointer, long currentWritePointer, long[] invalids, long[] inProgress,
+  public Transaction(long readPointer, long txId, long writePointer, long[] invalids, long[] inProgress,
                      long firstShortInProgress, TransactionType type, long[] checkpointPointers) {
     this.readPointer = readPointer;
+    this.txId = txId;
     this.writePointer = writePointer;
-    this.currentWritePointer = currentWritePointer;
     this.invalids = invalids;
     this.inProgress = inProgress;
     this.firstShortInProgress = firstShortInProgress;
@@ -96,11 +96,11 @@ public class Transaction {
    * with the updated checkpoint write pointers.
    *
    * @param toCopy the original transaction containing the state to copy
-   * @param currentWritePointer the new write pointer to use for the transaction
+   * @param writePointer the new write pointer to use for the transaction
    * @param checkpointPointers the list of write pointers added from checkpoints on the transaction
    */
-  public Transaction(Transaction toCopy, long currentWritePointer, long[] checkpointPointers) {
-    this(toCopy.getReadPointer(), toCopy.getWritePointer(), currentWritePointer, toCopy.getInvalids(),
+  public Transaction(Transaction toCopy, long writePointer, long[] checkpointPointers) {
+    this(toCopy.getReadPointer(), toCopy.getTransactionId(), writePointer, toCopy.getInvalids(),
         toCopy.getInProgress(), toCopy.getFirstShortInProgress(), toCopy.getType(), checkpointPointers);
   }
 
@@ -113,17 +113,17 @@ public class Transaction {
    * transaction, and uniquely identifies it with the transaction service.  This value should be provided
    * to identify the transaction when calling any transaction lifecycle methods on the transaction service.
    */
-  public long getWritePointer() {
-    return writePointer;
+  public long getTransactionId() {
+    return txId;
   }
 
   /**
    * Returns the write pointer to be used in persisting any changes.  After a checkpoint is performed, this will differ
-   * from {@link #getWritePointer()}.  This method should always be used when setting the timestamp for writes
+   * from {@link #getTransactionId()}.  This method should always be used when setting the timestamp for writes
    * in order to ensure that the correct value is used.
    */
-  public long getCurrentWritePointer() {
-    return currentWritePointer;
+  public long getWritePointer() {
+    return writePointer;
   }
 
   public long[] getInvalids() {
@@ -150,7 +150,7 @@ public class Transaction {
     // NOTE: in some cases when we do not provide visibility guarantee, we set readPointer to MAX value, but
     //       at same time we don't want that to case cleanup everything as this is used for tx janitor + ttl to see
     //       what can be cleaned up. When non-tx mode is implemented better, we should not need this check
-    return inProgress.length == 0 ? Math.min(writePointer - 1, readPointer) : inProgress[0] - 1;
+    return inProgress.length == 0 ? Math.min(txId - 1, readPointer) : inProgress[0] - 1;
   }
 
   public long getFirstShortInProgress() {
@@ -209,8 +209,8 @@ public class Transaction {
   public boolean isVisible(long version, boolean excludeCurrentWritePointer) {
     // either it was committed before or the change belongs to current tx
     return (version <= getReadPointer() && !isExcluded(version)) ||
-        ((writePointer == version || isCheckpoint(version)) &&
-            (!excludeCurrentWritePointer || currentWritePointer != version));
+        ((txId == version || isCheckpoint(version)) &&
+            (!excludeCurrentWritePointer || writePointer != version));
   }
 
   public boolean hasExcludes() {
@@ -237,8 +237,8 @@ public class Transaction {
       .append(Transaction.class.getSimpleName())
       .append('{')
       .append("readPointer: ").append(readPointer)
+      .append(", transactionId: ").append(txId)
       .append(", writePointer: ").append(writePointer)
-      .append(", currentWritePointer: ").append(currentWritePointer)
       .append(", invalids: ").append(Arrays.toString(invalids))
       .append(", inProgress: ").append(Arrays.toString(inProgress))
       .append(", firstShortInProgress: ").append(firstShortInProgress)

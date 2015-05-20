@@ -142,7 +142,7 @@ public abstract class AbstractTransactionAwareTable implements TransactionAware 
   protected abstract boolean doRollback() throws Exception;
 
   protected void addToChangeSet(byte[] row, byte[] family, byte[] qualifier) {
-    long currentWritePointer = tx.getCurrentWritePointer();
+    long currentWritePointer = tx.getWritePointer();
     Set<ActionChange> changeSet = changeSets.get(currentWritePointer);
     if (changeSet == null) {
       changeSet = Sets.newHashSet();

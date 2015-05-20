@@ -74,7 +74,7 @@ public class TransactionContext {
         txAware.startTx(currentTx);
       } catch (Throwable e) {
         String message = String.format("Unable to start transaction-aware '%s' for transaction %d. ",
-                                       txAware.getTransactionAwareName(), currentTx.getWritePointer());
+                                       txAware.getTransactionAwareName(), currentTx.getTransactionId());
         LOG.warn(message, e);
         txClient.abort(currentTx);
         throw new TransactionFailureException(message, e);
@@ -134,12 +134,12 @@ public class TransactionContext {
         txAware.startTx(currentTx);
       }
     } catch (TransactionNotInProgressException e) {
-      String message = String.format("Transaction %d is not in progress.", currentTx.getWritePointer());
+      String message = String.format("Transaction %d is not in progress.", currentTx.getTransactionId());
       LOG.warn(message, e);
       abort(new TransactionFailureException(message, e));
       // abort will throw that exception
     } catch (Throwable e) {
-      String message = String.format("Exception from checkpoint for transaction %d.", currentTx.getWritePointer());
+      String message = String.format("Exception from checkpoint for transaction %d.", currentTx.getTransactionId());
       LOG.warn(message, e);
       abort(new TransactionFailureException(message, e));
       // abort will throw that exception
@@ -179,7 +179,7 @@ public class TransactionContext {
           }
         } catch (Throwable e) {
           String message = String.format("Unable to roll back changes in transaction-aware '%s' for transaction %d. ",
-                                         txAware.getTransactionAwareName(), currentTx.getWritePointer());
+                                         txAware.getTransactionAwareName(), currentTx.getTransactionId());
           LOG.warn(message, e);
           if (cause == null) {
             cause = new TransactionFailureException(message, e);
@@ -190,7 +190,7 @@ public class TransactionContext {
       if (success) {
         txClient.abort(currentTx);
       } else {
-        txClient.invalidate(currentTx.getWritePointer());
+        txClient.invalidate(currentTx.getTransactionId());
       }
       if (cause != null) {
         throw cause;
@@ -207,7 +207,7 @@ public class TransactionContext {
         changes.addAll(txAware.getTxChanges());
       } catch (Throwable e) {
         String message = String.format("Unable to retrieve changes from transaction-aware '%s' for transaction %d. ",
-                                       txAware.getTransactionAwareName(), currentTx.getWritePointer());
+                                       txAware.getTransactionAwareName(), currentTx.getTransactionId());
         LOG.warn(message, e);
         abort(new TransactionFailureException(message, e));
         // abort will throw that exception
@@ -218,18 +218,18 @@ public class TransactionContext {
     try {
       canCommit = txClient.canCommit(currentTx, changes);
     } catch (TransactionNotInProgressException e) {
-      String message = String.format("Transaction %d is not in progress.", currentTx.getWritePointer());
+      String message = String.format("Transaction %d is not in progress.", currentTx.getTransactionId());
       LOG.warn(message, e);
       abort(new TransactionFailureException(message, e));
       // abort will throw that exception
     } catch (Throwable e) {
-      String message = String.format("Exception from canCommit for transaction %d.", currentTx.getWritePointer());
+      String message = String.format("Exception from canCommit for transaction %d.", currentTx.getTransactionId());
       LOG.warn(message, e);
       abort(new TransactionFailureException(message, e));
       // abort will throw that exception
     }
     if (!canCommit) {
-      String message = String.format("Conflict detected for transaction %d.", currentTx.getWritePointer());
+      String message = String.format("Conflict detected for transaction %d.", currentTx.getTransactionId());
       abort(new TransactionConflictException(message));
       // abort will throw
     }
@@ -247,7 +247,7 @@ public class TransactionContext {
       }
       if (!success) {
         String message = String.format("Unable to persist changes of transaction-aware '%s' for transaction %d. ",
-                                       txAware.getTransactionAwareName(), currentTx.getWritePointer());
+                                       txAware.getTransactionAwareName(), currentTx.getTransactionId());
         if (cause == null) {
           LOG.warn(message);
         } else {
@@ -264,18 +264,18 @@ public class TransactionContext {
     try {
       commitSuccess = txClient.commit(currentTx);
     } catch (TransactionNotInProgressException e) {
-      String message = String.format("Transaction %d is not in progress.", currentTx.getWritePointer());
+      String message = String.format("Transaction %d is not in progress.", currentTx.getTransactionId());
       LOG.warn(message, e);
       abort(new TransactionFailureException(message, e));
       // abort will throw that exception
     } catch (Throwable e) {
-      String message = String.format("Exception from commit for transaction %d.", currentTx.getWritePointer());
+      String message = String.format("Exception from commit for transaction %d.", currentTx.getTransactionId());
       LOG.warn(message, e);
       abort(new TransactionFailureException(message, e));
       // abort will throw that exception
     }
     if (!commitSuccess) {
-      String message = String.format("Conflict detected for transaction %d.", currentTx.getWritePointer());
+      String message = String.format("Conflict detected for transaction %d.", currentTx.getTransactionId());
       abort(new TransactionConflictException(message));
       // abort will throw
     }
@@ -288,7 +288,7 @@ public class TransactionContext {
         txAware.postTxCommit();
       } catch (Throwable e) {
         String message = String.format("Unable to perform post-commit in transaction-aware '%s' for transaction %d. ",
-                                       txAware.getTransactionAwareName(), currentTx.getWritePointer());
+                                       txAware.getTransactionAwareName(), currentTx.getTransactionId());
         LOG.warn(message, e);
         cause = new TransactionFailureException(message, e);
       }

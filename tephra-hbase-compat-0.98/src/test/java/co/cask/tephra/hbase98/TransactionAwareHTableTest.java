@@ -768,22 +768,22 @@ public class TransactionAwareHTableTest {
     transactionContext.checkpoint();
     Transaction postCheckpointTx = transactionContext.getCurrentTransaction();
 
-    assertEquals(origTx.getWritePointer(), postCheckpointTx.getWritePointer());
-    assertNotEquals(origTx.getCurrentWritePointer(), postCheckpointTx.getCurrentWritePointer());
+    assertEquals(origTx.getTransactionId(), postCheckpointTx.getTransactionId());
+    assertNotEquals(origTx.getWritePointer(), postCheckpointTx.getWritePointer());
     long[] checkpointPtrs = postCheckpointTx.getCheckpointWritePointers();
     assertEquals(1, checkpointPtrs.length);
-    assertEquals(postCheckpointTx.getCurrentWritePointer(), checkpointPtrs[0]);
+    assertEquals(postCheckpointTx.getWritePointer(), checkpointPtrs[0]);
 
     transactionAwareHTable.put(new Put(TestBytes.row2).add(TestBytes.family, TestBytes.qualifier, TestBytes.value2));
     transactionContext.checkpoint();
     Transaction postCheckpointTx2 = transactionContext.getCurrentTransaction();
 
-    assertEquals(origTx.getWritePointer(), postCheckpointTx2.getWritePointer());
-    assertNotEquals(postCheckpointTx.getCurrentWritePointer(), postCheckpointTx2.getCurrentWritePointer());
+    assertEquals(origTx.getTransactionId(), postCheckpointTx2.getTransactionId());
+    assertNotEquals(postCheckpointTx.getWritePointer(), postCheckpointTx2.getWritePointer());
     long[] checkpointPtrs2 = postCheckpointTx2.getCheckpointWritePointers();
     assertEquals(2, checkpointPtrs2.length);
-    assertEquals(postCheckpointTx.getCurrentWritePointer(), checkpointPtrs2[0]);
-    assertEquals(postCheckpointTx2.getCurrentWritePointer(), checkpointPtrs2[1]);
+    assertEquals(postCheckpointTx.getWritePointer(), checkpointPtrs2[0]);
+    assertEquals(postCheckpointTx2.getWritePointer(), checkpointPtrs2[1]);
 
     transactionAwareHTable.put(new Put(TestBytes.row3).add(TestBytes.family, TestBytes.qualifier, TestBytes.value));
 
@@ -883,7 +883,7 @@ public class TransactionAwareHTableTest {
     transactionAwareHTable.put(new Put(TestBytes.row3).add(TestBytes.family, TestBytes.qualifier, TestBytes.value));
 
     TransactionSystemClient txClient = new InMemoryTxSystemClient(txManager);
-    txClient.invalidate(transactionContext.getCurrentTransaction().getWritePointer());
+    txClient.invalidate(transactionContext.getCurrentTransaction().getTransactionId());
 
     // check that writes are not visible
     TransactionAwareHTable txTable2 = new TransactionAwareHTable(new HTable(conf, TestBytes.table));
@@ -892,9 +892,9 @@ public class TransactionAwareHTableTest {
     Transaction newTx = txContext2.getCurrentTransaction();
 
     // all 3 writes pointers from the previous transaction should now be excluded
-    assertTrue(newTx.isExcluded(origTx.getCurrentWritePointer()));
-    assertTrue(newTx.isExcluded(checkpointTx1.getCurrentWritePointer()));
-    assertTrue(newTx.isExcluded(checkpointTx2.getCurrentWritePointer()));
+    assertTrue(newTx.isExcluded(origTx.getWritePointer()));
+    assertTrue(newTx.isExcluded(checkpointTx1.getWritePointer()));
+    assertTrue(newTx.isExcluded(checkpointTx2.getWritePointer()));
 
     verifyRow(txTable2, TestBytes.row, null);
     verifyRow(txTable2, TestBytes.row2, null);

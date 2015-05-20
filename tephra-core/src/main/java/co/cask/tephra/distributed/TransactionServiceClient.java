@@ -99,7 +99,7 @@ public class TransactionServiceClient implements TransactionSystemClient {
       if (verbose) {
         LOG.info("Started tx details: " + tx.toString());
       } else {
-        LOG.info("Started tx: " + tx.getWritePointer() +
+        LOG.info("Started tx: " + tx.getTransactionId() +
                    ", readPointer: " + tx.getReadPointer() +
                    ", invalids: " + tx.getInvalids().length +
                    ", inProgress: " + tx.getInProgress().length);

@@ -146,7 +146,7 @@ public abstract class TransactionSystemTest {
     Assert.assertTrue(client.commit(tx1));
 
     // we know this is one is older than current writePointer and was not used
-    Transaction txOld = new Transaction(tx1.getReadPointer(), tx1.getWritePointer() - 1,
+    Transaction txOld = new Transaction(tx1.getReadPointer(), tx1.getTransactionId() - 1,
                                         new long[] {}, new long[] {}, Transaction.NO_TX_IN_PROGRESS, 
                                         TransactionType.SHORT);
     try {
@@ -165,7 +165,7 @@ public abstract class TransactionSystemTest {
     client.abort(txOld);
 
     // we know this is one is newer than current readPointer and was not used
-    Transaction txNew = new Transaction(tx1.getReadPointer(), tx1.getWritePointer() + 1,
+    Transaction txNew = new Transaction(tx1.getReadPointer(), tx1.getTransactionId() + 1,
                                         new long[] {}, new long[] {}, Transaction.NO_TX_IN_PROGRESS, 
                                         TransactionType.SHORT);
     try {
@@ -202,12 +202,12 @@ public abstract class TransactionSystemTest {
     // Invalidate an in-progress tx
     Transaction tx1 = client.startShort();
     client.canCommit(tx1, asList(C1, C2));
-    Assert.assertTrue(client.invalidate(tx1.getWritePointer()));
+    Assert.assertTrue(client.invalidate(tx1.getTransactionId()));
     // Cannot invalidate a committed tx
     Transaction tx2 = client.startShort();
     client.canCommit(tx2, asList(C3, C4));
     client.commit(tx2);
-    Assert.assertFalse(client.invalidate(tx2.getWritePointer()));
+    Assert.assertFalse(client.invalidate(tx2.getTransactionId()));
   }
 
   @Test
@@ -237,7 +237,7 @@ public abstract class TransactionSystemTest {
     // confirm that transaction IDs are not reset
     Transaction txPostReset = client.startShort();
     Assert.assertTrue("New tx ID should be greater than last ID before reset",
-                      txPostReset.getWritePointer() > txPreReset.getWritePointer());
+                      txPostReset.getTransactionId() > txPreReset.getTransactionId());
   }
   
   @Test
@@ -248,16 +248,16 @@ public abstract class TransactionSystemTest {
     Transaction tx2 = client.startShort();
     Transaction tx3 = client.startLong();
     
-    client.invalidate(tx1.getWritePointer());
-    client.invalidate(tx2.getWritePointer());
-    client.invalidate(tx3.getWritePointer());
+    client.invalidate(tx1.getTransactionId());
+    client.invalidate(tx2.getTransactionId());
+    client.invalidate(tx3.getTransactionId());
     
     // Remove tx2 and tx3 from invalid list
-    Assert.assertTrue(client.truncateInvalidTx(ImmutableSet.of(tx2.getWritePointer(), tx3.getWritePointer())));
+    Assert.assertTrue(client.truncateInvalidTx(ImmutableSet.of(tx2.getTransactionId(), tx3.getTransactionId())));
     
     Transaction tx = client.startShort();
     // Only tx1 should be in invalid list now
-    Assert.assertArrayEquals(new long[] {tx1.getWritePointer()}, tx.getInvalids());
+    Assert.assertArrayEquals(new long[] {tx1.getTransactionId()}, tx.getInvalids());
     client.abort(tx);
   }
 
@@ -282,16 +282,16 @@ public abstract class TransactionSystemTest {
     }
     
     // Invalidate all of them
-    client.invalidate(tx1.getWritePointer());
-    client.invalidate(tx2.getWritePointer());
-    client.invalidate(tx3.getWritePointer());
+    client.invalidate(tx1.getTransactionId());
+    client.invalidate(tx2.getTransactionId());
+    client.invalidate(tx3.getTransactionId());
 
     // Remove transactions before time beforeTx3
     Assert.assertTrue(client.truncateInvalidTxBefore(beforeTx3));
 
     Transaction tx = client.startShort();
     // Only tx3 should be in invalid list now
-    Assert.assertArrayEquals(new long[] {tx3.getWritePointer()}, tx.getInvalids());
+    Assert.assertArrayEquals(new long[] {tx3.getTransactionId()}, tx.getInvalids());
     client.abort(tx);
   }
 
@@ -305,9 +305,9 @@ public abstract class TransactionSystemTest {
 
     Assert.assertEquals(0, client.getInvalidSize());
 
-    client.invalidate(tx1.getWritePointer());
-    client.invalidate(tx2.getWritePointer());
-    client.invalidate(tx3.getWritePointer());
+    client.invalidate(tx1.getTransactionId());
+    client.invalidate(tx2.getTransactionId());
+    client.invalidate(tx3.getTransactionId());
 
     Assert.assertEquals(3, client.getInvalidSize());
   }
