@@ -131,7 +131,7 @@ public class TransactionContext {
       currentTx = txClient.checkpoint(currentTx);
       // update the current transaction with all TransactionAwares
       for (TransactionAware txAware : txAwares) {
-        txAware.startTx(currentTx);
+        txAware.updateTx(currentTx);
       }
     } catch (TransactionNotInProgressException e) {
       String message = String.format("Transaction %d is not in progress.", currentTx.getTransactionId());

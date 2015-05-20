@@ -72,6 +72,11 @@ public abstract class AbstractTransactionAwareTable implements TransactionAware 
   }
 
   @Override
+  public void updateTx(Transaction tx) {
+    this.tx = tx;
+  }
+
+  @Override
   public Collection<byte[]> getTxChanges() {
     if (conflictLevel == TxConstants.ConflictDetection.NONE) {
       return Collections.emptyList();

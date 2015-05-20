@@ -54,11 +54,22 @@ import java.util.Collection;
 // todo: add onCommitted() - so that e.g. hbase table can do *actual* deletes at this point
 public interface TransactionAware {
   /**
-   * Called when new transaction has started.
+   * Called when new transaction has started.  This may reset any state which has been left behind by the previous
+   * transaction.
+   *
    * @param tx transaction info
    */
   // todo: rename to onTxStart()
   void startTx(Transaction tx);
+
+  /**
+   * Called when the state of the current transaction has been updated.  This should replace any reference to the
+   * current {@link Transaction} held by this {@code TransactionAware}, but should <strong>not</strong> reset
+   * any state (such as the write change sets) that is currently maintained.
+   *
+   * @param tx the updated transaction
+   */
+  void updateTx(Transaction tx);
 
   /**
    * @return changes made by current transaction to be used for conflicts detection before commit.

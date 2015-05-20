@@ -54,6 +54,13 @@ public final class TransactionAwares {
     }
 
     @Override
+    public void updateTx(Transaction tx) {
+      for (TransactionAware txAware : this) {
+        txAware.updateTx(tx);
+      }
+    }
+
+    @Override
     public Collection<byte[]> getTxChanges() {
       List<byte[]> changes = new ArrayList<byte[]>();
       for (TransactionAware txAware : this) {
