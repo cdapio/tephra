@@ -20,13 +20,13 @@ enum TTransactionType {
 }
 
 struct TTransaction {
-  1: i64 writePointer,
+  1: i64 transactionId,
   2: i64 readPointer,
   3: list<i64> invalids,
   4: list<i64> inProgress,
   5: i64 firstShort,
   6: TTransactionType type,
-  7: i64 currentWritePointer,
+  7: i64 writePointer,
   8: list<i64> checkpointWritePointers,
 }
 

@@ -49,13 +49,13 @@ import org.slf4j.LoggerFactory;
 public class TTransaction implements org.apache.thrift.TBase<TTransaction, TTransaction._Fields>, java.io.Serializable, Cloneable {
   private static final org.apache.thrift.protocol.TStruct STRUCT_DESC = new org.apache.thrift.protocol.TStruct("TTransaction");
 
-  private static final org.apache.thrift.protocol.TField WRITE_POINTER_FIELD_DESC = new org.apache.thrift.protocol.TField("writePointer", org.apache.thrift.protocol.TType.I64, (short)1);
+  private static final org.apache.thrift.protocol.TField TRANSACTION_ID_FIELD_DESC = new org.apache.thrift.protocol.TField("transactionId", org.apache.thrift.protocol.TType.I64, (short)1);
   private static final org.apache.thrift.protocol.TField READ_POINTER_FIELD_DESC = new org.apache.thrift.protocol.TField("readPointer", org.apache.thrift.protocol.TType.I64, (short)2);
   private static final org.apache.thrift.protocol.TField INVALIDS_FIELD_DESC = new org.apache.thrift.protocol.TField("invalids", org.apache.thrift.protocol.TType.LIST, (short)3);
   private static final org.apache.thrift.protocol.TField IN_PROGRESS_FIELD_DESC = new org.apache.thrift.protocol.TField("inProgress", org.apache.thrift.protocol.TType.LIST, (short)4);
   private static final org.apache.thrift.protocol.TField FIRST_SHORT_FIELD_DESC = new org.apache.thrift.protocol.TField("firstShort", org.apache.thrift.protocol.TType.I64, (short)5);
   private static final org.apache.thrift.protocol.TField TYPE_FIELD_DESC = new org.apache.thrift.protocol.TField("type", org.apache.thrift.protocol.TType.I32, (short)6);
-  private static final org.apache.thrift.protocol.TField CURRENT_WRITE_POINTER_FIELD_DESC = new org.apache.thrift.protocol.TField("currentWritePointer", org.apache.thrift.protocol.TType.I64, (short)7);
+  private static final org.apache.thrift.protocol.TField WRITE_POINTER_FIELD_DESC = new org.apache.thrift.protocol.TField("writePointer", org.apache.thrift.protocol.TType.I64, (short)7);
   private static final org.apache.thrift.protocol.TField CHECKPOINT_WRITE_POINTERS_FIELD_DESC = new org.apache.thrift.protocol.TField("checkpointWritePointers", org.apache.thrift.protocol.TType.LIST, (short)8);
 
   private static final Map<Class<? extends IScheme>, SchemeFactory> schemes = new HashMap<Class<? extends IScheme>, SchemeFactory>();
@@ -64,7 +64,7 @@ public class TTransaction implements org.apache.thrift.TBase<TTransaction, TTran
     schemes.put(TupleScheme.class, new TTransactionTupleSchemeFactory());
   }
 
-  public long writePointer; // required
+  public long transactionId; // required
   public long readPointer; // required
   public List<Long> invalids; // required
   public List<Long> inProgress; // required
@@ -74,12 +74,12 @@ public class TTransaction implements org.apache.thrift.TBase<TTransaction, TTran
    * @see TTransactionType
    */
   public TTransactionType type; // required
-  public long currentWritePointer; // required
+  public long writePointer; // required
   public List<Long> checkpointWritePointers; // required
 
   /** The set of fields this struct contains, along with convenience methods for finding and manipulating them. */
   public enum _Fields implements org.apache.thrift.TFieldIdEnum {
-    WRITE_POINTER((short)1, "writePointer"),
+    TRANSACTION_ID((short)1, "transactionId"),
     READ_POINTER((short)2, "readPointer"),
     INVALIDS((short)3, "invalids"),
     IN_PROGRESS((short)4, "inProgress"),
@@ -89,7 +89,7 @@ public class TTransaction implements org.apache.thrift.TBase<TTransaction, TTran
      * @see TTransactionType
      */
     TYPE((short)6, "type"),
-    CURRENT_WRITE_POINTER((short)7, "currentWritePointer"),
+    WRITE_POINTER((short)7, "writePointer"),
     CHECKPOINT_WRITE_POINTERS((short)8, "checkpointWritePointers");
 
     private static final Map<String, _Fields> byName = new HashMap<String, _Fields>();
@@ -105,8 +105,8 @@ public class TTransaction implements org.apache.thrift.TBase<TTransaction, TTran
      */
     public static _Fields findByThriftId(int fieldId) {
       switch(fieldId) {
-        case 1: // WRITE_POINTER
-          return WRITE_POINTER;
+        case 1: // TRANSACTION_ID
+          return TRANSACTION_ID;
         case 2: // READ_POINTER
           return READ_POINTER;
         case 3: // INVALIDS
@@ -117,8 +117,8 @@ public class TTransaction implements org.apache.thrift.TBase<TTransaction, TTran
           return FIRST_SHORT;
         case 6: // TYPE
           return TYPE;
-        case 7: // CURRENT_WRITE_POINTER
-          return CURRENT_WRITE_POINTER;
+        case 7: // WRITE_POINTER
+          return WRITE_POINTER;
         case 8: // CHECKPOINT_WRITE_POINTERS
           return CHECKPOINT_WRITE_POINTERS;
         default:
@@ -161,15 +161,15 @@ public class TTransaction implements org.apache.thrift.TBase<TTransaction, TTran
   }
 
   // isset id assignments
-  private static final int __WRITEPOINTER_ISSET_ID = 0;
+  private static final int __TRANSACTIONID_ISSET_ID = 0;
   private static final int __READPOINTER_ISSET_ID = 1;
   private static final int __FIRSTSHORT_ISSET_ID = 2;
-  private static final int __CURRENTWRITEPOINTER_ISSET_ID = 3;
+  private static final int __WRITEPOINTER_ISSET_ID = 3;
   private byte __isset_bitfield = 0;
   public static final Map<_Fields, org.apache.thrift.meta_data.FieldMetaData> metaDataMap;
   static {
     Map<_Fields, org.apache.thrift.meta_data.FieldMetaData> tmpMap = new EnumMap<_Fields, org.apache.thrift.meta_data.FieldMetaData>(_Fields.class);
-    tmpMap.put(_Fields.WRITE_POINTER, new org.apache.thrift.meta_data.FieldMetaData("writePointer", org.apache.thrift.TFieldRequirementType.DEFAULT, 
+    tmpMap.put(_Fields.TRANSACTION_ID, new org.apache.thrift.meta_data.FieldMetaData("transactionId", org.apache.thrift.TFieldRequirementType.DEFAULT, 
         new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.I64)));
     tmpMap.put(_Fields.READ_POINTER, new org.apache.thrift.meta_data.FieldMetaData("readPointer", org.apache.thrift.TFieldRequirementType.DEFAULT, 
         new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.I64)));
@@ -183,7 +183,7 @@ public class TTransaction implements org.apache.thrift.TBase<TTransaction, TTran
         new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.I64)));
     tmpMap.put(_Fields.TYPE, new org.apache.thrift.meta_data.FieldMetaData("type", org.apache.thrift.TFieldRequirementType.DEFAULT, 
         new org.apache.thrift.meta_data.EnumMetaData(org.apache.thrift.protocol.TType.ENUM, TTransactionType.class)));
-    tmpMap.put(_Fields.CURRENT_WRITE_POINTER, new org.apache.thrift.meta_data.FieldMetaData("currentWritePointer", org.apache.thrift.TFieldRequirementType.DEFAULT, 
+    tmpMap.put(_Fields.WRITE_POINTER, new org.apache.thrift.meta_data.FieldMetaData("writePointer", org.apache.thrift.TFieldRequirementType.DEFAULT, 
         new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.I64)));
     tmpMap.put(_Fields.CHECKPOINT_WRITE_POINTERS, new org.apache.thrift.meta_data.FieldMetaData("checkpointWritePointers", org.apache.thrift.TFieldRequirementType.DEFAULT, 
         new org.apache.thrift.meta_data.ListMetaData(org.apache.thrift.protocol.TType.LIST, 
@@ -196,18 +196,18 @@ public class TTransaction implements org.apache.thrift.TBase<TTransaction, TTran
   }
 
   public TTransaction(
-    long writePointer,
+    long transactionId,
     long readPointer,
     List<Long> invalids,
     List<Long> inProgress,
     long firstShort,
     TTransactionType type,
-    long currentWritePointer,
+    long writePointer,
     List<Long> checkpointWritePointers)
   {
     this();
-    this.writePointer = writePointer;
-    setWritePointerIsSet(true);
+    this.transactionId = transactionId;
+    setTransactionIdIsSet(true);
     this.readPointer = readPointer;
     setReadPointerIsSet(true);
     this.invalids = invalids;
@@ -215,8 +215,8 @@ public class TTransaction implements org.apache.thrift.TBase<TTransaction, TTran
     this.firstShort = firstShort;
     setFirstShortIsSet(true);
     this.type = type;
-    this.currentWritePointer = currentWritePointer;
-    setCurrentWritePointerIsSet(true);
+    this.writePointer = writePointer;
+    setWritePointerIsSet(true);
     this.checkpointWritePointers = checkpointWritePointers;
   }
 
@@ -225,7 +225,7 @@ public class TTransaction implements org.apache.thrift.TBase<TTransaction, TTran
    */
   public TTransaction(TTransaction other) {
     __isset_bitfield = other.__isset_bitfield;
-    this.writePointer = other.writePointer;
+    this.transactionId = other.transactionId;
     this.readPointer = other.readPointer;
     if (other.isSetInvalids()) {
       List<Long> __this__invalids = new ArrayList<Long>();
@@ -245,7 +245,7 @@ public class TTransaction implements org.apache.thrift.TBase<TTransaction, TTran
     if (other.isSetType()) {
       this.type = other.type;
     }
-    this.currentWritePointer = other.currentWritePointer;
+    this.writePointer = other.writePointer;
     if (other.isSetCheckpointWritePointers()) {
       List<Long> __this__checkpointWritePointers = new ArrayList<Long>();
       for (Long other_element : other.checkpointWritePointers) {
@@ -261,8 +261,8 @@ public class TTransaction implements org.apache.thrift.TBase<TTransaction, TTran
 
   @Override
   public void clear() {
-    setWritePointerIsSet(false);
-    this.writePointer = 0;
+    setTransactionIdIsSet(false);
+    this.transactionId = 0;
     setReadPointerIsSet(false);
     this.readPointer = 0;
     this.invalids = null;
@@ -270,32 +270,32 @@ public class TTransaction implements org.apache.thrift.TBase<TTransaction, TTran
     setFirstShortIsSet(false);
     this.firstShort = 0;
     this.type = null;
-    setCurrentWritePointerIsSet(false);
-    this.currentWritePointer = 0;
+    setWritePointerIsSet(false);
+    this.writePointer = 0;
     this.checkpointWritePointers = null;
   }
 
-  public long getWritePointer() {
-    return this.writePointer;
+  public long getTransactionId() {
+    return this.transactionId;
   }
 
-  public TTransaction setWritePointer(long writePointer) {
-    this.writePointer = writePointer;
-    setWritePointerIsSet(true);
+  public TTransaction setTransactionId(long transactionId) {
+    this.transactionId = transactionId;
+    setTransactionIdIsSet(true);
     return this;
   }
 
-  public void unsetWritePointer() {
-    __isset_bitfield = EncodingUtils.clearBit(__isset_bitfield, __WRITEPOINTER_ISSET_ID);
+  public void unsetTransactionId() {
+    __isset_bitfield = EncodingUtils.clearBit(__isset_bitfield, __TRANSACTIONID_ISSET_ID);
   }
 
-  /** Returns true if field writePointer is set (has been assigned a value) and false otherwise */
-  public boolean isSetWritePointer() {
-    return EncodingUtils.testBit(__isset_bitfield, __WRITEPOINTER_ISSET_ID);
+  /** Returns true if field transactionId is set (has been assigned a value) and false otherwise */
+  public boolean isSetTransactionId() {
+    return EncodingUtils.testBit(__isset_bitfield, __TRANSACTIONID_ISSET_ID);
   }
 
-  public void setWritePointerIsSet(boolean value) {
-    __isset_bitfield = EncodingUtils.setBit(__isset_bitfield, __WRITEPOINTER_ISSET_ID, value);
+  public void setTransactionIdIsSet(boolean value) {
+    __isset_bitfield = EncodingUtils.setBit(__isset_bitfield, __TRANSACTIONID_ISSET_ID, value);
   }
 
   public long getReadPointer() {
@@ -454,27 +454,27 @@ public class TTransaction implements org.apache.thrift.TBase<TTransaction, TTran
     }
   }
 
-  public long getCurrentWritePointer() {
-    return this.currentWritePointer;
+  public long getWritePointer() {
+    return this.writePointer;
   }
 
-  public TTransaction setCurrentWritePointer(long currentWritePointer) {
-    this.currentWritePointer = currentWritePointer;
-    setCurrentWritePointerIsSet(true);
+  public TTransaction setWritePointer(long writePointer) {
+    this.writePointer = writePointer;
+    setWritePointerIsSet(true);
     return this;
   }
 
-  public void unsetCurrentWritePointer() {
-    __isset_bitfield = EncodingUtils.clearBit(__isset_bitfield, __CURRENTWRITEPOINTER_ISSET_ID);
+  public void unsetWritePointer() {
+    __isset_bitfield = EncodingUtils.clearBit(__isset_bitfield, __WRITEPOINTER_ISSET_ID);
   }
 
-  /** Returns true if field currentWritePointer is set (has been assigned a value) and false otherwise */
-  public boolean isSetCurrentWritePointer() {
-    return EncodingUtils.testBit(__isset_bitfield, __CURRENTWRITEPOINTER_ISSET_ID);
+  /** Returns true if field writePointer is set (has been assigned a value) and false otherwise */
+  public boolean isSetWritePointer() {
+    return EncodingUtils.testBit(__isset_bitfield, __WRITEPOINTER_ISSET_ID);
   }
 
-  public void setCurrentWritePointerIsSet(boolean value) {
-    __isset_bitfield = EncodingUtils.setBit(__isset_bitfield, __CURRENTWRITEPOINTER_ISSET_ID, value);
+  public void setWritePointerIsSet(boolean value) {
+    __isset_bitfield = EncodingUtils.setBit(__isset_bitfield, __WRITEPOINTER_ISSET_ID, value);
   }
 
   public int getCheckpointWritePointersSize() {
@@ -518,11 +518,11 @@ public class TTransaction implements org.apache.thrift.TBase<TTransaction, TTran
 
   public void setFieldValue(_Fields field, Object value) {
     switch (field) {
-    case WRITE_POINTER:
+    case TRANSACTION_ID:
       if (value == null) {
-        unsetWritePointer();
+        unsetTransactionId();
       } else {
-        setWritePointer((Long)value);
+        setTransactionId((Long)value);
       }
       break;
 
@@ -566,11 +566,11 @@ public class TTransaction implements org.apache.thrift.TBase<TTransaction, TTran
       }
       break;
 
-    case CURRENT_WRITE_POINTER:
+    case WRITE_POINTER:
       if (value == null) {
-        unsetCurrentWritePointer();
+        unsetWritePointer();
       } else {
-        setCurrentWritePointer((Long)value);
+        setWritePointer((Long)value);
       }
       break;
 
@@ -587,8 +587,8 @@ public class TTransaction implements org.apache.thrift.TBase<TTransaction, TTran
 
   public Object getFieldValue(_Fields field) {
     switch (field) {
-    case WRITE_POINTER:
-      return Long.valueOf(getWritePointer());
+    case TRANSACTION_ID:
+      return Long.valueOf(getTransactionId());
 
     case READ_POINTER:
       return Long.valueOf(getReadPointer());
@@ -605,8 +605,8 @@ public class TTransaction implements org.apache.thrift.TBase<TTransaction, TTran
     case TYPE:
       return getType();
 
-    case CURRENT_WRITE_POINTER:
-      return Long.valueOf(getCurrentWritePointer());
+    case WRITE_POINTER:
+      return Long.valueOf(getWritePointer());
 
     case CHECKPOINT_WRITE_POINTERS:
       return getCheckpointWritePointers();
@@ -622,8 +622,8 @@ public class TTransaction implements org.apache.thrift.TBase<TTransaction, TTran
     }
 
     switch (field) {
-    case WRITE_POINTER:
-      return isSetWritePointer();
+    case TRANSACTION_ID:
+      return isSetTransactionId();
     case READ_POINTER:
       return isSetReadPointer();
     case INVALIDS:
@@ -634,8 +634,8 @@ public class TTransaction implements org.apache.thrift.TBase<TTransaction, TTran
       return isSetFirstShort();
     case TYPE:
       return isSetType();
-    case CURRENT_WRITE_POINTER:
-      return isSetCurrentWritePointer();
+    case WRITE_POINTER:
+      return isSetWritePointer();
     case CHECKPOINT_WRITE_POINTERS:
       return isSetCheckpointWritePointers();
     }
@@ -655,12 +655,12 @@ public class TTransaction implements org.apache.thrift.TBase<TTransaction, TTran
     if (that == null)
       return false;
 
-    boolean this_present_writePointer = true;
-    boolean that_present_writePointer = true;
-    if (this_present_writePointer || that_present_writePointer) {
-      if (!(this_present_writePointer && that_present_writePointer))
+    boolean this_present_transactionId = true;
+    boolean that_present_transactionId = true;
+    if (this_present_transactionId || that_present_transactionId) {
+      if (!(this_present_transactionId && that_present_transactionId))
         return false;
-      if (this.writePointer != that.writePointer)
+      if (this.transactionId != that.transactionId)
         return false;
     }
 
@@ -709,12 +709,12 @@ public class TTransaction implements org.apache.thrift.TBase<TTransaction, TTran
         return false;
     }
 
-    boolean this_present_currentWritePointer = true;
-    boolean that_present_currentWritePointer = true;
-    if (this_present_currentWritePointer || that_present_currentWritePointer) {
-      if (!(this_present_currentWritePointer && that_present_currentWritePointer))
+    boolean this_present_writePointer = true;
+    boolean that_present_writePointer = true;
+    if (this_present_writePointer || that_present_writePointer) {
+      if (!(this_present_writePointer && that_present_writePointer))
         return false;
-      if (this.currentWritePointer != that.currentWritePointer)
+      if (this.writePointer != that.writePointer)
         return false;
     }
 
@@ -743,12 +743,12 @@ public class TTransaction implements org.apache.thrift.TBase<TTransaction, TTran
     int lastComparison = 0;
     TTransaction typedOther = (TTransaction)other;
 
-    lastComparison = Boolean.valueOf(isSetWritePointer()).compareTo(typedOther.isSetWritePointer());
+    lastComparison = Boolean.valueOf(isSetTransactionId()).compareTo(typedOther.isSetTransactionId());
     if (lastComparison != 0) {
       return lastComparison;
     }
-    if (isSetWritePointer()) {
-      lastComparison = org.apache.thrift.TBaseHelper.compareTo(this.writePointer, typedOther.writePointer);
+    if (isSetTransactionId()) {
+      lastComparison = org.apache.thrift.TBaseHelper.compareTo(this.transactionId, typedOther.transactionId);
       if (lastComparison != 0) {
         return lastComparison;
       }
@@ -803,12 +803,12 @@ public class TTransaction implements org.apache.thrift.TBase<TTransaction, TTran
         return lastComparison;
       }
     }
-    lastComparison = Boolean.valueOf(isSetCurrentWritePointer()).compareTo(typedOther.isSetCurrentWritePointer());
+    lastComparison = Boolean.valueOf(isSetWritePointer()).compareTo(typedOther.isSetWritePointer());
     if (lastComparison != 0) {
       return lastComparison;
     }
-    if (isSetCurrentWritePointer()) {
-      lastComparison = org.apache.thrift.TBaseHelper.compareTo(this.currentWritePointer, typedOther.currentWritePointer);
+    if (isSetWritePointer()) {
+      lastComparison = org.apache.thrift.TBaseHelper.compareTo(this.writePointer, typedOther.writePointer);
       if (lastComparison != 0) {
         return lastComparison;
       }
@@ -843,8 +843,8 @@ public class TTransaction implements org.apache.thrift.TBase<TTransaction, TTran
     StringBuilder sb = new StringBuilder("TTransaction(");
     boolean first = true;
 
-    sb.append("writePointer:");
-    sb.append(this.writePointer);
+    sb.append("transactionId:");
+    sb.append(this.transactionId);
     first = false;
     if (!first) sb.append(", ");
     sb.append("readPointer:");
@@ -879,8 +879,8 @@ public class TTransaction implements org.apache.thrift.TBase<TTransaction, TTran
     }
     first = false;
     if (!first) sb.append(", ");
-    sb.append("currentWritePointer:");
-    sb.append(this.currentWritePointer);
+    sb.append("writePointer:");
+    sb.append(this.writePointer);
     first = false;
     if (!first) sb.append(", ");
     sb.append("checkpointWritePointers:");
@@ -935,10 +935,10 @@ public class TTransaction implements org.apache.thrift.TBase<TTransaction, TTran
           break;
         }
         switch (schemeField.id) {
-          case 1: // WRITE_POINTER
+          case 1: // TRANSACTION_ID
             if (schemeField.type == org.apache.thrift.protocol.TType.I64) {
-              struct.writePointer = iprot.readI64();
-              struct.setWritePointerIsSet(true);
+              struct.transactionId = iprot.readI64();
+              struct.setTransactionIdIsSet(true);
             } else { 
               org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
             }
@@ -1003,10 +1003,10 @@ public class TTransaction implements org.apache.thrift.TBase<TTransaction, TTran
               org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
             }
             break;
-          case 7: // CURRENT_WRITE_POINTER
+          case 7: // WRITE_POINTER
             if (schemeField.type == org.apache.thrift.protocol.TType.I64) {
-              struct.currentWritePointer = iprot.readI64();
-              struct.setCurrentWritePointerIsSet(true);
+              struct.writePointer = iprot.readI64();
+              struct.setWritePointerIsSet(true);
             } else { 
               org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
             }
@@ -1044,8 +1044,8 @@ public class TTransaction implements org.apache.thrift.TBase<TTransaction, TTran
       struct.validate();
 
       oprot.writeStructBegin(STRUCT_DESC);
-      oprot.writeFieldBegin(WRITE_POINTER_FIELD_DESC);
-      oprot.writeI64(struct.writePointer);
+      oprot.writeFieldBegin(TRANSACTION_ID_FIELD_DESC);
+      oprot.writeI64(struct.transactionId);
       oprot.writeFieldEnd();
       oprot.writeFieldBegin(READ_POINTER_FIELD_DESC);
       oprot.writeI64(struct.readPointer);
@@ -1082,8 +1082,8 @@ public class TTransaction implements org.apache.thrift.TBase<TTransaction, TTran
         oprot.writeI32(struct.type.getValue());
         oprot.writeFieldEnd();
       }
-      oprot.writeFieldBegin(CURRENT_WRITE_POINTER_FIELD_DESC);
-      oprot.writeI64(struct.currentWritePointer);
+      oprot.writeFieldBegin(WRITE_POINTER_FIELD_DESC);
+      oprot.writeI64(struct.writePointer);
       oprot.writeFieldEnd();
       if (struct.checkpointWritePointers != null) {
         oprot.writeFieldBegin(CHECKPOINT_WRITE_POINTERS_FIELD_DESC);
@@ -1115,7 +1115,7 @@ public class TTransaction implements org.apache.thrift.TBase<TTransaction, TTran
     public void write(org.apache.thrift.protocol.TProtocol prot, TTransaction struct) throws org.apache.thrift.TException {
       TTupleProtocol oprot = (TTupleProtocol) prot;
       BitSet optionals = new BitSet();
-      if (struct.isSetWritePointer()) {
+      if (struct.isSetTransactionId()) {
         optionals.set(0);
       }
       if (struct.isSetReadPointer()) {
@@ -1133,15 +1133,15 @@ public class TTransaction implements org.apache.thrift.TBase<TTransaction, TTran
       if (struct.isSetType()) {
         optionals.set(5);
       }
-      if (struct.isSetCurrentWritePointer()) {
+      if (struct.isSetWritePointer()) {
         optionals.set(6);
       }
       if (struct.isSetCheckpointWritePointers()) {
         optionals.set(7);
       }
       oprot.writeBitSet(optionals, 8);
-      if (struct.isSetWritePointer()) {
-        oprot.writeI64(struct.writePointer);
+      if (struct.isSetTransactionId()) {
+        oprot.writeI64(struct.transactionId);
       }
       if (struct.isSetReadPointer()) {
         oprot.writeI64(struct.readPointer);
@@ -1170,8 +1170,8 @@ public class TTransaction implements org.apache.thrift.TBase<TTransaction, TTran
       if (struct.isSetType()) {
         oprot.writeI32(struct.type.getValue());
       }
-      if (struct.isSetCurrentWritePointer()) {
-        oprot.writeI64(struct.currentWritePointer);
+      if (struct.isSetWritePointer()) {
+        oprot.writeI64(struct.writePointer);
       }
       if (struct.isSetCheckpointWritePointers()) {
         {
@@ -1189,8 +1189,8 @@ public class TTransaction implements org.apache.thrift.TBase<TTransaction, TTran
       TTupleProtocol iprot = (TTupleProtocol) prot;
       BitSet incoming = iprot.readBitSet(8);
       if (incoming.get(0)) {
-        struct.writePointer = iprot.readI64();
-        struct.setWritePointerIsSet(true);
+        struct.transactionId = iprot.readI64();
+        struct.setTransactionIdIsSet(true);
       }
       if (incoming.get(1)) {
         struct.readPointer = iprot.readI64();
@@ -1231,8 +1231,8 @@ public class TTransaction implements org.apache.thrift.TBase<TTransaction, TTran
         struct.setTypeIsSet(true);
       }
       if (incoming.get(6)) {
-        struct.currentWritePointer = iprot.readI64();
-        struct.setCurrentWritePointerIsSet(true);
+        struct.writePointer = iprot.readI64();
+        struct.setWritePointerIsSet(true);
       }
       if (incoming.get(7)) {
         {

@@ -3370,7 +3370,7 @@ public class TTransactionServer {
         if (value == null) {
           unsetChanges();
         } else {
-          setChanges((Set<ByteBuffer>)value);
+          setChanges((Set<ByteBuffer>) value);
         }
         break;
 
@@ -3861,7 +3861,7 @@ public class TTransactionServer {
         if (value == null) {
           unsetE();
         } else {
-          setE((TTransactionNotInProgressException)value);
+          setE((TTransactionNotInProgressException) value);
         }
         break;
 
@@ -6710,7 +6710,7 @@ public class TTransactionServer {
         if (value == null) {
           unsetE();
         } else {
-          setE((TTransactionCouldNotTakeSnapshotException)value);
+          setE((TTransactionCouldNotTakeSnapshotException) value);
         }
         break;
 
@@ -8980,7 +8980,7 @@ public class TTransactionServer {
         if (value == null) {
           unsetTime();
         } else {
-          setTime((Long)value);
+          setTime((Long) value);
         }
         break;
 
@@ -10039,7 +10039,7 @@ public class TTransactionServer {
         if (value == null) {
           unsetSuccess();
         } else {
-          setSuccess((Integer)value);
+          setSuccess((Integer) value);
         }
         break;
 
@@ -10795,7 +10795,7 @@ public class TTransactionServer {
         if (value == null) {
           unsetE();
         } else {
-          setE((TTransactionNotInProgressException)value);
+          setE((TTransactionNotInProgressException) value);
         }
         break;
 
