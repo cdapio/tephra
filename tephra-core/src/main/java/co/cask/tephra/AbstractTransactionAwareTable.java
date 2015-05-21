@@ -24,6 +24,7 @@ import com.google.common.primitives.UnsignedBytes;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.TreeSet;
@@ -69,6 +70,10 @@ public abstract class AbstractTransactionAwareTable implements TransactionAware 
 
   @Override
   public Collection<byte[]> getTxChanges() {
+    if (conflictLevel == TxConstants.ConflictDetection.NONE) {
+      return Collections.emptyList();
+    }
+
     Collection<byte[]> txChanges = new TreeSet<byte[]>(UnsignedBytes.lexicographicalComparator());
     for (ActionChange change : changeSet) {
       txChanges.add(getChangeKey(change.getRow(), change.getFamily(), change.getQualifier()));
@@ -85,6 +90,8 @@ public abstract class AbstractTransactionAwareTable implements TransactionAware 
       case COLUMN:
         key = Bytes.concat(getTableKey(), row, family, qualifier);
         break;
+      case NONE:
+        throw new IllegalStateException("NONE conflict detection does not support change keys");
       default:
         throw new IllegalStateException("Unknown conflict detection level: " + conflictLevel);
     }
@@ -132,7 +139,8 @@ public abstract class AbstractTransactionAwareTable implements TransactionAware 
   protected void addToChangeSet(byte[] row, byte[] family, byte[] qualifier) {
     switch (conflictLevel) {
       case ROW:
-        // even with row-level conflict detection, we need to track changes per-family, since this
+      case NONE:
+        // with ROW or NONE conflict detection, we still need to track changes per-family, since this
         // is the granularity at which we will issue deletes for rollback
         changeSet.add(new ActionChange(row, family));
         break;

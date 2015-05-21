@@ -137,6 +137,7 @@ public class TransactionAwareHTable extends AbstractTransactionAwareTable
         rollbackDelete.setAttribute(TxConstants.TX_ROLLBACK_ATTRIBUTE_KEY, new byte[0]);
         switch (conflictLevel) {
           case ROW:
+          case NONE:
             // issue family delete for the tx write pointer
             rollbackDelete.deleteFamilyVersion(change.getFamily(), transactionTimestamp);
             break;
@@ -550,7 +551,8 @@ public class TransactionAwareHTable extends AbstractTransactionAwareTable
     Map<byte[], List<Cell>> familyToDelete = delete.getFamilyCellMap();
     if (familyToDelete.isEmpty()) {
       // perform a row delete is we are using row-level conflict detection
-      if (conflictLevel == TxConstants.ConflictDetection.ROW) {
+      if (conflictLevel == TxConstants.ConflictDetection.ROW ||
+          conflictLevel == TxConstants.ConflictDetection.NONE) {
         // no need to identify individual columns deleted
         addToChangeSet(deleteRow, null, null);
       } else {
@@ -575,7 +577,8 @@ public class TransactionAwareHTable extends AbstractTransactionAwareTable
           isFamilyDelete = CellUtil.isDeleteFamily(cell);
         }
         if (isFamilyDelete) {
-          if (conflictLevel == TxConstants.ConflictDetection.ROW) {
+          if (conflictLevel == TxConstants.ConflictDetection.ROW ||
+              conflictLevel == TxConstants.ConflictDetection.NONE) {
             // no need to identify individual columns deleted
             txDelete.deleteFamily(family);
             addToChangeSet(deleteRow, null, null);

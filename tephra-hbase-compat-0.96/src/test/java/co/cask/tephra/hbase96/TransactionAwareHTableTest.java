@@ -15,6 +15,7 @@
  */
 package co.cask.tephra.hbase96;
 
+import co.cask.tephra.Transaction;
 import co.cask.tephra.TransactionConflictException;
 import co.cask.tephra.TransactionContext;
 import co.cask.tephra.TransactionManager;
@@ -689,5 +690,65 @@ public class TransactionAwareHTableTest {
     assertTrue(changeSet.contains(txTable1.getChangeKey(row1, null, null)));
     assertTrue(changeSet.contains(txTable1.getChangeKey(row2, null, null)));
     txContext1.finish();
+  }
+
+  @Test
+  public void testNoneLevelConflictDetection() throws Exception {
+    InMemoryTxSystemClient txClient = new InMemoryTxSystemClient(txManager);
+    TransactionAwareHTable txTable1 = new TransactionAwareHTable(new HTable(conf, TestBytes.table),
+        TxConstants.ConflictDetection.NONE);
+    TransactionContext txContext1 = new TransactionContext(txClient, txTable1);
+
+    TransactionAwareHTable txTable2 = new TransactionAwareHTable(new HTable(conf, TestBytes.table),
+        TxConstants.ConflictDetection.NONE);
+    TransactionContext txContext2 = new TransactionContext(txClient, txTable2);
+
+    // overlapping writes to the same row + column should not conflict
+
+    txContext1.start();
+    txTable1.put(new Put(TestBytes.row).add(TestBytes.family, TestBytes.qualifier, TestBytes.value));
+
+    // changes should not be visible yet
+    txContext2.start();
+    Result row = txTable2.get(new Get(TestBytes.row));
+    assertTrue(row.isEmpty());
+
+    txTable2.put(new Put(TestBytes.row).add(TestBytes.family, TestBytes.qualifier, TestBytes.value2));
+
+    // both commits should succeed
+    txContext1.finish();
+    txContext2.finish();
+
+    txContext1.start();
+    row = txTable1.get(new Get(TestBytes.row));
+    assertFalse(row.isEmpty());
+    assertArrayEquals(TestBytes.value2, row.getValue(TestBytes.family, TestBytes.qualifier));
+    txContext1.finish();
+
+    // transaction abort should still rollback changes
+
+    txContext1.start();
+    txTable1.put(new Put(TestBytes.row2).add(TestBytes.family, TestBytes.qualifier, TestBytes.value));
+    txContext1.abort();
+
+    // changes to row2 should be rolled back
+    txContext2.start();
+    Result row2 = txTable2.get(new Get(TestBytes.row2));
+    assertTrue(row2.isEmpty());
+    txContext2.finish();
+
+    // transaction invalidate should still make changes invisible
+
+    txContext1.start();
+    Transaction tx1 = txContext1.getCurrentTransaction();
+    txTable1.put(new Put(TestBytes.row3).add(TestBytes.family, TestBytes.qualifier, TestBytes.value));
+    assertNotNull(tx1);
+    txClient.invalidate(tx1.getWritePointer());
+
+    // changes to row2 should be rolled back
+    txContext2.start();
+    Result row3 = txTable2.get(new Get(TestBytes.row3));
+    assertTrue(row3.isEmpty());
+    txContext2.finish();
   }
 }

@@ -29,8 +29,10 @@ public class TxConstants {
    * Defines what level of conflict detection should be used for transactions.  {@code ROW} means that only the
    * table name and row key for each change will be used to determine if the transaction change sets conflict.
    * {@code COLUMN} means that the table name, row key, column family, and column qualifier will all be used to
-   * identify write conflicts.  The default value used by {@code TransactionAwareHTable} implementations is
-   * {@code COLUMN}.
+   * identify write conflicts.  {@code NONE} means that no conflict detection will be performed, but transaction
+   * clients will still track the current transaction's change set to rollback any persisted changes in the event of
+   * a failure.  This should only be used where writes to the same coordinate should never conflict, such as
+   * append-only data.  The default value used by {@code TransactionAwareHTable} implementations is {@code COLUMN}.
    *
    * <p>
    * <strong>Note: for a given table, all clients must use the same conflict detection setting!</strong>
@@ -39,11 +41,12 @@ public class TxConstants {
    */
   public enum ConflictDetection {
     ROW,
-    COLUMN
+    COLUMN,
+    NONE
   }
 
   /**
-   * property set for {@code org.apache.hadoop.hbase.HColumnDescriptor} to configure time-to-live on data within
+   * Property set for {@code org.apache.hadoop.hbase.HColumnDescriptor} to configure time-to-live on data within
    * the column family.  The value given is in milliseconds.  Once a cell's data has surpassed the given value in age,
    * the cell's data will no longer be visible and may be garbage collected.
    */
