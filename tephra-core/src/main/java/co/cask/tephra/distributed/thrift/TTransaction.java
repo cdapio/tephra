@@ -57,6 +57,7 @@ public class TTransaction implements org.apache.thrift.TBase<TTransaction, TTran
   private static final org.apache.thrift.protocol.TField TYPE_FIELD_DESC = new org.apache.thrift.protocol.TField("type", org.apache.thrift.protocol.TType.I32, (short)6);
   private static final org.apache.thrift.protocol.TField WRITE_POINTER_FIELD_DESC = new org.apache.thrift.protocol.TField("writePointer", org.apache.thrift.protocol.TType.I64, (short)7);
   private static final org.apache.thrift.protocol.TField CHECKPOINT_WRITE_POINTERS_FIELD_DESC = new org.apache.thrift.protocol.TField("checkpointWritePointers", org.apache.thrift.protocol.TType.LIST, (short)8);
+  private static final org.apache.thrift.protocol.TField VISIBILITY_LEVEL_FIELD_DESC = new org.apache.thrift.protocol.TField("visibilityLevel", org.apache.thrift.protocol.TType.I32, (short)9);
 
   private static final Map<Class<? extends IScheme>, SchemeFactory> schemes = new HashMap<Class<? extends IScheme>, SchemeFactory>();
   static {
@@ -76,6 +77,11 @@ public class TTransaction implements org.apache.thrift.TBase<TTransaction, TTran
   public TTransactionType type; // required
   public long writePointer; // required
   public List<Long> checkpointWritePointers; // required
+  /**
+   * 
+   * @see TVisibilityLevel
+   */
+  public TVisibilityLevel visibilityLevel; // required
 
   /** The set of fields this struct contains, along with convenience methods for finding and manipulating them. */
   public enum _Fields implements org.apache.thrift.TFieldIdEnum {
@@ -90,7 +96,12 @@ public class TTransaction implements org.apache.thrift.TBase<TTransaction, TTran
      */
     TYPE((short)6, "type"),
     WRITE_POINTER((short)7, "writePointer"),
-    CHECKPOINT_WRITE_POINTERS((short)8, "checkpointWritePointers");
+    CHECKPOINT_WRITE_POINTERS((short)8, "checkpointWritePointers"),
+    /**
+     * 
+     * @see TVisibilityLevel
+     */
+    VISIBILITY_LEVEL((short)9, "visibilityLevel");
 
     private static final Map<String, _Fields> byName = new HashMap<String, _Fields>();
 
@@ -121,6 +132,8 @@ public class TTransaction implements org.apache.thrift.TBase<TTransaction, TTran
           return WRITE_POINTER;
         case 8: // CHECKPOINT_WRITE_POINTERS
           return CHECKPOINT_WRITE_POINTERS;
+        case 9: // VISIBILITY_LEVEL
+          return VISIBILITY_LEVEL;
         default:
           return null;
       }
@@ -188,6 +201,8 @@ public class TTransaction implements org.apache.thrift.TBase<TTransaction, TTran
     tmpMap.put(_Fields.CHECKPOINT_WRITE_POINTERS, new org.apache.thrift.meta_data.FieldMetaData("checkpointWritePointers", org.apache.thrift.TFieldRequirementType.DEFAULT, 
         new org.apache.thrift.meta_data.ListMetaData(org.apache.thrift.protocol.TType.LIST, 
             new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.I64))));
+    tmpMap.put(_Fields.VISIBILITY_LEVEL, new org.apache.thrift.meta_data.FieldMetaData("visibilityLevel", org.apache.thrift.TFieldRequirementType.DEFAULT, 
+        new org.apache.thrift.meta_data.EnumMetaData(org.apache.thrift.protocol.TType.ENUM, TVisibilityLevel.class)));
     metaDataMap = Collections.unmodifiableMap(tmpMap);
     org.apache.thrift.meta_data.FieldMetaData.addStructMetaDataMap(TTransaction.class, metaDataMap);
   }
@@ -203,7 +218,8 @@ public class TTransaction implements org.apache.thrift.TBase<TTransaction, TTran
     long firstShort,
     TTransactionType type,
     long writePointer,
-    List<Long> checkpointWritePointers)
+    List<Long> checkpointWritePointers,
+    TVisibilityLevel visibilityLevel)
   {
     this();
     this.transactionId = transactionId;
@@ -218,6 +234,7 @@ public class TTransaction implements org.apache.thrift.TBase<TTransaction, TTran
     this.writePointer = writePointer;
     setWritePointerIsSet(true);
     this.checkpointWritePointers = checkpointWritePointers;
+    this.visibilityLevel = visibilityLevel;
   }
 
   /**
@@ -253,6 +270,9 @@ public class TTransaction implements org.apache.thrift.TBase<TTransaction, TTran
       }
       this.checkpointWritePointers = __this__checkpointWritePointers;
     }
+    if (other.isSetVisibilityLevel()) {
+      this.visibilityLevel = other.visibilityLevel;
+    }
   }
 
   public TTransaction deepCopy() {
@@ -273,6 +293,7 @@ public class TTransaction implements org.apache.thrift.TBase<TTransaction, TTran
     setWritePointerIsSet(false);
     this.writePointer = 0;
     this.checkpointWritePointers = null;
+    this.visibilityLevel = null;
   }
 
   public long getTransactionId() {
@@ -516,6 +537,38 @@ public class TTransaction implements org.apache.thrift.TBase<TTransaction, TTran
     }
   }
 
+  /**
+   * 
+   * @see TVisibilityLevel
+   */
+  public TVisibilityLevel getVisibilityLevel() {
+    return this.visibilityLevel;
+  }
+
+  /**
+   * 
+   * @see TVisibilityLevel
+   */
+  public TTransaction setVisibilityLevel(TVisibilityLevel visibilityLevel) {
+    this.visibilityLevel = visibilityLevel;
+    return this;
+  }
+
+  public void unsetVisibilityLevel() {
+    this.visibilityLevel = null;
+  }
+
+  /** Returns true if field visibilityLevel is set (has been assigned a value) and false otherwise */
+  public boolean isSetVisibilityLevel() {
+    return this.visibilityLevel != null;
+  }
+
+  public void setVisibilityLevelIsSet(boolean value) {
+    if (!value) {
+      this.visibilityLevel = null;
+    }
+  }
+
   public void setFieldValue(_Fields field, Object value) {
     switch (field) {
     case TRANSACTION_ID:
@@ -582,6 +635,14 @@ public class TTransaction implements org.apache.thrift.TBase<TTransaction, TTran
       }
       break;
 
+    case VISIBILITY_LEVEL:
+      if (value == null) {
+        unsetVisibilityLevel();
+      } else {
+        setVisibilityLevel((TVisibilityLevel)value);
+      }
+      break;
+
     }
   }
 
@@ -611,6 +672,9 @@ public class TTransaction implements org.apache.thrift.TBase<TTransaction, TTran
     case CHECKPOINT_WRITE_POINTERS:
       return getCheckpointWritePointers();
 
+    case VISIBILITY_LEVEL:
+      return getVisibilityLevel();
+
     }
     throw new IllegalStateException();
   }
@@ -638,6 +702,8 @@ public class TTransaction implements org.apache.thrift.TBase<TTransaction, TTran
       return isSetWritePointer();
     case CHECKPOINT_WRITE_POINTERS:
       return isSetCheckpointWritePointers();
+    case VISIBILITY_LEVEL:
+      return isSetVisibilityLevel();
     }
     throw new IllegalStateException();
   }
@@ -724,6 +790,15 @@ public class TTransaction implements org.apache.thrift.TBase<TTransaction, TTran
       if (!(this_present_checkpointWritePointers && that_present_checkpointWritePointers))
         return false;
       if (!this.checkpointWritePointers.equals(that.checkpointWritePointers))
+        return false;
+    }
+
+    boolean this_present_visibilityLevel = true && this.isSetVisibilityLevel();
+    boolean that_present_visibilityLevel = true && that.isSetVisibilityLevel();
+    if (this_present_visibilityLevel || that_present_visibilityLevel) {
+      if (!(this_present_visibilityLevel && that_present_visibilityLevel))
+        return false;
+      if (!this.visibilityLevel.equals(that.visibilityLevel))
         return false;
     }
 
@@ -823,6 +898,16 @@ public class TTransaction implements org.apache.thrift.TBase<TTransaction, TTran
         return lastComparison;
       }
     }
+    lastComparison = Boolean.valueOf(isSetVisibilityLevel()).compareTo(typedOther.isSetVisibilityLevel());
+    if (lastComparison != 0) {
+      return lastComparison;
+    }
+    if (isSetVisibilityLevel()) {
+      lastComparison = org.apache.thrift.TBaseHelper.compareTo(this.visibilityLevel, typedOther.visibilityLevel);
+      if (lastComparison != 0) {
+        return lastComparison;
+      }
+    }
     return 0;
   }
 
@@ -888,6 +973,14 @@ public class TTransaction implements org.apache.thrift.TBase<TTransaction, TTran
       sb.append("null");
     } else {
       sb.append(this.checkpointWritePointers);
+    }
+    first = false;
+    if (!first) sb.append(", ");
+    sb.append("visibilityLevel:");
+    if (this.visibilityLevel == null) {
+      sb.append("null");
+    } else {
+      sb.append(this.visibilityLevel);
     }
     first = false;
     sb.append(")");
@@ -1029,6 +1122,14 @@ public class TTransaction implements org.apache.thrift.TBase<TTransaction, TTran
               org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
             }
             break;
+          case 9: // VISIBILITY_LEVEL
+            if (schemeField.type == org.apache.thrift.protocol.TType.I32) {
+              struct.visibilityLevel = TVisibilityLevel.findByValue(iprot.readI32());
+              struct.setVisibilityLevelIsSet(true);
+            } else { 
+              org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
+            }
+            break;
           default:
             org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
         }
@@ -1097,6 +1198,11 @@ public class TTransaction implements org.apache.thrift.TBase<TTransaction, TTran
         }
         oprot.writeFieldEnd();
       }
+      if (struct.visibilityLevel != null) {
+        oprot.writeFieldBegin(VISIBILITY_LEVEL_FIELD_DESC);
+        oprot.writeI32(struct.visibilityLevel.getValue());
+        oprot.writeFieldEnd();
+      }
       oprot.writeFieldStop();
       oprot.writeStructEnd();
     }
@@ -1139,7 +1245,10 @@ public class TTransaction implements org.apache.thrift.TBase<TTransaction, TTran
       if (struct.isSetCheckpointWritePointers()) {
         optionals.set(7);
       }
-      oprot.writeBitSet(optionals, 8);
+      if (struct.isSetVisibilityLevel()) {
+        optionals.set(8);
+      }
+      oprot.writeBitSet(optionals, 9);
       if (struct.isSetTransactionId()) {
         oprot.writeI64(struct.transactionId);
       }
@@ -1182,12 +1291,15 @@ public class TTransaction implements org.apache.thrift.TBase<TTransaction, TTran
           }
         }
       }
+      if (struct.isSetVisibilityLevel()) {
+        oprot.writeI32(struct.visibilityLevel.getValue());
+      }
     }
 
     @Override
     public void read(org.apache.thrift.protocol.TProtocol prot, TTransaction struct) throws org.apache.thrift.TException {
       TTupleProtocol iprot = (TTupleProtocol) prot;
-      BitSet incoming = iprot.readBitSet(8);
+      BitSet incoming = iprot.readBitSet(9);
       if (incoming.get(0)) {
         struct.transactionId = iprot.readI64();
         struct.setTransactionIdIsSet(true);
@@ -1246,6 +1358,10 @@ public class TTransaction implements org.apache.thrift.TBase<TTransaction, TTran
           }
         }
         struct.setCheckpointWritePointersIsSet(true);
+      }
+      if (incoming.get(8)) {
+        struct.visibilityLevel = TVisibilityLevel.findByValue(iprot.readI32());
+        struct.setVisibilityLevelIsSet(true);
       }
     }
   }

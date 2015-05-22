@@ -792,19 +792,16 @@ public class TransactionAwareHTableTest {
     verifyRow(transactionAwareHTable, TestBytes.row3, TestBytes.value);
 
     // when disabling current write pointer, only the previous checkpoints should be visible
+    transactionContext.getCurrentTransaction().setVisibility(Transaction.VisibilityLevel.SNAPSHOT_EXCLUDE_CURRENT);
     Get get = new Get(TestBytes.row);
-    get.setAttribute(TxConstants.TX_EXCLUDE_CURRENT_WRITE, new byte[]{ (byte) 1 });
     verifyRow(transactionAwareHTable, get, TestBytes.value);
     get = new Get(TestBytes.row2);
-    get.setAttribute(TxConstants.TX_EXCLUDE_CURRENT_WRITE, new byte[]{ (byte) 1 });
     verifyRow(transactionAwareHTable, get, TestBytes.value2);
     get = new Get(TestBytes.row3);
-    get.setAttribute(TxConstants.TX_EXCLUDE_CURRENT_WRITE, new byte[]{ (byte) 1 });
     verifyRow(transactionAwareHTable, get, null);
 
     // test scan results excluding current write pointer
     Scan scan = new Scan();
-    scan.setAttribute(TxConstants.TX_EXCLUDE_CURRENT_WRITE, new byte[]{ (byte) 1 });
     ResultScanner scanner = transactionAwareHTable.getScanner(scan);
 
     Result row = scanner.next();
@@ -822,6 +819,7 @@ public class TransactionAwareHTableTest {
     row = scanner.next();
     assertNull(row);
     scanner.close();
+    transactionContext.getCurrentTransaction().setVisibility(Transaction.VisibilityLevel.SNAPSHOT);
 
     // check that writes are still not visible to other clients
     TransactionAwareHTable txTable2 = new TransactionAwareHTable(new HTable(conf, TestBytes.table));

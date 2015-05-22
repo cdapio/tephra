@@ -33,11 +33,35 @@ public class Transaction {
   private final TransactionType type;
   private final long[] checkpointWritePointers;
 
+  private VisibilityLevel visibilityLevel = VisibilityLevel.SNAPSHOT;
+
   private static final long[] NO_EXCLUDES = { };
   public static final long NO_TX_IN_PROGRESS = Long.MAX_VALUE;
 
   public static final Transaction ALL_VISIBLE_LATEST =
     new Transaction(Long.MAX_VALUE, Long.MAX_VALUE, NO_EXCLUDES, NO_EXCLUDES, NO_TX_IN_PROGRESS, TransactionType.SHORT);
+
+  /**
+   * Defines the possible visibility levels for read operations.
+   *
+   * <p>
+   * <ul>
+   *   <li><code>SNAPSHOT</code> - uses the transaction's read snapshot, plus includes all write pointers from the
+   *       current transaction</li>
+   *   <li><code>SNAPSHOT_EXCLUDE_CURRENT</code> - uses the transaction's read snapshot, plus includes all write
+   *       pointers from the current transaction, <strong>except</strong> the current write pointer
+   *       (see {@link #getWritePointer()})</li>
+   * </ul>
+   * </p>
+   *
+   * <p>The default value used is {@code SNAPSHOT}.</p>
+   *
+   * @see #setVisibility(VisibilityLevel)
+   */
+  public enum VisibilityLevel {
+    SNAPSHOT,
+    SNAPSHOT_EXCLUDE_CURRENT
+  }
 
   /**
    * Creates a new short transaction.
@@ -63,7 +87,8 @@ public class Transaction {
    */
   public Transaction(long readPointer, long txId, long[] invalids, long[] inProgress,
                      long firstShortInProgress, TransactionType type) {
-    this(readPointer, txId, txId, invalids, inProgress, firstShortInProgress, type, new long[0]);
+    this(readPointer, txId, txId, invalids, inProgress, firstShortInProgress, type, new long[0],
+        VisibilityLevel.SNAPSHOT);
   }
 
   /**
@@ -78,9 +103,11 @@ public class Transaction {
    * @param firstShortInProgress earliest in-progress short transaction
    * @param type transaction type
    * @param checkpointPointers the list of writer pointers added from checkpoints on the transaction
+   * @param visibilityLevel the visibility level to use for transactional reads
    */
   public Transaction(long readPointer, long txId, long writePointer, long[] invalids, long[] inProgress,
-                     long firstShortInProgress, TransactionType type, long[] checkpointPointers) {
+                     long firstShortInProgress, TransactionType type, long[] checkpointPointers,
+                     VisibilityLevel visibilityLevel) {
     this.readPointer = readPointer;
     this.txId = txId;
     this.writePointer = writePointer;
@@ -89,6 +116,7 @@ public class Transaction {
     this.firstShortInProgress = firstShortInProgress;
     this.type = type;
     this.checkpointWritePointers = checkpointPointers;
+    this.visibilityLevel = visibilityLevel;
   }
 
   /**
@@ -101,7 +129,8 @@ public class Transaction {
    */
   public Transaction(Transaction toCopy, long writePointer, long[] checkpointPointers) {
     this(toCopy.getReadPointer(), toCopy.getTransactionId(), writePointer, toCopy.getInvalids(),
-        toCopy.getInProgress(), toCopy.getFirstShortInProgress(), toCopy.getType(), checkpointPointers);
+        toCopy.getInProgress(), toCopy.getFirstShortInProgress(), toCopy.getType(), checkpointPointers,
+        toCopy.getVisibilityLevel());
   }
 
   public long getReadPointer() {
@@ -190,27 +219,27 @@ public class Transaction {
    * @param version the data version to check for visibility
    * @return true if the version is visible, false if it should be hidden (filtered)
    *
-   * @see #isVisible(long, boolean) to exclude the current write pointer from visible versions.  This method always
-   *      includes the current write pointer.
+   * @see #setVisibility(VisibilityLevel) to control whether the current write pointer is visible.
    */
   public boolean isVisible(long version) {
-    return isVisible(version, true);
-  }
-
-  /**
-   * Returns whether or not the given version should be visible to the current transaction.  A version will be visible
-   * if it was successfully committed prior to the current transaction starting, or was written by the current
-   * transaction (using either the current write pointer or the write pointer from a prior checkpoint).
-   *
-   * @param version the data version to check for visibility
-   * @param excludeCurrentWritePointer whether writes from the current write pointer should be visible
-   * @return true if the version is visible, false if it should be hidden (filtered)
-   */
-  public boolean isVisible(long version, boolean excludeCurrentWritePointer) {
     // either it was committed before or the change belongs to current tx
     return (version <= getReadPointer() && !isExcluded(version)) ||
         ((txId == version || isCheckpoint(version)) &&
-            (!excludeCurrentWritePointer || writePointer != version));
+            (visibilityLevel == VisibilityLevel.SNAPSHOT || writePointer != version));
+  }
+
+  /**
+   * Sets the visibility level for read operations.
+   */
+  public void setVisibility(VisibilityLevel level) {
+    this.visibilityLevel = level;
+  }
+
+  /**
+   * Returns the currently set visibility level.
+   */
+  public VisibilityLevel getVisibilityLevel() {
+    return visibilityLevel;
   }
 
   public boolean hasExcludes() {
@@ -244,6 +273,7 @@ public class Transaction {
       .append(", firstShortInProgress: ").append(firstShortInProgress)
       .append(", type: ").append(type)
       .append(", checkpointWritePointers: ").append(Arrays.toString(checkpointWritePointers))
+      .append(", visibilityLevel: ").append(visibilityLevel)
       .append('}')
       .toString();
   }

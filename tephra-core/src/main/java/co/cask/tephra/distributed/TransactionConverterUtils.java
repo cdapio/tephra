@@ -20,6 +20,7 @@ import co.cask.tephra.Transaction;
 import co.cask.tephra.TransactionType;
 import co.cask.tephra.distributed.thrift.TTransaction;
 import co.cask.tephra.distributed.thrift.TTransactionType;
+import co.cask.tephra.distributed.thrift.TVisibilityLevel;
 import com.google.common.primitives.Longs;
 
 /**
@@ -31,14 +32,16 @@ public final class TransactionConverterUtils {
     return new TTransaction(tx.getTransactionId(), tx.getReadPointer(),
                             Longs.asList(tx.getInvalids()), Longs.asList(tx.getInProgress()),
                             tx.getFirstShortInProgress(), getTTransactionType(tx.getType()),
-                            tx.getWritePointer(), Longs.asList(tx.getCheckpointWritePointers()));
+                            tx.getWritePointer(), Longs.asList(tx.getCheckpointWritePointers()),
+                            getTVisibilityLevel(tx.getVisibilityLevel()));
   }
 
   public static Transaction unwrap(TTransaction thriftTx) {
     return new Transaction(thriftTx.getReadPointer(), thriftTx.getTransactionId(), thriftTx.getWritePointer(),
                            Longs.toArray(thriftTx.getInvalids()), Longs.toArray(thriftTx.getInProgress()),
                            thriftTx.getFirstShort(), getTransactionType(thriftTx.getType()),
-                           Longs.toArray(thriftTx.getCheckpointWritePointers()));
+                           Longs.toArray(thriftTx.getCheckpointWritePointers()),
+                           getVisibilityLevel(thriftTx.getVisibilityLevel()));
   }
 
   private static TransactionType getTransactionType(TTransactionType tType) {
@@ -47,5 +50,27 @@ public final class TransactionConverterUtils {
 
   private static TTransactionType getTTransactionType(TransactionType type) {
     return type == TransactionType.SHORT ? TTransactionType.SHORT : TTransactionType.LONG;
+  }
+
+  private static Transaction.VisibilityLevel getVisibilityLevel(TVisibilityLevel tLevel) {
+    switch (tLevel) {
+      case SNAPSHOT:
+        return Transaction.VisibilityLevel.SNAPSHOT;
+      case SNAPSHOT_EXCLUDE_CURRENT:
+        return Transaction.VisibilityLevel.SNAPSHOT_EXCLUDE_CURRENT;
+      default:
+        throw new IllegalArgumentException("Unknown TVisibilityLevel: " + tLevel);
+    }
+  }
+
+  private static TVisibilityLevel getTVisibilityLevel(Transaction.VisibilityLevel level) {
+    switch (level) {
+      case SNAPSHOT:
+        return TVisibilityLevel.SNAPSHOT;
+      case SNAPSHOT_EXCLUDE_CURRENT:
+        return TVisibilityLevel.SNAPSHOT_EXCLUDE_CURRENT;
+      default:
+        throw new IllegalArgumentException("Unknown VisibilityLevel: " + level);
+    }
   }
 }

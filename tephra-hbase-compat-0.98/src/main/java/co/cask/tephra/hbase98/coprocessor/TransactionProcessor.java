@@ -149,13 +149,10 @@ public class TransactionProcessor extends BaseRegionObserver {
     throws IOException {
     Transaction tx = getFromOperation(get);
     if (tx != null) {
-      boolean excludeCurrentWritePtr = isAttributeSet(get, TxConstants.TX_EXCLUDE_CURRENT_WRITE);
-
       projectFamilyDeletes(get);
       get.setMaxVersions();
       get.setTimeRange(TxUtils.getOldestVisibleTimestamp(ttlByFamily, tx), TxUtils.getMaxVisibleTimestamp(tx));
-      Filter newFilter = Filters.combine(getTransactionFilter(tx, ScanType.USER_SCAN, excludeCurrentWritePtr),
-          get.getFilter());
+      Filter newFilter = Filters.combine(getTransactionFilter(tx, ScanType.USER_SCAN), get.getFilter());
       get.setFilter(newFilter);
     }
   }
@@ -203,13 +200,10 @@ public class TransactionProcessor extends BaseRegionObserver {
     throws IOException {
     Transaction tx = getFromOperation(scan);
     if (tx != null) {
-      boolean excludeCurrentWritePtr = isAttributeSet(scan, TxConstants.TX_EXCLUDE_CURRENT_WRITE);
-
       projectFamilyDeletes(scan);
       scan.setMaxVersions();
       scan.setTimeRange(TxUtils.getOldestVisibleTimestamp(ttlByFamily, tx), TxUtils.getMaxVisibleTimestamp(tx));
-      Filter newFilter = Filters.combine(getTransactionFilter(tx, ScanType.USER_SCAN, excludeCurrentWritePtr),
-          scan.getFilter());
+      Filter newFilter = Filters.combine(getTransactionFilter(tx, ScanType.USER_SCAN), scan.getFilter());
       scan.setFilter(newFilter);
     }
     return s;
@@ -287,7 +281,7 @@ public class TransactionProcessor extends BaseRegionObserver {
     scan.setFilter(
         new IncludeInProgressFilter(dummyTx.getVisibilityUpperBound(),
             snapshot.getInvalid(),
-            getTransactionFilter(dummyTx, type, false)));
+            getTransactionFilter(dummyTx, type)));
 
     return new StoreScanner(store, store.getScanInfo(), scan, scanners,
                             type, store.getSmallestReadPoint(), earliestPutTs);
@@ -301,11 +295,6 @@ public class TransactionProcessor extends BaseRegionObserver {
     return null;
   }
 
-  private boolean isAttributeSet(OperationWithAttributes op, String attribute) {
-    byte[] attributeValue = op.getAttribute(attribute);
-    return attributeValue != null;
-  }
-
   /**
    * Derived classes can override this method to customize the filter used to return data visible for the current
    * transaction.
@@ -313,8 +302,8 @@ public class TransactionProcessor extends BaseRegionObserver {
    * @param tx the current transaction to apply
    * @param type the type of scan being performed
    */
-  protected Filter getTransactionFilter(Transaction tx, ScanType type, boolean excludeCurrentWritePtr) {
-    return new TransactionVisibilityFilter(tx, ttlByFamily, allowEmptyValues, type, null, excludeCurrentWritePtr);
+  protected Filter getTransactionFilter(Transaction tx, ScanType type) {
+    return new TransactionVisibilityFilter(tx, ttlByFamily, allowEmptyValues, type);
   }
 
   /**

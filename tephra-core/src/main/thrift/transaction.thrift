@@ -19,6 +19,11 @@ enum TTransactionType {
   LONG = 2
 }
 
+enum TVisibilityLevel {
+  SNAPSHOT = 1,
+  SNAPSHOT_EXCLUDE_CURRENT = 2
+}
+
 struct TTransaction {
   1: i64 transactionId,
   2: i64 readPointer,
@@ -28,6 +33,7 @@ struct TTransaction {
   6: TTransactionType type,
   7: i64 writePointer,
   8: list<i64> checkpointWritePointers,
+  9: TVisibilityLevel visibilityLevel
 }
 
 exception TTransactionNotInProgressException {

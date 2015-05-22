@@ -97,11 +97,6 @@ public class TxConstants {
    */
   public static final byte[] FAMILY_DELETE_QUALIFIER = new byte[0];
 
-  /**
-   * Attribute key used to exclude the transaction's current write pointer from reads.
-   */
-  public static final String TX_EXCLUDE_CURRENT_WRITE = "cask.tx.exclude.current";
-
   // Constants for monitoring status
   public static final String STATUS_OK = "OK";
   public static final String STATUS_NOTOK = "NOTOK";
