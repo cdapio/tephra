@@ -18,6 +18,8 @@ package co.cask.tephra;
 
 import co.cask.tephra.snapshot.DefaultSnapshotCodec;
 import co.cask.tephra.snapshot.SnapshotCodecV2;
+import co.cask.tephra.snapshot.SnapshotCodecV3;
+import co.cask.tephra.snapshot.SnapshotCodecV4;
 
 import java.util.concurrent.TimeUnit;
 
@@ -305,7 +307,7 @@ public class TxConstants {
      */
     public static final String CFG_TX_SNAPHOT_CODEC_CLASSES = "data.tx.snapshot.codecs";
     public static final Class[] DEFAULT_TX_SNAPHOT_CODEC_CLASSES = 
-      { DefaultSnapshotCodec.class, SnapshotCodecV2.class };
+      { DefaultSnapshotCodec.class, SnapshotCodecV2.class, SnapshotCodecV3.class, SnapshotCodecV4.class };
   }
 
 }

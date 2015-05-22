@@ -19,6 +19,7 @@ package co.cask.tephra.inmemory;
 import co.cask.tephra.InvalidTruncateTimeException;
 import co.cask.tephra.Transaction;
 import co.cask.tephra.TransactionCouldNotTakeSnapshotException;
+import co.cask.tephra.TransactionNotInProgressException;
 import co.cask.tephra.TransactionSystemClient;
 import co.cask.tephra.TransactionType;
 import co.cask.tephra.TxConstants;
@@ -70,6 +71,11 @@ public class MinimalTxSystemClient implements TransactionSystemClient {
   @Override
   public boolean invalidate(long tx) {
     return true;
+  }
+
+  @Override
+  public Transaction checkpoint(Transaction tx) throws TransactionNotInProgressException {
+    return tx;
   }
 
   @Override

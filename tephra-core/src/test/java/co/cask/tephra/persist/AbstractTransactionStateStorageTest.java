@@ -163,19 +163,19 @@ public abstract class AbstractTransactionStateStorageTest {
       Assert.assertTrue(txManager.commit(tx2));
       // start another transaction, must be greater than tx3
       Transaction tx4 = txManager.startShort();
-      Assert.assertTrue(tx4.getWritePointer() > tx3.getWritePointer());
+      Assert.assertTrue(tx4.getTransactionId() > tx3.getTransactionId());
       // tx1 must be visble from tx2, but tx3 and tx4 must not
-      Assert.assertTrue(tx2.isVisible(tx1.getWritePointer()));
-      Assert.assertFalse(tx2.isVisible(tx3.getWritePointer()));
-      Assert.assertFalse(tx2.isVisible(tx4.getWritePointer()));
+      Assert.assertTrue(tx2.isVisible(tx1.getTransactionId()));
+      Assert.assertFalse(tx2.isVisible(tx3.getTransactionId()));
+      Assert.assertFalse(tx2.isVisible(tx4.getTransactionId()));
       // add same change for tx3
       Assert.assertFalse(txManager.canCommit(tx3, Collections.singleton(b)));
       // check visibility with new xaction
       Transaction tx5 = txManager.startShort();
-      Assert.assertTrue(tx5.isVisible(tx1.getWritePointer()));
-      Assert.assertTrue(tx5.isVisible(tx2.getWritePointer()));
-      Assert.assertFalse(tx5.isVisible(tx3.getWritePointer()));
-      Assert.assertFalse(tx5.isVisible(tx4.getWritePointer()));
+      Assert.assertTrue(tx5.isVisible(tx1.getTransactionId()));
+      Assert.assertTrue(tx5.isVisible(tx2.getTransactionId()));
+      Assert.assertFalse(tx5.isVisible(tx3.getTransactionId()));
+      Assert.assertFalse(tx5.isVisible(tx4.getTransactionId()));
       // can commit tx3?
       txManager.abort(tx3);
       txManager.abort(tx4);
@@ -204,7 +204,7 @@ public abstract class AbstractTransactionStateStorageTest {
 
       // get a new transaction and verify it is greater
       Transaction txAfter = txManager.startShort();
-      Assert.assertTrue(txAfter.getWritePointer() > tx.getWritePointer());
+      Assert.assertTrue(txAfter.getTransactionId() > tx.getTransactionId());
     } finally {
       if (storage != null) {
         storage.stopAndWait();
@@ -367,7 +367,7 @@ public abstract class AbstractTransactionStateStorageTest {
       long time1 = System.currentTimeMillis();
       long wp1 = time1 * TxConstants.MAX_TX_PER_MS;
       TransactionEdit edit1 = TransactionEdit.createStarted(wp1, wp1 - 10, time1 + 100000, TransactionType.LONG);
-      TransactionEdit edit2 = TransactionEdit.createAborted(wp1, TransactionType.LONG);
+      TransactionEdit edit2 = TransactionEdit.createAborted(wp1, TransactionType.LONG, null);
 
       long time2 = time1 + 100;
       long wp2 = time2 * TxConstants.MAX_TX_PER_MS;
@@ -378,7 +378,7 @@ public abstract class AbstractTransactionStateStorageTest {
       long wp3 = time3 * TxConstants.MAX_TX_PER_MS;
       TransactionEdit edit5 = TransactionEdit.createStarted(wp3, wp3 - 10, time3 + 100000, TransactionType.LONG);
       TransactionEdit edit6 = TransactionEdit.createInvalid(wp3);
-      TransactionEdit edit7 = TransactionEdit.createAborted(wp3, TransactionType.LONG);
+      TransactionEdit edit7 = TransactionEdit.createAborted(wp3, TransactionType.LONG, null);
       
       // write transaction edits
       TransactionLog log = storage.createLog(time1);
@@ -580,7 +580,7 @@ public abstract class AbstractTransactionStateStorageTest {
           edits.add(TransactionEdit.createInvalid(writePointer));
           break;
         case ABORTED:
-          edits.add(TransactionEdit.createAborted(writePointer, TransactionType.SHORT));
+          edits.add(TransactionEdit.createAborted(writePointer, TransactionType.SHORT, null));
           break;
         case MOVE_WATERMARK:
           edits.add(TransactionEdit.createMoveWatermark(writePointer));

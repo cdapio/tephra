@@ -25,7 +25,6 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.Cell;
 import org.apache.hadoop.hbase.CellUtil;
 import org.apache.hadoop.hbase.HTableDescriptor;
-import org.apache.hadoop.hbase.KeyValue;
 import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.client.Append;
 import org.apache.hadoop.hbase.client.Delete;
@@ -124,31 +123,38 @@ public class TransactionAwareHTable extends AbstractTransactionAwareTable
   @Override
   protected boolean doRollback() throws Exception {
     try {
-      List<Delete> rollbackDeletes = new ArrayList<Delete>(changeSet.size());
-      for (ActionChange change : changeSet) {
-        byte[] row = change.getRow();
-        byte[] family = change.getFamily();
-        byte[] qualifier = change.getQualifier();
-        long transactionTimestamp = tx.getWritePointer();
-        Delete rollbackDelete = new Delete(row);
-        rollbackDelete.setAttribute(TxConstants.TX_ROLLBACK_ATTRIBUTE_KEY, new byte[0]);
-        switch (conflictLevel) {
-          case ROW:
-          case NONE:
-            // issue family delete for the tx write pointer
-            rollbackDelete.deleteFamilyVersion(change.getFamily(), transactionTimestamp);
-            break;
-          case COLUMN:
-            if (family != null && qualifier == null) {
-              rollbackDelete.deleteFamilyVersion(family, transactionTimestamp);
-            } else if (family != null && qualifier != null) {
-              rollbackDelete.deleteColumn(family, qualifier, transactionTimestamp);
-            }
-            break;
-          default:
-            throw new IllegalStateException("Unknown conflict detection level: " + conflictLevel);
+      // pre-size arraylist of deletes
+      int size = 0;
+      for (Set<ActionChange> cs : changeSets.values()) {
+        size += cs.size();
+      }
+      List<Delete> rollbackDeletes = new ArrayList<Delete>(size);
+      for (Map.Entry<Long, Set<ActionChange>> entry : changeSets.entrySet()) {
+        long transactionTimestamp = entry.getKey();
+        for (ActionChange change : entry.getValue()) {
+          byte[] row = change.getRow();
+          byte[] family = change.getFamily();
+          byte[] qualifier = change.getQualifier();
+          Delete rollbackDelete = new Delete(row);
+          rollbackDelete.setAttribute(TxConstants.TX_ROLLBACK_ATTRIBUTE_KEY, new byte[0]);
+          switch (conflictLevel) {
+            case ROW:
+            case NONE:
+              // issue family delete for the tx write pointer
+              rollbackDelete.deleteFamilyVersion(change.getFamily(), transactionTimestamp);
+              break;
+            case COLUMN:
+              if (family != null && qualifier == null) {
+                rollbackDelete.deleteFamilyVersion(family, transactionTimestamp);
+              } else if (family != null && qualifier != null) {
+                rollbackDelete.deleteColumn(family, qualifier, transactionTimestamp);
+              }
+              break;
+            default:
+              throw new IllegalStateException("Unknown conflict detection level: " + conflictLevel);
+          }
+          rollbackDeletes.add(rollbackDelete);
         }
-        rollbackDeletes.add(rollbackDelete);
       }
       hTable.delete(rollbackDeletes);
       return true;
@@ -159,7 +165,7 @@ public class TransactionAwareHTable extends AbstractTransactionAwareTable
         LOG.error("Could not flush HTable commits", e);
       }
       tx = null;
-      changeSet.clear();
+      changeSets.clear();
     }
   }
 

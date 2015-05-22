@@ -22,6 +22,7 @@ import co.cask.tephra.TransactionCouldNotTakeSnapshotException;
 import co.cask.tephra.TransactionSystemClient;
 import co.cask.tephra.TransactionType;
 import co.cask.tephra.TxConstants;
+import it.unimi.dsi.fastutil.longs.LongArrayList;
 
 import java.io.InputStream;
 import java.util.Collection;
@@ -48,6 +49,14 @@ public class DetachedTxSystemClient implements TransactionSystemClient {
 
   @Override
   public Transaction startShort() {
+    long wp = getWritePointer();
+    // NOTE: -1 here is because we have logic that uses (readpointer + 1) as a "exclusive stop key" in some datasets
+    return new Transaction(
+      Long.MAX_VALUE - 1, wp, new long[0], new long[0],
+      Transaction.NO_TX_IN_PROGRESS, TransactionType.SHORT);
+  }
+
+  private long getWritePointer() {
     long wp = generator.incrementAndGet();
     // NOTE: using InMemoryTransactionManager.MAX_TX_PER_MS to be at least close to real one
     long now = System.currentTimeMillis();
@@ -58,10 +67,7 @@ public class DetachedTxSystemClient implements TransactionSystemClient {
         wp = advanced;
       }
     }
-    // NOTE: -1 here is because we have logic that uses (readpointer + 1) as a "exclusive stop key" in some datasets
-    return new Transaction(
-      Long.MAX_VALUE - 1, wp, new long[0], new long[0],
-      Transaction.NO_TX_IN_PROGRESS, TransactionType.SHORT);
+    return wp;
   }
 
   @Override
@@ -92,6 +98,14 @@ public class DetachedTxSystemClient implements TransactionSystemClient {
   @Override
   public boolean invalidate(long tx) {
     return true;
+  }
+
+  @Override
+  public Transaction checkpoint(Transaction tx) {
+    long newWritePointer = getWritePointer();
+    LongArrayList newCheckpointPointers = new LongArrayList(tx.getCheckpointWritePointers());
+    newCheckpointPointers.add(newWritePointer);
+    return new Transaction(tx, newWritePointer, newCheckpointPointers.toLongArray());
   }
 
   @Override

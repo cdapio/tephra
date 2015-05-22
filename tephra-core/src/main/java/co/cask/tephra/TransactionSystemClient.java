@@ -94,6 +94,14 @@ public interface TransactionSystemClient {
   boolean invalidate(long tx);
 
   /**
+   * Performs a checkpoint operation on the current transaction, returning a new Transaction instance with the
+   * updated state.  A checkpoint operation assigns a new write pointer for the current transaction.
+   * @param tx the current transaction to checkpoint
+   * @return an updated transaction instance with the new write pointer
+   */
+  Transaction checkpoint(Transaction tx) throws TransactionNotInProgressException;
+
+  /**
    * Retrieves the state of the transaction manager and send it as a stream. The snapshot will not be persisted.
    * @return an input stream containing an encoded snapshot of the transaction manager
    */

@@ -27,13 +27,13 @@ import java.util.Map;
 import java.util.HashMap;
 import org.apache.thrift.TEnum;
 
-public enum TTransactionType implements org.apache.thrift.TEnum {
-  SHORT(1),
-  LONG(2);
+public enum TVisibilityLevel implements org.apache.thrift.TEnum {
+  SNAPSHOT(1),
+  SNAPSHOT_EXCLUDE_CURRENT(2);
 
   private final int value;
 
-  private TTransactionType(int value) {
+  private TVisibilityLevel(int value) {
     this.value = value;
   }
 
@@ -48,12 +48,12 @@ public enum TTransactionType implements org.apache.thrift.TEnum {
    * Find a the enum type by its integer value, as defined in the Thrift IDL.
    * @return null if the value is not found.
    */
-  public static TTransactionType findByValue(int value) { 
+  public static TVisibilityLevel findByValue(int value) { 
     switch (value) {
       case 1:
-        return SHORT;
+        return SNAPSHOT;
       case 2:
-        return LONG;
+        return SNAPSHOT_EXCLUDE_CURRENT;
       default:
         return null;
     }

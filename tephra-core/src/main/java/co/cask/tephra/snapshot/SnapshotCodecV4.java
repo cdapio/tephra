@@ -28,16 +28,17 @@ import java.util.NavigableMap;
 /**
  * Handles serialization/deserialization of a {@link co.cask.tephra.persist.TransactionSnapshot}
  * and its elements to {@code byte[]}.
+ *
  */
-public class SnapshotCodecV2 extends DefaultSnapshotCodec {
+public class SnapshotCodecV4 extends SnapshotCodecV2 {
   @Override
   public int getVersion() {
-    return 2;
+    return 4;
   }
 
   @Override
   protected void encodeInProgress(BinaryEncoder encoder, Map<Long, TransactionManager.InProgressTx> inProgress)
-    throws IOException {
+      throws IOException {
 
     if (!inProgress.isEmpty()) {
       encoder.writeInt(inProgress.size());
@@ -46,6 +47,15 @@ public class SnapshotCodecV2 extends DefaultSnapshotCodec {
         encoder.writeLong(entry.getValue().getExpiration());
         encoder.writeLong(entry.getValue().getVisibilityUpperBound());
         encoder.writeInt(entry.getValue().getType().ordinal());
+        // write checkpoint tx IDs
+        LongArrayList checkpointPointers = entry.getValue().getCheckpointWritePointers();
+        if (checkpointPointers == null && !checkpointPointers.isEmpty()) {
+          encoder.writeInt(checkpointPointers.size());
+          for (int i = 0; i < checkpointPointers.size(); i++) {
+            encoder.writeLong(checkpointPointers.getLong(i));
+          }
+        }
+        encoder.writeInt(0);
       }
     }
     encoder.writeInt(0); // zero denotes end of list as per AVRO spec
@@ -53,7 +63,7 @@ public class SnapshotCodecV2 extends DefaultSnapshotCodec {
 
   @Override
   protected NavigableMap<Long, TransactionManager.InProgressTx> decodeInProgress(BinaryDecoder decoder)
-    throws IOException {
+      throws IOException {
 
     int size = decoder.readInt();
     NavigableMap<Long, TransactionManager.InProgressTx> inProgress = Maps.newTreeMap();
@@ -69,9 +79,17 @@ public class SnapshotCodecV2 extends DefaultSnapshotCodec {
         } catch (ArrayIndexOutOfBoundsException e) {
           throw new IOException("Type enum ordinal value is out of range: " + txTypeIdx);
         }
+        // read checkpoint tx IDs
+        int checkpointPointerSize = decoder.readInt();
+        LongArrayList checkpointPointers = new LongArrayList(checkpointPointerSize);
+        while (checkpointPointerSize != 0) {
+          for (int checkpointRemaining = checkpointPointerSize; checkpointRemaining > 0; --checkpointRemaining) {
+            checkpointPointers.add(decoder.readLong());
+          }
+          size = decoder.readInt();
+        }
         inProgress.put(txId,
-                       new TransactionManager.InProgressTx(visibilityUpperBound, expiration, txType,
-                           new LongArrayList()));
+            new TransactionManager.InProgressTx(visibilityUpperBound, expiration, txType, checkpointPointers));
       }
       size = decoder.readInt();
     }

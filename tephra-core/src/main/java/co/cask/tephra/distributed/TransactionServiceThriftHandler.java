@@ -1,5 +1,5 @@
 /*
- * Copyright © 2012-2014 Cask Data, Inc.
+ * Copyright © 2012-2015 Cask Data, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not
  * use this file except in compliance with the License. You may obtain a copy of
@@ -111,16 +111,6 @@ public class TransactionServiceThriftHandler implements TTransactionServer.Iface
   }
 
   @Override
-  public void init() throws Exception {
-    txManager.startAndWait();
-  }
-
-  @Override
-  public void destroy() throws Exception {
-    txManager.stopAndWait();
-  }
-
-  @Override
   public ByteBuffer getSnapshot() throws TException {
     try {
       ByteArrayOutputStream out = new ByteArrayOutputStream();
@@ -166,5 +156,27 @@ public class TransactionServiceThriftHandler implements TTransactionServer.Iface
   @Override
   public int invalidTxSize() throws TException {
     return txManager.getInvalidSize();
+  }
+
+  @Override
+  public TTransaction checkpoint(TTransaction originalTx) throws TException {
+    try {
+      return TransactionConverterUtils.wrap(
+          txManager.checkpoint(TransactionConverterUtils.unwrap(originalTx)));
+    } catch (TransactionNotInProgressException e) {
+      throw new TTransactionNotInProgressException(e.getMessage());
+    }
+  }
+
+  /* RPCServiceHandler implementation */
+
+  @Override
+  public void init() throws Exception {
+    txManager.startAndWait();
+  }
+
+  @Override
+  public void destroy() throws Exception {
+    txManager.stopAndWait();
   }
 }

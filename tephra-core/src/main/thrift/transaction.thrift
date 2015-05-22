@@ -19,13 +19,21 @@ enum TTransactionType {
   LONG = 2
 }
 
+enum TVisibilityLevel {
+  SNAPSHOT = 1,
+  SNAPSHOT_EXCLUDE_CURRENT = 2
+}
+
 struct TTransaction {
-  1: i64 writePointer,
+  1: i64 transactionId,
   2: i64 readPointer,
   3: list<i64> invalids,
   4: list<i64> inProgress,
   5: i64 firstShort,
   6: TTransactionType type,
+  7: i64 writePointer,
+  8: list<i64> checkpointWritePointers,
+  9: TVisibilityLevel visibilityLevel
 }
 
 exception TTransactionNotInProgressException {
@@ -60,4 +68,5 @@ service TTransactionServer {
   TBoolean truncateInvalidTx(1: set<i64> txns),
   TBoolean truncateInvalidTxBefore(1: i64 time) throws (1: TInvalidTruncateTimeException e),
   i32 invalidTxSize(),
+  TTransaction checkpoint(1: TTransaction tx) throws (1: TTransactionNotInProgressException e),
 }

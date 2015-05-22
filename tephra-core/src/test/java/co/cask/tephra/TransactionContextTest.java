@@ -498,6 +498,11 @@ public class TransactionContextTest {
     }
 
     @Override
+    public void updateTx(Transaction tx) {
+      this.tx = tx;
+    }
+
+    @Override
     public Collection<byte[]> getTxChanges() {
       checked = true;
       if (failChangesTxOnce == InduceFailure.ThrowException) {

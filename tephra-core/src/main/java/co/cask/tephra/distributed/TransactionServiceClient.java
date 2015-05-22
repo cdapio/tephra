@@ -99,7 +99,7 @@ public class TransactionServiceClient implements TransactionSystemClient {
       if (verbose) {
         LOG.info("Started tx details: " + tx.toString());
       } else {
-        LOG.info("Started tx: " + tx.getWritePointer() +
+        LOG.info("Started tx: " + tx.getTransactionId() +
                    ", readPointer: " + tx.getReadPointer() +
                    ", invalids: " + tx.getInvalids().length +
                    ", inProgress: " + tx.getInProgress().length);
@@ -374,6 +374,24 @@ public class TransactionServiceClient implements TransactionSystemClient {
             return client.invalidate(tx);
           }
         });
+    } catch (Exception e) {
+      throw Throwables.propagate(e);
+    }
+  }
+
+  @Override
+  public Transaction checkpoint(final Transaction tx) throws TransactionNotInProgressException {
+    try {
+      return this.execute(
+          new Operation<Transaction>("checkpoint") {
+            @Override
+            Transaction execute(TransactionServiceThriftClient client) throws Exception {
+              return client.checkpoint(tx);
+            }
+          }
+      );
+    } catch (TransactionNotInProgressException te) {
+      throw te;
     } catch (Exception e) {
       throw Throwables.propagate(e);
     }

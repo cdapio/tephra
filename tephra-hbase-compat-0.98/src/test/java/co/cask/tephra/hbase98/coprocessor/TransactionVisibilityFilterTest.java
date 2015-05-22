@@ -65,7 +65,7 @@ public class TransactionVisibilityFilterTest extends AbstractTransactionVisibili
 
     Transaction tx3 = txManager.startShort();
     Transaction tx4 = txManager.startShort();
-    txManager.invalidate(tx4.getWritePointer());
+    txManager.invalidate(tx4.getTransactionId());
 
     Transaction tx5 = txManager.startShort();
     assertTrue(txManager.canCommit(tx5, EMPTY_CHANGESET));
@@ -77,15 +77,15 @@ public class TransactionVisibilityFilterTest extends AbstractTransactionVisibili
     Filter filter = createFilter(tx6, ttls);
 
     assertEquals(Filter.ReturnCode.INCLUDE_AND_NEXT_COL,
-                 filter.filterKeyValue(newKeyValue("row1", "val1", tx6.getWritePointer())));
+                 filter.filterKeyValue(newKeyValue("row1", "val1", tx6.getTransactionId())));
     assertEquals(Filter.ReturnCode.INCLUDE_AND_NEXT_COL,
-                 filter.filterKeyValue(newKeyValue("row1", "val1", tx5.getWritePointer())));
+                 filter.filterKeyValue(newKeyValue("row1", "val1", tx5.getTransactionId())));
     assertEquals(Filter.ReturnCode.SKIP,
-                 filter.filterKeyValue(newKeyValue("row1", "val1", tx4.getWritePointer())));
+                 filter.filterKeyValue(newKeyValue("row1", "val1", tx4.getTransactionId())));
     assertEquals(Filter.ReturnCode.SKIP,
-                 filter.filterKeyValue(newKeyValue("row1", "val1", tx3.getWritePointer())));
+                 filter.filterKeyValue(newKeyValue("row1", "val1", tx3.getTransactionId())));
     assertEquals(Filter.ReturnCode.INCLUDE_AND_NEXT_COL,
-                 filter.filterKeyValue(newKeyValue("row1", "val1", tx2.getWritePointer())));
+                 filter.filterKeyValue(newKeyValue("row1", "val1", tx2.getTransactionId())));
   }
 
   /**

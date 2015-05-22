@@ -1,5 +1,5 @@
 /*
- * Copyright © 2012-2014 Cask Data, Inc.
+ * Copyright © 2012-2015 Cask Data, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not
  * use this file except in compliance with the License. You may obtain a copy of
@@ -518,12 +518,13 @@ public class TransactionManager extends AbstractService {
         // handle null expiration
         long newExpiration = getTxExpirationFromWritePointer(writePointer, defaultLongTimeout);
         InProgressTx compatTx =
-          new InProgressTx(entry.getValue().getVisibilityUpperBound(), newExpiration, TransactionType.LONG);
+          new InProgressTx(entry.getValue().getVisibilityUpperBound(), newExpiration, TransactionType.LONG,
+              entry.getValue().getCheckpointWritePointers());
         entry.setValue(compatTx);
       } else if (entry.getValue().getType() == null) {
         InProgressTx compatTx =
           new InProgressTx(entry.getValue().getVisibilityUpperBound(), entry.getValue().getExpiration(),
-                           TransactionType.SHORT);
+                           TransactionType.SHORT, entry.getValue().getCheckpointWritePointers());
         entry.setValue(compatTx);
       }
     }
@@ -613,7 +614,7 @@ public class TransactionManager extends AbstractService {
                   break;
                 }
               }
-              doAbort(edit.getWritePointer(), type);
+              doAbort(edit.getWritePointer(), edit.getCheckpointPointers(), type);
               break;
             case TRUNCATE_INVALID_TX:
               if (edit.getTruncateInvalidTxTime() != 0) {
@@ -621,6 +622,9 @@ public class TransactionManager extends AbstractService {
               } else {
                 doTruncateInvalidTx(edit.getTruncateInvalidTx());
               }
+              break;
+            case CHECKPOINT:
+              doCheckpoint(edit.getWritePointer(), edit.getParentWritePointer());
               break;
             default:
               // unknown type!
@@ -752,11 +756,11 @@ public class TransactionManager extends AbstractService {
         ensureAvailable();
         txid = getNextWritePointer();
         tx = createTransaction(txid, type);
-        addInProgressAndAdvance(tx.getWritePointer(), tx.getVisibilityUpperBound(), expiration, type);
+        addInProgressAndAdvance(tx.getTransactionId(), tx.getVisibilityUpperBound(), expiration, type);
       }
       // appending to WAL out of global lock for concurrent performance
       // we should still be able to arrive at the same state even if log entries are out of order
-      appendToLog(TransactionEdit.createStarted(tx.getWritePointer(), tx.getVisibilityUpperBound(), expiration, type));
+      appendToLog(TransactionEdit.createStarted(tx.getTransactionId(), tx.getVisibilityUpperBound(), expiration, type));
     } finally {
       this.logReadLock.unlock();
     }
@@ -766,6 +770,10 @@ public class TransactionManager extends AbstractService {
   private void addInProgressAndAdvance(long writePointer, long visibilityUpperBound,
                                        long expiration, TransactionType type) {
     inProgress.put(writePointer, new InProgressTx(visibilityUpperBound, expiration, type));
+    advanceWritePointer(writePointer);
+  }
+
+  private void advanceWritePointer(long writePointer) {
     // don't move the write pointer back if we have out of order transaction log entries
     if (writePointer > lastWritePointer) {
       lastWritePointer = writePointer;
@@ -775,15 +783,15 @@ public class TransactionManager extends AbstractService {
   public boolean canCommit(Transaction tx, Collection<byte[]> changeIds) throws TransactionNotInProgressException {
     txMetricsCollector.rate("canCommit");
     Stopwatch timer = new Stopwatch().start();
-    if (inProgress.get(tx.getWritePointer()) == null) {
+    if (inProgress.get(tx.getTransactionId()) == null) {
       // invalid transaction, either this has timed out and moved to invalid, or something else is wrong.
-      if (invalid.contains(tx.getWritePointer())) {
+      if (invalid.contains(tx.getTransactionId())) {
         throw new TransactionNotInProgressException(
           String.format("canCommit() is called for transaction %d that is not in progress (it is known to be invalid)",
-                        tx.getWritePointer()));
+                        tx.getTransactionId()));
       } else {
         throw new TransactionNotInProgressException(
-          String.format("canCommit() is called for transaction %d that is not in progress", tx.getWritePointer()));
+          String.format("canCommit() is called for transaction %d that is not in progress", tx.getTransactionId()));
       }
     }
 
@@ -800,9 +808,9 @@ public class TransactionManager extends AbstractService {
     try {
       synchronized (this) {
         ensureAvailable();
-        addCommittingChangeSet(tx.getWritePointer(), set);
+        addCommittingChangeSet(tx.getTransactionId(), set);
       }
-      appendToLog(TransactionEdit.createCommitting(tx.getWritePointer(), set));
+      appendToLog(TransactionEdit.createCommitting(tx.getTransactionId(), set));
     } finally {
       this.logReadLock.unlock();
     }
@@ -828,22 +836,22 @@ public class TransactionManager extends AbstractService {
         // we record commits at the first not-yet assigned transaction id to simplify clearing out change sets that
         // are no longer visible by any in-progress transactions
         commitPointer = lastWritePointer + 1;
-        if (inProgress.get(tx.getWritePointer()) == null) {
+        if (inProgress.get(tx.getTransactionId()) == null) {
           // invalid transaction, either this has timed out and moved to invalid, or something else is wrong.
-          if (invalid.contains(tx.getWritePointer())) {
+          if (invalid.contains(tx.getTransactionId())) {
             throw new TransactionNotInProgressException(
               String.format("canCommit() is called for transaction %d that is not in progress " +
-                              "(it is known to be invalid)", tx.getWritePointer()));
+                              "(it is known to be invalid)", tx.getTransactionId()));
           } else {
             throw new TransactionNotInProgressException(
-              String.format("canCommit() is called for transaction %d that is not in progress", tx.getWritePointer()));
+              String.format("canCommit() is called for transaction %d that is not in progress", tx.getTransactionId()));
           }
         }
 
         // these should be atomic
         // NOTE: whether we succeed or not we don't need to keep changes in committing state: same tx cannot
         //       be attempted to commit twice
-        changeSet = committingChangeSets.remove(tx.getWritePointer());
+        changeSet = committingChangeSets.remove(tx.getTransactionId());
 
         if (changeSet != null) {
           // double-checking if there are conflicts: someone may have committed since canCommit check
@@ -854,9 +862,9 @@ public class TransactionManager extends AbstractService {
           // no changes
           addToCommitted = false;
         }
-        doCommit(tx.getWritePointer(), changeSet, commitPointer, addToCommitted);
+        doCommit(tx.getTransactionId(), changeSet, commitPointer, addToCommitted);
       }
-      appendToLog(TransactionEdit.createCommitted(tx.getWritePointer(), changeSet, commitPointer, addToCommitted));
+      appendToLog(TransactionEdit.createCommitted(tx.getTransactionId(), changeSet, commitPointer, addToCommitted));
     } finally {
       this.logReadLock.unlock();
     }
@@ -908,16 +916,16 @@ public class TransactionManager extends AbstractService {
     try {
       synchronized (this) {
         ensureAvailable();
-        doAbort(tx.getWritePointer(), tx.getType());
+        doAbort(tx.getTransactionId(), tx.getCheckpointWritePointers(), tx.getType());
       }
-      appendToLog(TransactionEdit.createAborted(tx.getWritePointer(), tx.getType()));
+      appendToLog(TransactionEdit.createAborted(tx.getTransactionId(), tx.getType(), tx.getCheckpointWritePointers()));
       txMetricsCollector.histogram("abort.latency", (int) timer.elapsedMillis());
     } finally {
       this.logReadLock.unlock();
     }
   }
 
-  private void doAbort(long writePointer, TransactionType type) {
+  private void doAbort(long writePointer, long[] checkpointWritePointers, TransactionType type) {
     committingChangeSets.remove(writePointer);
     
     if (type == TransactionType.LONG) {
@@ -933,6 +941,13 @@ public class TransactionManager extends AbstractService {
     if (removed == null) {
       // tx was not in progress! perhaps it timed out and is invalid? try to remove it there.
       if (invalid.rem(writePointer)) {
+        // remove any invalidated checkpoint pointers
+        // this will only be present if the parent write pointer was also invalidated
+        if (checkpointWritePointers != null) {
+          for (int i = 0; i < checkpointWritePointers.length; i++) {
+            invalid.rem(checkpointWritePointers[i]);
+          }
+        }
         invalidArray = invalid.toLongArray();
         LOG.info("Tx invalid list: removed aborted tx {}", writePointer);
         // removed a tx from excludes: must move read pointer
@@ -969,11 +984,19 @@ public class TransactionManager extends AbstractService {
     InProgressTx previous = inProgress.remove(writePointer);
     // This check is to prevent from invalidating committed transactions
     if (previous != null || previousChangeSet != null) {
-      if (previous == null) {
-        LOG.debug("Invalidating tx {} in committing change sets but not in-progress", writePointer);
-      }
       // add tx to invalids
       invalid.add(writePointer);
+      if (previous == null) {
+        LOG.debug("Invalidating tx {} in committing change sets but not in-progress", writePointer);
+      } else {
+        // invalidate any checkpoint write pointers
+        LongArrayList childWritePointers = previous.getCheckpointWritePointers();
+        if (childWritePointers != null) {
+          for (int i = 0; i < childWritePointers.size(); i++) {
+            invalid.add(childWritePointers.get(i));
+          }
+        }
+      }
       LOG.info("Tx invalid list: added tx {} because of invalidate", writePointer);
       // todo: find a more efficient way to keep this sorted. Could it just be an array?
       Collections.sort(invalid);
@@ -1064,6 +1087,53 @@ public class TransactionManager extends AbstractService {
     }
     return doTruncateInvalidTx(toTruncate);
   }
+
+  public Transaction checkpoint(Transaction originalTx) throws TransactionNotInProgressException {
+    txMetricsCollector.rate("checkpoint");
+    Stopwatch timer = new Stopwatch().start();
+
+    Transaction checkpointedTx = null;
+    long txId = originalTx.getTransactionId();
+    long newWritePointer = 0;
+    // guard against changes to the transaction log while processing
+    this.logReadLock.lock();
+    try {
+      synchronized (this) {
+        ensureAvailable();
+        // check that the parent tx is in progress
+        InProgressTx parentTx = inProgress.get(txId);
+        if (parentTx == null) {
+          if (invalid.contains(txId)) {
+            throw new TransactionNotInProgressException(
+                String.format("Transaction %d is not in progress because it was invalidated", txId));
+          } else {
+            throw new TransactionNotInProgressException(
+                String.format("Transaction %d is not in progress", txId));
+          }
+        }
+        newWritePointer = getNextWritePointer();
+        doCheckpoint(newWritePointer, txId);
+        // create a new transaction with the same read snapshot, plus the additional checkpoint write pointer
+        // the same read snapshot is maintained to
+        checkpointedTx = new Transaction(originalTx, newWritePointer,
+            parentTx.getCheckpointWritePointers().toLongArray());
+      }
+      // appending to WAL out of global lock for concurrent performance
+      // we should still be able to arrive at the same state even if log entries are out of order
+      appendToLog(TransactionEdit.createCheckpoint(newWritePointer, txId));
+    } finally {
+      this.logReadLock.unlock();
+    }
+    txMetricsCollector.histogram("checkpoint.latency", (int) timer.elapsedMillis());
+
+    return checkpointedTx;
+  }
+
+  private void doCheckpoint(long newWritePointer, long parentWritePointer) {
+    InProgressTx existingTx = inProgress.get(parentWritePointer);
+    existingTx.addCheckpointWritePointer(newWritePointer);
+    advanceWritePointer(newWritePointer);
+  }
   
   // hack for exposing important metric
   public int getExcludedListSize() {
@@ -1089,7 +1159,7 @@ public class TransactionManager extends AbstractService {
     for (Map.Entry<Long, Set<ChangeId>> changeSet : committedChangeSets.entrySet()) {
       // If commit time is greater than tx read-pointer,
       // basically not visible but committed means "tx committed after given tx was started"
-      if (changeSet.getKey() > tx.getWritePointer()) {
+      if (changeSet.getKey() > tx.getTransactionId()) {
         if (overlap(changeSet.getValue(), changeIds)) {
           return true;
         }
@@ -1129,17 +1199,23 @@ public class TransactionManager extends AbstractService {
   private Transaction createTransaction(long writePointer, TransactionType type) {
     // For holding the first in progress short transaction Id (with timeout >= 0).
     long firstShortTx = Transaction.NO_TX_IN_PROGRESS;
-    long[] array = new long[inProgress.size()];
-    int i = 0;
+    LongArrayList inProgressIds = new LongArrayList(inProgress.size());
     for (Map.Entry<Long, InProgressTx> entry : inProgress.entrySet()) {
       long txId = entry.getKey();
-      array[i++] = txId;
+      inProgressIds.add(txId);
+      // add any checkpointed write pointers to the in-progress list
+      LongArrayList childIds = entry.getValue().getCheckpointWritePointers();
+      if (childIds != null) {
+        for (int i = 0; i < childIds.size(); i++) {
+          inProgressIds.add(childIds.get(i));
+        }
+      }
       if (firstShortTx == Transaction.NO_TX_IN_PROGRESS && !entry.getValue().isLongRunning()) {
         firstShortTx = txId;
       }
     }
 
-    return new Transaction(readPointer, writePointer, invalidArray, array, firstShortTx, type);
+    return new Transaction(readPointer, writePointer, invalidArray, inProgressIds.toLongArray(), firstShortTx, type);
   }
 
   private void appendToLog(TransactionEdit edit) {
@@ -1224,11 +1300,18 @@ public class TransactionManager extends AbstractService {
     private final long visibilityUpperBound;
     private final long expiration;
     private final TransactionType type;
+    private LongArrayList checkpointWritePointers = new LongArrayList();
 
     public InProgressTx(long visibilityUpperBound, long expiration, TransactionType type) {
+      this(visibilityUpperBound, expiration, type, new LongArrayList());
+    }
+
+    public InProgressTx(long visibilityUpperBound, long expiration, TransactionType type,
+                        LongArrayList checkpointWritePointers) {
       this.visibilityUpperBound = visibilityUpperBound;
       this.expiration = expiration;
       this.type = type;
+      this.checkpointWritePointers = checkpointWritePointers;
     }
 
     // For backwards compatibility when long running txns were represented with -1 expiration
@@ -1258,6 +1341,14 @@ public class TransactionManager extends AbstractService {
       return type == TransactionType.LONG;
     }
 
+    public void addCheckpointWritePointer(long checkpointWritePointer) {
+      checkpointWritePointers.add(checkpointWritePointer);
+    }
+
+    public LongArrayList getCheckpointWritePointers() {
+      return checkpointWritePointers;
+    }
+
     @Override
     public boolean equals(Object o) {
       if (o == null || !(o instanceof InProgressTx)) {
@@ -1270,12 +1361,14 @@ public class TransactionManager extends AbstractService {
 
       InProgressTx other = (InProgressTx) o;
       return Objects.equal(visibilityUpperBound, other.getVisibilityUpperBound()) &&
-        Objects.equal(expiration, other.getExpiration()) && Objects.equal(type, other.type);
+          Objects.equal(expiration, other.getExpiration()) &&
+          Objects.equal(type, other.type) &&
+          Objects.equal(checkpointWritePointers, other.checkpointWritePointers);
     }
 
     @Override
     public int hashCode() {
-      return Objects.hashCode(visibilityUpperBound, expiration, type);
+      return Objects.hashCode(visibilityUpperBound, expiration, type, checkpointWritePointers);
     }
 
     @Override
@@ -1287,4 +1380,5 @@ public class TransactionManager extends AbstractService {
           .toString();
     }
   }
+
 }

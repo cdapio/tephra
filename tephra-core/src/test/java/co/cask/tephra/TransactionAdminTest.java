@@ -125,12 +125,12 @@ public class TransactionAdminTest {
   public void testTruncateInvalidTx() throws Exception {
     Transaction tx1 = txClient.startLong();
     Transaction tx2 = txClient.startShort();
-    txClient.invalidate(tx1.getWritePointer());
-    txClient.invalidate(tx2.getWritePointer());
+    txClient.invalidate(tx1.getTransactionId());
+    txClient.invalidate(tx2.getTransactionId());
     Assert.assertEquals(2, txClient.getInvalidSize());
 
     TransactionAdmin txAdmin = new TransactionAdmin(new PrintStream(System.out), new PrintStream(System.err));
-    int status = txAdmin.doMain(new String[]{"--truncate-invalid-tx", String.valueOf(tx2.getWritePointer())}, conf);
+    int status = txAdmin.doMain(new String[]{"--truncate-invalid-tx", String.valueOf(tx2.getTransactionId())}, conf);
     Assert.assertEquals(0, status);
     Assert.assertEquals(1, txClient.getInvalidSize());
   }
@@ -151,8 +151,8 @@ public class TransactionAdminTest {
     // Assert no change to invalid size
     Assert.assertEquals(0, txClient.getInvalidSize());
 
-    txClient.invalidate(tx1.getWritePointer());
-    txClient.invalidate(tx2.getWritePointer());
+    txClient.invalidate(tx1.getTransactionId());
+    txClient.invalidate(tx2.getTransactionId());
     Assert.assertEquals(2, txClient.getInvalidSize());
 
     status = txAdmin.doMain(new String[]{"--truncate-invalid-tx-before", String.valueOf(beforeTx2)}, conf);
@@ -164,7 +164,7 @@ public class TransactionAdminTest {
   public void testGetInvalidTxSize() throws Exception {
     Transaction tx1 = txClient.startShort();
     txClient.startLong();
-    txClient.invalidate(tx1.getWritePointer());
+    txClient.invalidate(tx1.getTransactionId());
 
     ByteArrayOutputStream out = new ByteArrayOutputStream();
     ByteArrayOutputStream err = new ByteArrayOutputStream();
