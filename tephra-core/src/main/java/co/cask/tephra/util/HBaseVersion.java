@@ -20,6 +20,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.lang.reflect.Method;
+import java.text.ParseException;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * Detects the currently loaded HBase version.  It is assumed that only one HBase version is loaded at a time,
@@ -29,6 +32,8 @@ public class HBaseVersion {
   private static final String HBASE_94_VERSION = "0.94";
   private static final String HBASE_96_VERSION = "0.96";
   private static final String HBASE_98_VERSION = "0.98";
+  private static final String HBASE_10_VERSION = "1.0";
+  private static final String CDH_CLASSIFIER = "cdh";
 
   private static final Logger LOG = LoggerFactory.getLogger(HBaseVersion.class);
 
@@ -39,6 +44,8 @@ public class HBaseVersion {
     HBASE_94("0.94"),
     HBASE_96("0.96"),
     HBASE_98("0.98"),
+    HBASE_10("1.0"),
+    HBASE_10_CDH("1.0-cdh"),
     UNKNOWN("unknown");
 
     final String majorVersion;
@@ -65,6 +72,13 @@ public class HBaseVersion {
         currentVersion = Version.HBASE_96;
       } else if (versionString.startsWith(HBASE_98_VERSION)) {
         currentVersion = Version.HBASE_98;
+      } else if (versionString.startsWith(HBASE_10_VERSION)) {
+        VersionNumber ver = VersionNumber.create(versionString);
+        if (ver.getClassifier() != null && ver.getClassifier().startsWith(CDH_CLASSIFIER)) {
+          currentVersion = Version.HBASE_10_CDH;
+        } else {
+          currentVersion = Version.HBASE_10;
+        }
       } else {
         currentVersion = Version.UNKNOWN;
       }
@@ -94,7 +108,74 @@ public class HBaseVersion {
    * Prints out the HBase {@link Version} enum value for the current version of HBase on the classpath.
    */
   public static void main(String[] args) {
+    boolean verbose = args.length == 1 && "-v".equals(args[0]);
     Version version = HBaseVersion.get();
     System.out.println(version.getMajorVersion());
+    if (verbose) {
+      System.out.println("versionString=" + getVersionString());
+    }
+  }
+
+  /**
+   * Utility class to parse apart version number components.  The version string provided is expected to be in
+   * the format: major[.minor[.patch][-classifier][-SNAPSHOT]
+   *
+   * <p>Only the major version number is actually required.</p>
+   */
+  public static class VersionNumber {
+    private static final Pattern PATTERN =
+        Pattern.compile("(\\d+)(\\.(\\d+))?(\\.(\\d+))?(\\-(?!SNAPSHOT)([^\\-]+))?(\\-SNAPSHOT)?");
+
+    private Integer major;
+    private Integer minor;
+    private Integer patch;
+    private String classifier;
+    private boolean snapshot;
+
+    private VersionNumber(Integer major, Integer minor, Integer patch, String classifier, boolean snapshot) {
+      this.major = major;
+      this.minor = minor;
+      this.patch = patch;
+      this.classifier = classifier;
+      this.snapshot = snapshot;
+    }
+
+    public Integer getMajor() {
+      return major;
+    }
+
+    public Integer getMinor() {
+      return minor;
+    }
+
+    public Integer getPatch() {
+      return patch;
+    }
+
+    public String getClassifier() {
+      return classifier;
+    }
+
+    public boolean isSnapshot() {
+      return snapshot;
+    }
+
+    public static VersionNumber create(String versionString) throws ParseException {
+      Matcher matcher = PATTERN.matcher(versionString);
+      if (matcher.matches()) {
+        String majorString = matcher.group(1);
+        String minorString = matcher.group(3);
+        String patchString = matcher.group(5);
+        String classifier = matcher.group(7);
+        String snapshotString = matcher.group(8);
+        return new VersionNumber(new Integer(majorString),
+            minorString != null ? new Integer(minorString) : null,
+            patchString != null ? new Integer(patchString) : null,
+            classifier,
+            "-SNAPSHOT".equals(snapshotString));
+      }
+      throw new ParseException(
+          "Input string did not match expected pattern: major[.minor[.patch]][-classifier][-SNAPSHOT]", 0);
+    }
   }
 }
