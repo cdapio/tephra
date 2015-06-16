@@ -56,6 +56,21 @@
       <artifactId>tephra-hbase-compat-0.98</artifactId>
       <version>${project.version}</version>
     </dependency>
+    <dependency>
+      <groupId>co.cask.tephra</groupId>
+      <artifactId>tephra-hbase-compat-1.0</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>co.cask.tephra</groupId>
+      <artifactId>tephra-hbase-compat-1.0-cdh</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>co.cask.tephra</groupId>
+      <artifactId>tephra-examples</artifactId>
+      <version>${project.version}</version>
+    </dependency>
   </dependencies>
 
   <build>
