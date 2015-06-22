@@ -1,4 +1,4 @@
- /*
+/*
  * Copyright © 2014 Cask Data, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not
@@ -13,7 +13,7 @@
  * License for the specific language governing permissions and limitations under
  * the License.
  */
-package co.cask.tephra.hbase96;
+package co.cask.tephra.hbase10;
 
 import co.cask.tephra.Transaction;
 import co.cask.tephra.TransactionConflictException;
@@ -21,7 +21,7 @@ import co.cask.tephra.TransactionContext;
 import co.cask.tephra.TransactionManager;
 import co.cask.tephra.TransactionSystemClient;
 import co.cask.tephra.TxConstants;
-import co.cask.tephra.hbase96.coprocessor.TransactionProcessor;
+import co.cask.tephra.hbase10.coprocessor.TransactionProcessor;
 import co.cask.tephra.inmemory.InMemoryTxSystemClient;
 import co.cask.tephra.metrics.TxMetricsCollector;
 import co.cask.tephra.persist.InMemoryTransactionStateStorage;
@@ -45,6 +45,7 @@ import org.apache.hadoop.hbase.client.Scan;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.junit.After;
 import org.junit.AfterClass;
+import org.junit.Assert;
 import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -111,7 +112,7 @@ public class TransactionAwareHTableTest {
 
   @Before
   public void setupBeforeTest() throws Exception {
-    HTable hTable = createTable(TestBytes.table, new byte[][] {TestBytes.family});
+    HTable hTable = createTable(TestBytes.table, new byte[][]{TestBytes.family});
     transactionAwareHTable = new TransactionAwareHTable(hTable);
     transactionContext = new TransactionContext(new InMemoryTxSystemClient(txManager), transactionAwareHTable);
   }
@@ -355,7 +356,7 @@ public class TransactionAwareHTableTest {
 
   @Test
   public void testRowDelete() throws Exception {
-    HTable hTable = createTable(Bytes.toBytes("TestRowDelete"), new byte[][] {TestBytes.family, TestBytes.family2});
+    HTable hTable = createTable(Bytes.toBytes("TestRowDelete"), new byte[][]{TestBytes.family, TestBytes.family2});
     TransactionAwareHTable txTable = new TransactionAwareHTable(hTable, TxConstants.ConflictDetection.ROW);
     try {
       TransactionContext txContext = new TransactionContext(new InMemoryTxSystemClient(txManager), txTable);
@@ -363,10 +364,10 @@ public class TransactionAwareHTableTest {
       // Test 1: full row delete
       txContext.start();
       txTable.put(new Put(TestBytes.row)
-              .add(TestBytes.family, TestBytes.qualifier, TestBytes.value)
-              .add(TestBytes.family, TestBytes.qualifier2, TestBytes.value2)
-              .add(TestBytes.family2, TestBytes.qualifier, TestBytes.value)
-              .add(TestBytes.family2, TestBytes.qualifier2, TestBytes.value2));
+          .add(TestBytes.family, TestBytes.qualifier, TestBytes.value)
+          .add(TestBytes.family, TestBytes.qualifier2, TestBytes.value2)
+          .add(TestBytes.family2, TestBytes.qualifier, TestBytes.value)
+          .add(TestBytes.family2, TestBytes.qualifier2, TestBytes.value2));
       txContext.finish();
 
       txContext.start();
@@ -391,8 +392,8 @@ public class TransactionAwareHTableTest {
 
       // verify row is empty for explicit column retrieval
       result = txTable.get(new Get(TestBytes.row)
-              .addColumn(TestBytes.family, TestBytes.qualifier)
-              .addFamily(TestBytes.family2));
+          .addColumn(TestBytes.family, TestBytes.qualifier)
+          .addFamily(TestBytes.family2));
       assertTrue(result.isEmpty());
 
       // verify row is empty for scan
@@ -409,8 +410,8 @@ public class TransactionAwareHTableTest {
       // write swapped values to one column per family
       txContext.start();
       txTable.put(new Put(TestBytes.row)
-              .add(TestBytes.family, TestBytes.qualifier, TestBytes.value2)
-              .add(TestBytes.family2, TestBytes.qualifier2, TestBytes.value));
+          .add(TestBytes.family, TestBytes.qualifier, TestBytes.value2)
+          .add(TestBytes.family2, TestBytes.qualifier2, TestBytes.value));
       txContext.finish();
 
       // verify new values appear
@@ -434,10 +435,10 @@ public class TransactionAwareHTableTest {
       // Test 2: delete of first column family
       txContext.start();
       txTable.put(new Put(TestBytes.row2)
-              .add(TestBytes.family, TestBytes.qualifier, TestBytes.value)
-              .add(TestBytes.family, TestBytes.qualifier2, TestBytes.value2)
-              .add(TestBytes.family2, TestBytes.qualifier, TestBytes.value)
-              .add(TestBytes.family2, TestBytes.qualifier2, TestBytes.value2));
+          .add(TestBytes.family, TestBytes.qualifier, TestBytes.value)
+          .add(TestBytes.family, TestBytes.qualifier2, TestBytes.value2)
+          .add(TestBytes.family2, TestBytes.qualifier, TestBytes.value)
+          .add(TestBytes.family2, TestBytes.qualifier2, TestBytes.value2));
       txContext.finish();
 
       txContext.start();
@@ -455,10 +456,10 @@ public class TransactionAwareHTableTest {
       // Test 3: delete of second column family
       txContext.start();
       txTable.put(new Put(TestBytes.row3)
-              .add(TestBytes.family, TestBytes.qualifier, TestBytes.value)
-              .add(TestBytes.family, TestBytes.qualifier2, TestBytes.value2)
-              .add(TestBytes.family2, TestBytes.qualifier, TestBytes.value)
-              .add(TestBytes.family2, TestBytes.qualifier2, TestBytes.value2));
+          .add(TestBytes.family, TestBytes.qualifier, TestBytes.value)
+          .add(TestBytes.family, TestBytes.qualifier2, TestBytes.value2)
+          .add(TestBytes.family2, TestBytes.qualifier, TestBytes.value)
+          .add(TestBytes.family2, TestBytes.qualifier2, TestBytes.value2));
       txContext.finish();
 
       txContext.start();
@@ -477,8 +478,8 @@ public class TransactionAwareHTableTest {
       txContext.start();
       for (int i = 0; i < 10; i++) {
         txTable.put(new Put(Bytes.toBytes("z" + i))
-                .add(TestBytes.family, TestBytes.qualifier, Bytes.toBytes(i))
-                .add(TestBytes.family2, TestBytes.qualifier2, Bytes.toBytes(i)));
+            .add(TestBytes.family, TestBytes.qualifier, Bytes.toBytes(i))
+            .add(TestBytes.family2, TestBytes.qualifier2, Bytes.toBytes(i)));
       }
       txContext.finish();
 
@@ -570,8 +571,8 @@ public class TransactionAwareHTableTest {
     Result row = transactionAwareHTable.get(get);
     assertFalse(row.isEmpty());
     byte[] col1Value = row.getValue(TestBytes.family, TestBytes.qualifier);
-    assertNotNull(col1Value);
-    assertArrayEquals(value, col1Value);
+    Assert.assertNotNull(col1Value);
+    Assert.assertArrayEquals(value, col1Value);
     // write from in-progress transaction should not be visible
     byte[] col2Value = row.getValue(TestBytes.family, col2);
     assertNull(col2Value);

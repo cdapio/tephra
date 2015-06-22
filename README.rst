@@ -93,12 +93,12 @@ build system's equivalent configuration), in order to make use of Tephra classes
   <dependency>
     <groupId>co.cask.tephra</groupId>
     <artifactId>tephra-api</artifactId>
-    <version>0.3.0</version>
+    <version>0.5.0</version>
   </dependency>
   <dependency>
     <groupId>co.cask.tephra</groupId>
     <artifactId>tephra-core</artifactId>
-    <version>0.3.0</version>
+    <version>0.5.0</version>
   </dependency>
 
 Since the HBase APIs have changed between versions, you will need to select the
@@ -109,7 +109,7 @@ For HBase 0.96.x::
   <dependency>
     <groupId>co.cask.tephra</groupId>
     <artifactId>tephra-hbase-compat-0.96</artifactId>
-    <version>0.3.0</version>
+    <version>0.5.0</version>
   </dependency>
 
 For HBase 0.98.x::
@@ -117,7 +117,24 @@ For HBase 0.98.x::
   <dependency>
     <groupId>co.cask.tephra</groupId>
     <artifactId>tephra-hbase-compat-0.98</artifactId>
-    <version>0.3.0</version>
+    <version>0.5.0</version>
+  </dependency>
+
+For HBase 1.0.x::
+
+  <dependency>
+    <groupId>co.cask.tephra</groupId>
+    <artifactId>tephra-hbase-compat-1.0</artifactId>
+    <version>0.5.0</version>
+  </dependency>
+
+If you are running the CDH 5.4 version of HBase 1.0.x (this version contains API incompatibilities
+with Apache HBase 1.0.x)::
+
+  <dependency>
+    <groupId>co.cask.tephra</groupId>
+    <artifactId>tephra-hbase-compat-1.0-cdh</artifactId>
+    <version>0.5.0</version>
   </dependency>
 
 
@@ -228,6 +245,20 @@ For HBase 0.98::
   <property>
     <name>hbase.coprocessor.region.classes</name>
     <value>co.cask.tephra.hbase98.coprocessor.TransactionProcessor</value>
+  </property>
+
+For HBase 1.0::
+
+  <property>
+    <name>hbase.coprocessor.region.classes</name>
+    <value>co.cask.tephra.hbase10.coprocessor.TransactionProcessor</value>
+  </property>
+
+For the CDH 5.4 version of HBase 1.0::
+
+  <property>
+    <name>hbase.coprocessor.region.classes</name>
+    <value>co.cask.tephra.hbase10cdh.coprocessor.TransactionProcessor</value>
   </property>
 
 You may configure the ``TransactionProcessor`` to be loaded only on HBase tables that you will

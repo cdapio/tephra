@@ -100,8 +100,7 @@ public class TransactionAwareHTableTest {
     conf = testUtil.getConfiguration();
     hBaseAdmin = testUtil.getHBaseAdmin();
     txStateStorage = new InMemoryTransactionStateStorage();
-    txManager = new TransactionManager
-        (conf, txStateStorage, new TxMetricsCollector());
+    txManager = new TransactionManager(conf, txStateStorage, new TxMetricsCollector());
     txManager.startAndWait();
   }
 

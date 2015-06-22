@@ -14,7 +14,7 @@
  * the License.
  */
 
-package co.cask.tephra.hbase98.coprocessor;
+package co.cask.tephra.hbase10.coprocessor;
 
 import co.cask.tephra.Transaction;
 import co.cask.tephra.TxConstants;
@@ -32,7 +32,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
 /**
- * HBase 0.98 specific test for filtering logic applied when reading data transactionally.
+ * HBase 1.0 specific test for filtering logic applied when reading data transactionally.
  */
 public class TransactionVisibilityFilterTest extends AbstractTransactionVisibilityFilterTest {
   /**
