@@ -176,7 +176,8 @@ public class TransactionProcessor extends BaseRegionObserver {
     for (byte[] family : delete.getFamilyCellMap().keySet()) {
       List<Cell> familyCells = delete.getFamilyCellMap().get(family);
       if (isFamilyDelete(familyCells)) {
-        deleteMarkers.add(family, TxConstants.FAMILY_DELETE_QUALIFIER, HConstants.EMPTY_BYTE_ARRAY);
+        deleteMarkers.add(family, TxConstants.FAMILY_DELETE_QUALIFIER, familyCells.get(0).getTimestamp(),
+                   HConstants.EMPTY_BYTE_ARRAY);
       } else {
         int cellSize = familyCells.size();
         for (int i = 0; i < cellSize; i++) {

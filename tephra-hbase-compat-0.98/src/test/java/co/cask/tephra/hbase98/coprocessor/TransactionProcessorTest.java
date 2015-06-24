@@ -372,6 +372,66 @@ public class TransactionProcessorTest {
     }
   }
 
+  /**
+   * Test that we correctly preserve the timestamp set for column family delete markers.  This is not
+   * directly required for the TransactionAwareHTable usage, but is the right thing to do and ensures
+   * that we make it easy to interoperate with other systems.
+   */
+  @Test
+  public void testFamilyDeleteTimestamp() throws Exception {
+    String tableName = "TestFamilyDeleteTimestamp";
+    byte[] family1Bytes = Bytes.toBytes("f1");
+    byte[] columnBytes = Bytes.toBytes("c");
+    byte[] rowBytes = Bytes.toBytes("row");
+    byte[] valBytes = Bytes.toBytes("val");
+    HRegion region = createRegion(tableName, family1Bytes, 0);
+    try {
+      region.initialize();
+
+      long now = System.currentTimeMillis() * TxConstants.MAX_TX_PER_MS;
+      Put p = new Put(rowBytes);
+      p.add(family1Bytes, columnBytes, now - 10, valBytes);
+      region.put(p);
+
+      // issue a family delete with an explicit timestamp
+      Delete delete = new Delete(rowBytes, now);
+      delete.deleteFamily(family1Bytes, now - 5);
+      region.delete(delete);
+
+      // test that the delete marker preserved the timestamp
+      Scan scan = new Scan();
+      scan.setMaxVersions();
+      RegionScanner scanner = region.getScanner(scan);
+      List<Cell> results = Lists.newArrayList();
+      scanner.next(results);
+      assertEquals(2, results.size());
+      // delete marker should appear first
+      Cell cell = results.get(0);
+      assertArrayEquals(new byte[0], cell.getQualifier());
+      assertArrayEquals(new byte[0], cell.getValue());
+      assertEquals(now - 5, cell.getTimestamp());
+      // since this is an unfiltered scan against the region, the original put should be next
+      cell = results.get(1);
+      assertArrayEquals(valBytes, cell.getValue());
+      assertEquals(now - 10, cell.getTimestamp());
+      scanner.close();
+
+
+      // with a filtered scan the original put should disappear
+      scan = new Scan();
+      scan.setMaxVersions();
+      scan.setFilter(new TransactionVisibilityFilter(
+          TxUtils.createDummyTransaction(txSnapshot), new TreeMap<byte[], Long>(), false, ScanType.USER_SCAN));
+      scanner = region.getScanner(scan);
+      results = Lists.newArrayList();
+      scanner.next(results);
+      assertEquals(0, results.size());
+      scanner.close();
+    } finally {
+      region.close();
+    }
+  }
+
   private HRegion createRegion(String tableName, byte[] family, long ttl) throws IOException {
     HTableDescriptor htd = new HTableDescriptor(TableName.valueOf(tableName));
     HColumnDescriptor cfd = new HColumnDescriptor(family);
