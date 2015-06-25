@@ -19,6 +19,7 @@ package co.cask.tephra.snapshot;
 import co.cask.tephra.TxConstants;
 import co.cask.tephra.persist.TransactionSnapshot;
 import com.google.common.base.Throwables;
+import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.inject.Inject;
 import org.apache.hadoop.conf.Configuration;
@@ -28,6 +29,8 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.util.Arrays;
+import java.util.List;
 import java.util.SortedMap;
 import javax.annotation.Nonnull;
 
@@ -50,9 +53,21 @@ public class SnapshotCodecProvider implements SnapshotCodec {
    * There can only be one codec for a given version.
    */
   private void initialize(Configuration configuration) {
-    Class<?>[] codecClasses = configuration.getClasses(TxConstants.Persist.CFG_TX_SNAPHOT_CODEC_CLASSES);
-    if (codecClasses == null || codecClasses.length == 0) {
-      codecClasses = TxConstants.Persist.DEFAULT_TX_SNAPHOT_CODEC_CLASSES;
+    String[] codecClassNames = configuration.getStrings(TxConstants.Persist.CFG_TX_SNAPHOT_CODEC_CLASSES);
+    List<Class> codecClasses = Lists.newArrayList();
+    if (codecClassNames != null) {
+      for (String clsName : codecClassNames) {
+        try {
+          codecClasses.add(Class.forName(clsName));
+        } catch (ClassNotFoundException cnfe) {
+          LOG.warn("Unable to load class configured for " + TxConstants.Persist.CFG_TX_SNAPHOT_CODEC_CLASSES
+              + ": " + clsName, cnfe);
+        }
+      }
+    }
+
+    if (codecClasses.size() == 0) {
+      codecClasses.addAll(Arrays.asList(TxConstants.Persist.DEFAULT_TX_SNAPHOT_CODEC_CLASSES));
     }
     for (Class<?> codecClass : codecClasses) {
       try {
