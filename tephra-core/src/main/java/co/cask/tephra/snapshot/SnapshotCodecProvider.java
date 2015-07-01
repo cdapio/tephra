@@ -18,6 +18,7 @@ package co.cask.tephra.snapshot;
 
 import co.cask.tephra.TxConstants;
 import co.cask.tephra.persist.TransactionSnapshot;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Throwables;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
@@ -53,7 +54,7 @@ public class SnapshotCodecProvider implements SnapshotCodec {
    * There can only be one codec for a given version.
    */
   private void initialize(Configuration configuration) {
-    String[] codecClassNames = configuration.getStrings(TxConstants.Persist.CFG_TX_SNAPHOT_CODEC_CLASSES);
+    String[] codecClassNames = configuration.getTrimmedStrings(TxConstants.Persist.CFG_TX_SNAPHOT_CODEC_CLASSES);
     List<Class> codecClasses = Lists.newArrayList();
     if (codecClassNames != null) {
       for (String clsName : codecClassNames) {
@@ -87,7 +88,8 @@ public class SnapshotCodecProvider implements SnapshotCodec {
    * @throws java.lang.IllegalArgumentException if the version is not known
    */
   @Nonnull
-  private SnapshotCodec getCodecForVersion(int version) {
+  @VisibleForTesting
+  SnapshotCodec getCodecForVersion(int version) {
     SnapshotCodec codec = codecs.get(version);
     if (codec == null) {
       throw new IllegalArgumentException(String.format("Version %d of snapshot encoding is not supported", version));

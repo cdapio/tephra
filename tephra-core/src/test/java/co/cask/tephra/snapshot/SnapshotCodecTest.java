@@ -48,6 +48,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
 
 /**
  * Tests related to {@link SnapshotCodec} implementations.
@@ -176,5 +177,35 @@ public class SnapshotCodecTest {
     // full snapshot should have deserialized correctly without any fixups
     assertEquals(snapshot2.getInProgress(), snapshot3.getInProgress());
     assertEquals(snapshot2, snapshot3);
+  }
+
+  @Test
+  public void testSnapshotCodecProviderConfiguration() throws Exception {
+    Configuration conf = new Configuration(false);
+    StringBuilder buf = new StringBuilder();
+    for (Class c : TxConstants.Persist.DEFAULT_TX_SNAPHOT_CODEC_CLASSES) {
+      if (buf.length() > 0) {
+        buf.append(",\n    ");
+      }
+      buf.append(c.getName());
+    }
+    conf.set(TxConstants.Persist.CFG_TX_SNAPHOT_CODEC_CLASSES, buf.toString());
+
+    SnapshotCodecProvider codecProvider = new SnapshotCodecProvider(conf);
+    SnapshotCodec v1codec = codecProvider.getCodecForVersion(new DefaultSnapshotCodec().getVersion());
+    assertNotNull(v1codec);
+    assertTrue(v1codec instanceof DefaultSnapshotCodec);
+
+    SnapshotCodec v2codec = codecProvider.getCodecForVersion(new SnapshotCodecV2().getVersion());
+    assertNotNull(v2codec);
+    assertTrue(v2codec instanceof SnapshotCodecV2);
+
+    SnapshotCodec v3codec = codecProvider.getCodecForVersion(new SnapshotCodecV3().getVersion());
+    assertNotNull(v3codec);
+    assertTrue(v3codec instanceof SnapshotCodecV3);
+
+    SnapshotCodec v4codec = codecProvider.getCodecForVersion(new SnapshotCodecV4().getVersion());
+    assertNotNull(v4codec);
+    assertTrue(v4codec instanceof SnapshotCodecV4);
   }
 }
