@@ -99,7 +99,7 @@
     <hadoop.version>2.2.0</hadoop.version>
     <hbase96.version>0.96.2-hadoop2</hbase96.version>
     <hbase98.version>0.98.11-hadoop2</hbase98.version>
-    <hbase10.version>1.0.1</hbase10.version>
+    <hbase10.version>1.0.1.1</hbase10.version>
     <hbase10cdh.version>1.0.0-cdh5.4.2</hbase10cdh.version>
     <junit.version>4.11</junit.version>
     <slf4j.version>1.7.5</slf4j.version>

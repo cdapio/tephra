@@ -118,24 +118,27 @@ public class HBaseVersion {
 
   /**
    * Utility class to parse apart version number components.  The version string provided is expected to be in
-   * the format: major[.minor[.patch][-classifier][-SNAPSHOT]
+   * the format: major[.minor[.patch[.last]][-classifier][-SNAPSHOT]
    *
    * <p>Only the major version number is actually required.</p>
    */
   public static class VersionNumber {
     private static final Pattern PATTERN =
-        Pattern.compile("(\\d+)(\\.(\\d+))?(\\.(\\d+))?(\\-(?!SNAPSHOT)([^\\-]+))?(\\-SNAPSHOT)?");
+        Pattern.compile("(\\d+)(\\.(\\d+))?(\\.(\\d+))?(\\.(\\d+))?(\\-(?!SNAPSHOT)([^\\-]+))?(\\-SNAPSHOT)?");
 
     private Integer major;
     private Integer minor;
     private Integer patch;
+    private Integer last;
     private String classifier;
     private boolean snapshot;
 
-    private VersionNumber(Integer major, Integer minor, Integer patch, String classifier, boolean snapshot) {
+    private VersionNumber(Integer major, Integer minor, Integer patch, Integer last,
+                          String classifier, boolean snapshot) {
       this.major = major;
       this.minor = minor;
       this.patch = patch;
+      this.last = last;
       this.classifier = classifier;
       this.snapshot = snapshot;
     }
@@ -152,6 +155,10 @@ public class HBaseVersion {
       return patch;
     }
 
+    public Integer getLast() {
+      return last;
+    }
+
     public String getClassifier() {
       return classifier;
     }
@@ -166,11 +173,13 @@ public class HBaseVersion {
         String majorString = matcher.group(1);
         String minorString = matcher.group(3);
         String patchString = matcher.group(5);
-        String classifier = matcher.group(7);
-        String snapshotString = matcher.group(8);
+        String last = matcher.group(7);
+        String classifier = matcher.group(9);
+        String snapshotString = matcher.group(10);
         return new VersionNumber(new Integer(majorString),
             minorString != null ? new Integer(minorString) : null,
             patchString != null ? new Integer(patchString) : null,
+            last != null ? new Integer(last) : null,
             classifier,
             "-SNAPSHOT".equals(snapshotString));
       }
