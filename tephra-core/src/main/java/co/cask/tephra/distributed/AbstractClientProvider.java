@@ -56,8 +56,9 @@ public abstract class AbstractClientProvider implements ThriftClientProvider {
   }
 
   public void initialize() throws TException {
-    // initialize the service discovery client
-    this.initDiscovery();
+    if (initialized.compareAndSet(false, true)) {
+      this.initDiscovery();
+    }
   }
 
   /**
@@ -83,9 +84,7 @@ public abstract class AbstractClientProvider implements ThriftClientProvider {
   }
 
   protected TransactionServiceThriftClient newClient(int timeout) throws TException {
-    if (initialized.compareAndSet(false, true)) {
-      initialize();
-    }
+    initialize();
     String address;
     int port;
 

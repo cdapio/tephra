@@ -59,8 +59,7 @@ public class PooledClientProvider extends AbstractClientProvider {
     super(conf, discoveryServiceClient);
   }
 
-  @Override
-  public void initialize() throws TException {
+  private void initializePool() throws TException {
     // initialize the super class (needed for service discovery)
     super.initialize();
 
@@ -105,7 +104,7 @@ public class PooledClientProvider extends AbstractClientProvider {
     synchronized (this) {
       if (clients == null) {
         try {
-          initialize();
+          initializePool();
         } catch (TException e) {
           LOG.error("Failed to initialize Tx client provider", e);
           throw Throwables.propagate(e);
