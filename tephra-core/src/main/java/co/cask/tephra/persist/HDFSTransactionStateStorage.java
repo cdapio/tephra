@@ -24,6 +24,7 @@ import co.cask.tephra.util.ConfigurationFactory;
 import com.google.common.base.Function;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
+import com.google.common.io.CountingInputStream;
 import com.google.common.primitives.Longs;
 import com.google.inject.Inject;
 import org.apache.hadoop.conf.Configuration;
@@ -161,7 +162,10 @@ public class HDFSTransactionStateStorage extends AbstractTransactionStateStorage
   }
 
   private TransactionSnapshot readSnapshotInputStream(InputStream in) throws IOException {
-    return codecProvider.decode(in);
+    CountingInputStream countingIn = new CountingInputStream(in);
+    TransactionSnapshot snapshot = codecProvider.decode(countingIn);
+    LOG.info("Read encoded transaction snapshot of {} bytes", countingIn.getCount());
+    return snapshot;
   }
 
   private TransactionSnapshot readSnapshotFile(Path filePath) throws IOException {
