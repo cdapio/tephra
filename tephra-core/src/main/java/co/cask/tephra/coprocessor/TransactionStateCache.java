@@ -157,6 +157,9 @@ public class TransactionStateCache extends AbstractIdleService implements Config
         } else {
           latestState = currentSnapshot;
           LOG.info("Transaction state reloaded with snapshot from " + latestState.getTimestamp());
+          if (LOG.isDebugEnabled()) {
+            LOG.debug("Latest transaction snapshot: " + latestState.toString());
+          }
           lastRefresh = now;
         }
       } else {
