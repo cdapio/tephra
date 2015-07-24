@@ -234,12 +234,15 @@ public class TransactionServiceClient implements TransactionSystemClient {
           // retry strategy is exceeded, throw an operation exception
           String message =
               "Thrift error for " + operation + ": " + te.getMessage();
-          LOG.error(message, te);
+          LOG.error(message);
+          LOG.debug(message, te);
           throw new Exception(message, te);
         } else {
           // call retry strategy before retrying
           retryStrategy.beforeRetry();
-          LOG.info("Retrying " + operation.getName() + " after Thrift error.", te);
+          String msg = "Retrying " + operation.getName() + " after Thrift error: " + te.getMessage();
+          LOG.info(msg);
+          LOG.debug(msg, te);
         }
 
       } finally {
