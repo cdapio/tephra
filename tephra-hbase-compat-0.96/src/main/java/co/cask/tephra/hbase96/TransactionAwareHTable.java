@@ -558,7 +558,9 @@ public class TransactionAwareHTable extends AbstractTransactionAwareTable
           if (conflictLevel == TxConstants.ConflictDetection.ROW ||
               conflictLevel == TxConstants.ConflictDetection.NONE) {
             // no need to identify individual columns deleted
-            txDelete.deleteFamily(family);
+            // Older versions of HBase 0.96 lack HBASE-10964, so family deletes do not correctly
+            // inherit the common Delete timestamp, so must explicitly set the timestamp here.
+            txDelete.deleteFamily(family, transactionTimestamp);
             addToChangeSet(deleteRow, null, null);
           } else {
             Result result = get(new Get(delete.getRow()).addFamily(family));
