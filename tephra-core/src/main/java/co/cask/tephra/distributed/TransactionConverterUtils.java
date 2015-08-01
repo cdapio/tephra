@@ -27,6 +27,7 @@ import com.google.common.primitives.Longs;
  * Utility methods to convert to thrift and back.
  */
 public final class TransactionConverterUtils {
+  private static final long[] EMPTY_LONG_ARRAY = {};
 
   public static TTransaction wrap(Transaction tx) {
     return new TTransaction(tx.getTransactionId(), tx.getReadPointer(),
@@ -38,9 +39,12 @@ public final class TransactionConverterUtils {
 
   public static Transaction unwrap(TTransaction thriftTx) {
     return new Transaction(thriftTx.getReadPointer(), thriftTx.getTransactionId(), thriftTx.getWritePointer(),
-                           Longs.toArray(thriftTx.getInvalids()), Longs.toArray(thriftTx.getInProgress()),
+                           thriftTx.getInvalids() == null ? EMPTY_LONG_ARRAY : Longs.toArray(thriftTx.getInvalids()),
+                           thriftTx.getInProgress() == null ? EMPTY_LONG_ARRAY :
+                               Longs.toArray(thriftTx.getInProgress()),
                            thriftTx.getFirstShort(), getTransactionType(thriftTx.getType()),
-                           Longs.toArray(thriftTx.getCheckpointWritePointers()),
+                           thriftTx.getCheckpointWritePointers() == null ? EMPTY_LONG_ARRAY :
+                               Longs.toArray(thriftTx.getCheckpointWritePointers()),
                            getVisibilityLevel(thriftTx.getVisibilityLevel()));
   }
 
@@ -53,6 +57,11 @@ public final class TransactionConverterUtils {
   }
 
   private static Transaction.VisibilityLevel getVisibilityLevel(TVisibilityLevel tLevel) {
+    // default to SNAPSHOT
+    if (tLevel == null) {
+      return Transaction.VisibilityLevel.SNAPSHOT;
+    }
+
     switch (tLevel) {
       case SNAPSHOT:
         return Transaction.VisibilityLevel.SNAPSHOT;
