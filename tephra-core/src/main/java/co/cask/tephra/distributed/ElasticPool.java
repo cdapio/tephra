@@ -86,7 +86,7 @@ public abstract class ElasticPool<T, E extends Exception> {
   private BlockingQueue<T> elements;
 
   // number of current acvtive elements (including ones that are in use)
-  int size = 0;
+  volatile int size = 0;
 
   // the limit for the number of active elements
   int limit;
