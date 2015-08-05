@@ -24,3 +24,9 @@ branches:
     - develop
     - /^feature\/.*$/
     - /^hotfix\/.*$/
+
+sudo: false
+
+cache:
+  directories:
+    - $HOME/.m2
