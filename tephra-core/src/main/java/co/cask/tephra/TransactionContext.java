@@ -44,8 +44,8 @@ public class TransactionContext {
   }
 
   public TransactionContext(TransactionSystemClient txClient, Iterable<TransactionAware> txAwares) {
-    // Use a set to avoid adding the same TransactionAware twice and makes removal faster.
-    // Use a linked hash set so that insertion order is preserved (same behavior when it was using a List).
+    // Use a set to avoid adding the same TransactionAware twice and to make removal faster.
+    // Use a linked hash set so that insertion order is preserved (same behavior as when it was using a List).
     this.txAwares = Sets.newLinkedHashSet(txAwares);
     this.txClient = txClient;
   }
@@ -64,8 +64,8 @@ public class TransactionContext {
   }
 
   /**
-   * Removes a {@link TransactionAware} to withdraw from participation in the transaction. Withdrawal is only allowed
-   * if there is no active transaction.
+   * Removes a {@link TransactionAware} and withdraws from participation in the transaction.
+   * Withdrawal is only allowed if there is no active transaction.
    *
    * @param txAware the {@link TransactionAware} to be removed
    * @return true if the given {@link TransactionAware} is removed; false otherwise.
@@ -135,7 +135,7 @@ public class TransactionContext {
    * instances, and obtaining a new current write pointer for the transaction.  By performing a checkpoint,
    * the client can ensure that all previous writes were flushed and are visible.  By default, the current write
    * pointer for the transaction is also visible.  The current write pointer can be excluded from read
-   * operations by calling {@link Transaction#setVisibility(Transaction.VisibilityLevel)} with visibility level set
+   * operations by calling {@link Transaction#setVisibility(Transaction.VisibilityLevel)} with the visibility level set
    * to {@link Transaction.VisibilityLevel#SNAPSHOT_EXCLUDE_CURRENT} on the {@link Transaction} instance created
    * by the checkpoint call, which can be retrieved by calling {@link #getCurrentTransaction()}.
    *

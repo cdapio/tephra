@@ -20,7 +20,7 @@ import co.cask.tephra.inmemory.InMemoryTxSystemClient;
 import co.cask.tephra.runtime.ConfigModule;
 import co.cask.tephra.runtime.DiscoveryModules;
 import co.cask.tephra.runtime.TransactionModules;
-import co.cask.tephra.snapshot.SnapshotCodecV2;
+import co.cask.tephra.snapshot.SnapshotCodecV4;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 import com.google.inject.AbstractModule;
@@ -53,7 +53,7 @@ public class TransactionContextTest {
   @BeforeClass
   public static void setup() throws IOException {
     final Configuration conf = new Configuration();
-    conf.set(TxConstants.Persist.CFG_TX_SNAPHOT_CODEC_CLASSES, SnapshotCodecV2.class.getName());
+    conf.set(TxConstants.Persist.CFG_TX_SNAPHOT_CODEC_CLASSES, SnapshotCodecV4.class.getName());
     conf.set(TxConstants.Manager.CFG_TX_SNAPSHOT_DIR, tmpFolder.newFolder().getAbsolutePath());
     Injector injector = Guice.createInjector(
       new ConfigModule(conf),
@@ -153,7 +153,7 @@ public class TransactionContextTest {
     // commit transaction should fail and cause rollback
     try {
       context.finish();
-      Assert.fail("persist failed - exception should be thrown");
+      Assert.fail("Persist should have failed - exception should be thrown");
     } catch (TransactionFailureException e) {
       Assert.assertEquals("persist failure", e.getCause().getMessage());
     }
@@ -183,7 +183,7 @@ public class TransactionContextTest {
     // commit transaction should fail and cause rollback
     try {
       context.finish();
-      Assert.fail("persist failed - exception should be thrown");
+      Assert.fail("Persist should have failed - exception should be thrown");
     } catch (TransactionFailureException e) {
       Assert.assertNull(e.getCause()); // in this case, the ds simply returned false
     }
@@ -214,7 +214,7 @@ public class TransactionContextTest {
     // commit transaction should fail and cause rollback
     try {
       context.finish();
-      Assert.fail("persist failed - exception should be thrown");
+      Assert.fail("Persist should have failed - exception should be thrown");
     } catch (TransactionFailureException e) {
       Assert.assertEquals("persist failure", e.getCause().getMessage());
     }
@@ -245,7 +245,7 @@ public class TransactionContextTest {
     // commit transaction should fail and cause rollback
     try {
       context.finish();
-      Assert.fail("persist failed - exception should be thrown");
+      Assert.fail("Persist should have failed - exception should be thrown");
     } catch (TransactionFailureException e) {
       Assert.assertNull(e.getCause()); // in this case, the ds simply returned false
     }
@@ -422,7 +422,7 @@ public class TransactionContextTest {
     // commit transaction should fail and cause rollback
     try {
       context.finish();
-      Assert.fail("persist failed - exception should be thrown");
+      Assert.fail("Persist should have failed - exception should be thrown");
     } catch (TransactionFailureException e) {
       Assert.assertEquals("persist failure", e.getCause().getMessage());
     }
@@ -458,7 +458,7 @@ public class TransactionContextTest {
     context.finish();
 
     Assert.assertTrue(context.removeTransactionAware(ds1));
-    // Remove a TransactionAware not added before should returns false
+    // Removing a TransactionAware not added before should returns false
     Assert.assertFalse(context.removeTransactionAware(ds2));
 
     // Verify ds1 is committed and post-committed
@@ -489,7 +489,7 @@ public class TransactionContextTest {
 
     try {
       context.finish();
-      Assert.fail("persist failed - exception should be thrown");
+      Assert.fail("Persist should have failed - exception should be thrown");
     } catch (TransactionFailureException e) {
       Assert.assertEquals("persist failure", e.getCause().getMessage());
     }
