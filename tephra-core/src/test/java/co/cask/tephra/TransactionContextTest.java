@@ -20,7 +20,7 @@ import co.cask.tephra.inmemory.InMemoryTxSystemClient;
 import co.cask.tephra.runtime.ConfigModule;
 import co.cask.tephra.runtime.DiscoveryModules;
 import co.cask.tephra.runtime.TransactionModules;
-import co.cask.tephra.snapshot.DefaultSnapshotCodec;
+import co.cask.tephra.snapshot.SnapshotCodecV2;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 import com.google.inject.AbstractModule;
@@ -40,7 +40,6 @@ import org.junit.rules.TemporaryFolder;
 import java.io.IOException;
 import java.util.Collection;
 import java.util.List;
-import javax.annotation.Nullable;
 
 /**
  * Tests the transaction executor.
@@ -54,7 +53,7 @@ public class TransactionContextTest {
   @BeforeClass
   public static void setup() throws IOException {
     final Configuration conf = new Configuration();
-    conf.set(TxConstants.Persist.CFG_TX_SNAPHOT_CODEC_CLASSES, DefaultSnapshotCodec.class.getName());
+    conf.set(TxConstants.Persist.CFG_TX_SNAPHOT_CODEC_CLASSES, SnapshotCodecV2.class.getName());
     conf.set(TxConstants.Manager.CFG_TX_SNAPSHOT_DIR, tmpFolder.newFolder().getAbsolutePath());
     Injector injector = Guice.createInjector(
       new ConfigModule(conf),
@@ -77,19 +76,6 @@ public class TransactionContextTest {
 
   static final byte[] A = { 'a' };
   static final byte[] B = { 'b' };
-
-  final TransactionExecutor.Function<Integer, Integer> testFunction =
-    new TransactionExecutor.Function<Integer, Integer>() {
-      @Override
-      public Integer apply(@Nullable Integer input) {
-        ds1.addChange(A);
-        ds2.addChange(B);
-        if (input == null) {
-          throw new RuntimeException("function failed");
-        }
-        return input * input;
-      }
-  };
 
   private static TransactionContext newTransactionContext(TransactionAware... txAwares) {
     return new TransactionContext(txClient, txAwares);
@@ -451,6 +437,72 @@ public class TransactionContextTest {
     Assert.assertFalse(ds2.postCommitted);
     Assert.assertTrue(ds1.rolledBack);
     Assert.assertTrue(ds2.rolledBack);
+    Assert.assertEquals(txClient.state, DummyTxClient.CommitState.Aborted);
+  }
+
+  @Test
+  public void testAddThenRemoveSuccess() throws TransactionFailureException {
+    TransactionContext context = newTransactionContext();
+
+    context.start();
+    Assert.assertTrue(context.addTransactionAware(ds1));
+    ds1.addChange(A);
+
+    try {
+      context.removeTransactionAware(ds1);
+      Assert.fail("Removal of TransactionAware should fails when there is active transaction.");
+    } catch (IllegalStateException e) {
+      // Expected
+    }
+
+    context.finish();
+
+    Assert.assertTrue(context.removeTransactionAware(ds1));
+    // Remove a TransactionAware not added before should returns false
+    Assert.assertFalse(context.removeTransactionAware(ds2));
+
+    // Verify ds1 is committed and post-committed
+    Assert.assertTrue(ds1.started);
+    Assert.assertTrue(ds1.checked);
+    Assert.assertTrue(ds1.committed);
+    Assert.assertTrue(ds1.postCommitted);
+    Assert.assertFalse(ds1.rolledBack);
+
+    // Verify nothing happen to ds2
+    Assert.assertFalse(ds2.started);
+    Assert.assertFalse(ds2.checked);
+    Assert.assertFalse(ds2.committed);
+    Assert.assertFalse(ds2.postCommitted);
+    Assert.assertFalse(ds2.rolledBack);
+
+    Assert.assertEquals(txClient.state, DummyTxClient.CommitState.Committed);
+  }
+
+  @Test
+  public void testAndThenRemoveOnFailure() throws TransactionFailureException {
+    ds1.failCommitTxOnce = InduceFailure.ThrowException;
+    TransactionContext context = newTransactionContext();
+
+    context.start();
+    Assert.assertTrue(context.addTransactionAware(ds1));
+    ds1.addChange(A);
+
+    try {
+      context.finish();
+      Assert.fail("persist failed - exception should be thrown");
+    } catch (TransactionFailureException e) {
+      Assert.assertEquals("persist failure", e.getCause().getMessage());
+    }
+
+    Assert.assertTrue(context.removeTransactionAware(ds1));
+
+    // Verify ds1 is rolled back
+    Assert.assertTrue(ds1.started);
+    Assert.assertTrue(ds1.checked);
+    Assert.assertTrue(ds1.committed);
+    Assert.assertFalse(ds1.postCommitted);
+    Assert.assertTrue(ds1.rolledBack);
+
     Assert.assertEquals(txClient.state, DummyTxClient.CommitState.Aborted);
   }
 

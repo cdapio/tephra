@@ -19,6 +19,7 @@ package co.cask.tephra;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
+import com.google.common.collect.Sets;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -43,7 +44,9 @@ public class TransactionContext {
   }
 
   public TransactionContext(TransactionSystemClient txClient, Iterable<TransactionAware> txAwares) {
-    this.txAwares = Lists.newArrayList(txAwares);
+    // Use a set to avoid adding the same TransactionAware twice and makes removal faster.
+    // Use a linked hash set so that insertion order is preserved (same behavior when it was using a List).
+    this.txAwares = Sets.newLinkedHashSet(txAwares);
     this.txClient = txClient;
   }
 
@@ -51,11 +54,26 @@ public class TransactionContext {
    * Adds a new transaction-aware to participate in the transaction.
    * @param txAware the new transaction-aware
    */
-  public void addTransactionAware(TransactionAware txAware) {
-    this.txAwares.add(txAware);
-    if (currentTx != null) {
+  public boolean addTransactionAware(TransactionAware txAware) {
+    // If the txAware is newly added, call startTx as well if there is an active transaction
+    boolean added = txAwares.add(txAware);
+    if (added && currentTx != null) {
       txAware.startTx(currentTx);
     }
+    return added;
+  }
+
+  /**
+   * Removes a {@link TransactionAware} to withdraw from participation in the transaction. Withdrawal is only allowed
+   * if there is no active transaction.
+   *
+   * @param txAware the {@link TransactionAware} to be removed
+   * @return true if the given {@link TransactionAware} is removed; false otherwise.
+   * @throws IllegalStateException if there is an active transaction going on with this TransactionContext.
+   */
+  public boolean removeTransactionAware(TransactionAware txAware) {
+    Preconditions.checkState(currentTx == null, "Cannot remove TransactionAware while there is an active transaction.");
+    return txAwares.remove(txAware);
   }
 
   /**
@@ -117,8 +135,11 @@ public class TransactionContext {
    * instances, and obtaining a new current write pointer for the transaction.  By performing a checkpoint,
    * the client can ensure that all previous writes were flushed and are visible.  By default, the current write
    * pointer for the transaction is also visible.  The current write pointer can be excluded from read
-   * operations by setting an attribute with the key {@link TxConstants#TX_EXCLUDE_CURRENT_WRITE} on the
-   * {@code Get} or {@code Scan} operation.  After the checkpoint operation is performed, the updated
+   * operations by calling {@link Transaction#setVisibility(Transaction.VisibilityLevel)} with visibility level set
+   * to {@link Transaction.VisibilityLevel#SNAPSHOT_EXCLUDE_CURRENT} on the {@link Transaction} instance created
+   * by the checkpoint call, which can be retrieved by calling {@link #getCurrentTransaction()}.
+   *
+   * After the checkpoint operation is performed, the updated
    * {@link Transaction} instance will be passed to {@link TransactionAware#startTx(Transaction)} for each
    * registered {@code TransactionAware} instance.
    *
