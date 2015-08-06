@@ -290,9 +290,11 @@
               <configuration>
                 <excludes>
                   <exclude>build-number.txt</exclude>
-                  <exclude>README.md</exclude>
+                  <exclude>README.rst</exclude>
+                  <exclude>RELEASING.rst</exclude>
                   <exclude>**/target/**</exclude>
                   <exclude>**/.git/**</exclude>
+                  <exclude>.gitignore</exclude>
                   <exclude>**/.idea/**</exclude>
                   <exclude>**/*.iml</exclude>
                   <exclude>**/.project</exclude>
