@@ -73,6 +73,57 @@ Is It Building?
 ----------------
 Status of continuous integration build at `Travis CI <https://travis-ci.org/caskdata/tephra>`__: |(BuildStatus)|
 
+Requirements
+------------
+
+Java Runtime
+............
+
+The latest `JDK or JRE version 1.7.xx or 1.8.xx <http://www.java.com/en/download/manual.jsp>`__
+for Linux, Windows, or Mac OS X must be installed in your environment; we recommend the Oracle JDK.
+
+To check the Java version installed, run the command::
+
+  $ java -version
+
+Tephra is tested with the Oracle JDKs; it may work with other JDKs such as
+`Open JDK <http://openjdk.java.net>`__, but it has not been tested with them.
+
+Once you have installed the JDK, you'll need to set the JAVA_HOME environment variable.
+
+
+Hadoop/HBase Environment
+........................
+
+Tephra requires a working HBase and HDFS environment in order to operate. Tephra supports these
+component versions:
+
++---------------+-------------------+-----------------------------------------------------+
+| Component     | Source            | Supported Versions                                  |
++===============+===================+=====================================================+
+| **HDFS**      | Apache Hadoop     | 2.0.2-alpha through 2.6.0                           |
++               +-------------------+-----------------------------------------------------+
+|               | CDH or HDP        | (CDH) 5.0.0 through 5.4.4 or (HDP) 2.0, 2.1, or 2.2 |
++               +-------------------+-----------------------------------------------------+
+|               | MapR              | 4.1 (with MapR-FS)                                  |
++---------------+-------------------+-----------------------------------------------------+
+| **HBase**     | Apache            | 0.96.x, 0.98.x, and 1.0.x                           |
++               +-------------------+-----------------------------------------------------+
+|               | CDH or HDP        | (CDH) 5.0.0 through 5.4.4 or (HDP) 2.0, 2.1, or 2.2 |
++               +-------------------+-----------------------------------------------------+
+|               | MapR              | 4.1 (with Apache HBase)                             |
++---------------+-------------------+-----------------------------------------------------+
+| **Zookeeper** | Apache            | Version 3.4.3 through 3.4.5                         |
++               +-------------------+-----------------------------------------------------+
+|               | CDH or HDP        | (CDH) 5.0.0 through 5.4.4 or (HDP) 2.0, 2.1, or 2.2 |
++               +-------------------+-----------------------------------------------------+
+|               | MapR              | 4.1                                                 |
++---------------+-------------------+-----------------------------------------------------+
+
+**Note:** Components versions shown in this table are those that we have tested and are
+confident of their suitability and compatibility. Later versions of components may work,
+but have not necessarily have been either tested or confirmed compatible.
+
 
 Getting Started
 ---------------
