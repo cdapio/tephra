@@ -76,7 +76,7 @@ public class LocalTransactionStateStorageTest extends AbstractTransactionStateSt
     }
     @Override
     public void write(DataOutput out) throws IOException {
-      new TransactionEditCodecV2().encode(this, out);
+      TransactionEditCodecs.encode(this, out, new TransactionEditCodecs.TransactionEditCodecV2());
     }
   }
 

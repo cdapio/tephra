@@ -17,6 +17,7 @@
 package co.cask.tephra.persist;
 
 import co.cask.tephra.ChangeId;
+import co.cask.tephra.TransactionType;
 import com.google.common.collect.Sets;
 import com.google.common.io.ByteArrayDataOutput;
 import com.google.common.io.ByteStreams;
@@ -34,7 +35,7 @@ public class TransactionEditTest {
 
   @Test
   public void testV1SerdeCompat() throws Exception {
-    TransactionEdit.TransactionEditCodec olderCodec = new TransactionEdit.TransactionEditCodecV1();
+    TransactionEditCodecs.TransactionEditCodec olderCodec = new TransactionEditCodecs.TransactionEditCodecV1();
     // start tx edit and committed tx edit cover all fields of tx edit
     // NOTE: set visibilityUpperBound to 0 and transaction type to null as this is expected default 
     // for decoding older versions that doesn't store it
@@ -45,7 +46,7 @@ public class TransactionEditTest {
   
   @Test
   public void testV2SerdeCompat() throws Exception {
-    TransactionEdit.TransactionEditCodec olderCodec = new TransactionEdit.TransactionEditCodecV2();
+    TransactionEditCodecs.TransactionEditCodec olderCodec = new TransactionEditCodecs.TransactionEditCodecV2();
     // start tx edit and committed tx edit cover all fields of tx edit
     // NOTE: transaction type to null as this is expected default for decoding older versions that doesn't store it
     verifyDecodingSupportsOlderVersion(TransactionEdit.createStarted(2L, 100L, 1000L, null), olderCodec);
@@ -55,11 +56,11 @@ public class TransactionEditTest {
 
   @SuppressWarnings("deprecation")
   private void verifyDecodingSupportsOlderVersion(TransactionEdit edit, 
-                                                  TransactionEdit.TransactionEditCodec olderCodec)
+                                                  TransactionEditCodecs.TransactionEditCodec olderCodec)
     throws IOException {
     // encoding with older version of codec
     ByteArrayDataOutput out = ByteStreams.newDataOutput();
-    olderCodec.encode(edit, out);
+    TransactionEditCodecs.encode(edit, out, olderCodec);
 
     // decoding
     TransactionEdit decodedEdit = new TransactionEdit();
@@ -67,5 +68,55 @@ public class TransactionEditTest {
     decodedEdit.readFields(in);
 
     Assert.assertEquals(edit, decodedEdit);
+  }
+
+  @Test
+  public void testSerialization() throws Exception {
+    assertSerializedEdit(TransactionEdit.createAborted(1L, TransactionType.SHORT, new long[0]));
+    assertSerializedEdit(TransactionEdit.createAborted(1L, TransactionType.SHORT, new long[]{ 2L, 3L }));
+    assertSerializedEdit(TransactionEdit.createAborted(1L, TransactionType.LONG, new long[0]));
+    assertSerializedEdit(TransactionEdit.createAborted(1L, TransactionType.LONG, new long[]{ 2L, 3L }));
+
+    assertSerializedEdit(TransactionEdit.createCheckpoint(2L, 1L));
+
+    assertSerializedEdit(TransactionEdit.createCommitted(1L, Sets.<ChangeId>newHashSet(), 2L, false));
+    assertSerializedEdit(TransactionEdit.createCommitted(1L, Sets.<ChangeId>newHashSet(), 2L, true));
+    assertSerializedEdit(TransactionEdit.createCommitted(1L,
+        Sets.newHashSet(new ChangeId(new byte[]{'a', 'b', 'c'})), 2L, false));
+    assertSerializedEdit(TransactionEdit.createCommitted(1L,
+        Sets.newHashSet(new ChangeId(new byte[]{ 'a', 'b', 'c' }), new ChangeId(new byte[]{ 'd', 'e', 'f' })),
+        2L, true));
+
+    assertSerializedEdit(TransactionEdit.createCommitting(1L, Sets.<ChangeId>newHashSet()));
+    assertSerializedEdit(TransactionEdit.createCommitting(1L,
+        Sets.newHashSet(new ChangeId(new byte[]{'a', 'b', 'c'}))));
+    assertSerializedEdit(TransactionEdit.createCommitting(1L,
+        Sets.newHashSet(new ChangeId(new byte[]{'a', 'b', 'c'}), new ChangeId(new byte[]{'d', 'e', 'f'}))));
+
+    assertSerializedEdit(TransactionEdit.createInvalid(1L));
+
+    assertSerializedEdit(TransactionEdit.createMoveWatermark(10L));
+
+    assertSerializedEdit(TransactionEdit.createStarted(2L, 1L, System.currentTimeMillis() + 1000,
+        TransactionType.SHORT));
+    assertSerializedEdit(TransactionEdit.createStarted(2L, 1L, System.currentTimeMillis() + 10000,
+        TransactionType.LONG));
+
+    assertSerializedEdit(TransactionEdit.createTruncateInvalidTx(Sets.newHashSet(new Long(1))));
+    assertSerializedEdit(TransactionEdit.createTruncateInvalidTx(
+        Sets.newHashSet(new Long(1), new Long(2), new Long(3))));
+
+    assertSerializedEdit(TransactionEdit.createTruncateInvalidTxBefore(System.currentTimeMillis()));
+  }
+
+  private void assertSerializedEdit(TransactionEdit originalEdit) throws IOException {
+    ByteArrayDataOutput out = ByteStreams.newDataOutput();
+    originalEdit.write(out);
+
+    TransactionEdit decodedEdit = new TransactionEdit();
+    DataInput in = ByteStreams.newDataInput(out.toByteArray());
+    decodedEdit.readFields(in);
+
+    Assert.assertEquals(originalEdit, decodedEdit);
   }
 }
