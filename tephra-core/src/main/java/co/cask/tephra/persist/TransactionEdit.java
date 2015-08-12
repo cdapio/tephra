@@ -26,6 +26,7 @@ import org.apache.hadoop.io.Writable;
 import java.io.DataInput;
 import java.io.DataOutput;
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Set;
 
@@ -33,17 +34,6 @@ import java.util.Set;
  * Represents a transaction state change in the {@link TransactionLog}.
  */
 public class TransactionEdit implements Writable {
-  // provides serde for current version
-  // V4 adds CHECKPOINT edit type
-  private static final TransactionEditCodec CODEC_V4 = new TransactionEditCodecV3();
-  private static final byte V4 = -4;
-  // provides serde for old but still supported version, should not be used for writing
-  private static final TransactionEditCodec CODEC_V3 = new TransactionEditCodecV3();
-  private static final byte V3 = -3;
-  private static final TransactionEditCodec CODEC_V2 = new TransactionEditCodecV2();
-  private static final byte V2 = -2;
-  private static final TransactionEditCodec CODEC_V1 = new TransactionEditCodecV1();
-  private static final byte V1 = -1;
 
   /**
    * The possible state changes for a transaction.
@@ -104,8 +94,16 @@ public class TransactionEdit implements Writable {
     return writePointer;
   }
 
+  void setWritePointer(long writePointer) {
+    this.writePointer = writePointer;
+  }
+
   public long getVisibilityUpperBound() {
     return visibilityUpperBound;
+  }
+
+  void setVisibilityUpperBound(long visibilityUpperBound) {
+    this.visibilityUpperBound = visibilityUpperBound;
   }
 
   /**
@@ -113,6 +111,10 @@ public class TransactionEdit implements Writable {
    */
   public State getState() {
     return state;
+  }
+
+  void setState(State state) {
+    this.state = state;
   }
 
   /**
@@ -123,12 +125,20 @@ public class TransactionEdit implements Writable {
     return expirationDate;
   }
 
+  void setExpiration(long expirationDate) {
+    this.expirationDate = expirationDate;
+  }
+
   /**
    * @return the set of changed row keys associated with the state change.  This is only populated for edits
    * of type {@link State#COMMITTING} or {@link State#COMMITTED}.
    */
   public Set<ChangeId> getChanges() {
     return changes;
+  }
+
+  void setChanges(Set<ChangeId> changes) {
+    this.changes = changes;
   }
 
   /**
@@ -139,12 +149,20 @@ public class TransactionEdit implements Writable {
     return commitPointer;
   }
 
+  void setCommitPointer(long commitPointer) {
+    this.commitPointer = commitPointer;
+  }
+
   /**
    * Returns whether or not the transaction should be moved to the committed set.  This is only populated for edits
    * of type {@link State#COMMITTED}.
    */
   public boolean getCanCommit() {
     return canCommit;
+  }
+
+  void setCanCommit(boolean canCommit) {
+    this.canCommit = canCommit;
   }
 
   /**
@@ -155,12 +173,20 @@ public class TransactionEdit implements Writable {
     return type;
   }
 
+  void setType(TransactionType type) {
+    this.type = type;
+  }
+
   /**
    * Returns the transaction ids to be removed from invalid transaction list. This is only populated for
    * edits of type {@link State#TRUNCATE_INVALID_TX} 
    */
   public Set<Long> getTruncateInvalidTx() {
     return truncateInvalidTx;
+  }
+
+  void setTruncateInvalidTx(Set<Long> truncateInvalidTx) {
+    this.truncateInvalidTx = truncateInvalidTx;
   }
 
   /**
@@ -171,6 +197,10 @@ public class TransactionEdit implements Writable {
     return truncateInvalidTxTime;
   }
 
+  void setTruncateInvalidTxTime(long truncateInvalidTxTime) {
+    this.truncateInvalidTxTime = truncateInvalidTxTime;
+  }
+
   /**
    * Returns the parent write pointer for a checkpoint operation.  This is only populated for edits of type
    * {@link State#CHECKPOINT}
@@ -179,12 +209,20 @@ public class TransactionEdit implements Writable {
     return parentWritePointer;
   }
 
+  void setParentWritePointer(long parentWritePointer) {
+    this.parentWritePointer = parentWritePointer;
+  }
+
   /**
    * Returns the checkpoint write pointers for the edit.  This is only populated for edits of type
    * {@link State#ABORTED}.
    */
   public long[] getCheckpointPointers() {
     return checkpointPointers;
+  }
+
+  void setCheckpointPointers(long[] checkpointPointers) {
+    this.checkpointPointers = checkpointPointers;
   }
 
   /**
@@ -260,28 +298,12 @@ public class TransactionEdit implements Writable {
 
   @Override
   public void write(DataOutput out) throws IOException {
-    CODEC_V4.encode(this, out);
+    TransactionEditCodecs.encode(this, out);
   }
 
   @Override
   public void readFields(DataInput in) throws IOException {
-    byte version = in.readByte();
-    switch (version) {
-      case V4:
-        CODEC_V4.decode(this, in);
-        break;
-      case V3:
-        CODEC_V3.decode(this, in);
-        break;
-      case V2:
-        CODEC_V2.decode(this, in);
-        break;
-      case V1:
-        CODEC_V1.decode(this, in);
-        break;
-      default:
-        throw new IOException("Unexpected version for edit: " + version);
-    }
+    TransactionEditCodecs.decode(this, in);
   }
 
   @Override
@@ -296,17 +318,17 @@ public class TransactionEdit implements Writable {
     TransactionEdit that = (TransactionEdit) o;
 
     return Objects.equal(this.writePointer, that.writePointer) &&
-      Objects.equal(this.visibilityUpperBound, that.visibilityUpperBound) &&
-      Objects.equal(this.commitPointer, that.commitPointer) &&
-      Objects.equal(this.expirationDate, that.expirationDate) &&
-      Objects.equal(this.state, that.state) &&
-      Objects.equal(this.changes, that.changes) &&
-      Objects.equal(this.canCommit, that.canCommit) &&
-      Objects.equal(this.type, that.type) &&
-      Objects.equal(this.truncateInvalidTx, that.truncateInvalidTx) &&
-      Objects.equal(this.truncateInvalidTxTime, that.truncateInvalidTxTime) &&
-      Objects.equal(this.parentWritePointer, that.parentWritePointer) &&
-      Objects.equal(this.checkpointPointers, that.checkpointPointers);
+        Objects.equal(this.visibilityUpperBound, that.visibilityUpperBound) &&
+        Objects.equal(this.commitPointer, that.commitPointer) &&
+        Objects.equal(this.expirationDate, that.expirationDate) &&
+        Objects.equal(this.state, that.state) &&
+        Objects.equal(this.changes, that.changes) &&
+        Objects.equal(this.canCommit, that.canCommit) &&
+        Objects.equal(this.type, that.type) &&
+        Objects.equal(this.truncateInvalidTx, that.truncateInvalidTx) &&
+        Objects.equal(this.truncateInvalidTxTime, that.truncateInvalidTxTime) &&
+        Objects.equal(this.parentWritePointer, that.parentWritePointer) &&
+        Arrays.equals(this.checkpointPointers, that.checkpointPointers);
   }
   
   @Override
@@ -333,254 +355,4 @@ public class TransactionEdit implements Writable {
       .toString();
   }
 
-  // package-private for unit-test access
-  static interface TransactionEditCodec {
-    // doesn't read version field
-    void decode(TransactionEdit dest, DataInput in) throws IOException;
-
-    // writes version field
-    void encode(TransactionEdit src, DataOutput out) throws IOException;
-  }
-
-  // package-private for unit-test access
-  static class TransactionEditCodecV1 implements TransactionEditCodec {
-    @Override
-    public void decode(TransactionEdit src, DataInput in) throws IOException {
-      if (src.changes == null) {
-        src.changes = Sets.newHashSet();
-      } else {
-        src.changes.clear();
-      }
-
-      src.writePointer = in.readLong();
-      // 1st version did not store this info. It is safe to set firstInProgress to 0, it may decrease performance until
-      // this tx is finished, but correctness will be preserved.
-      src.visibilityUpperBound = 0;
-      int stateIdx = in.readInt();
-      try {
-        src.state = TransactionEdit.State.values()[stateIdx];
-      } catch (ArrayIndexOutOfBoundsException e) {
-        throw new IOException("State enum ordinal value is out of range: " + stateIdx);
-      }
-      src.expirationDate = in.readLong();
-      src.commitPointer = in.readLong();
-      src.canCommit = in.readBoolean();
-      int changeSize = in.readInt();
-      for (int i = 0; i < changeSize; i++) {
-        int currentLength = in.readInt();
-        byte[] currentBytes = new byte[currentLength];
-        in.readFully(currentBytes);
-        src.changes.add(new ChangeId(currentBytes));
-      }
-    }
-
-    /** @deprecated use {@link TransactionEditCodecV3} instead, it is still here for unit-tests only */
-    @Override
-    @Deprecated
-    public void encode(TransactionEdit src, DataOutput out) throws IOException {
-      out.writeByte(V1);
-      out.writeLong(src.writePointer);
-      // use ordinal for predictable size, though this does not support evolution
-      out.writeInt(src.state.ordinal());
-      out.writeLong(src.expirationDate);
-      out.writeLong(src.commitPointer);
-      out.writeBoolean(src.canCommit);
-      if (src.changes == null) {
-        out.writeInt(0);
-      } else {
-        out.writeInt(src.changes.size());
-        for (ChangeId c : src.changes) {
-          byte[] cKey = c.getKey();
-          out.writeInt(cKey.length);
-          out.write(cKey);
-        }
-      }
-      // NOTE: we didn't have visibilityUpperBound in V1, it was added in V2
-      // we didn't have transaction type, truncateInvalidTx and truncateInvalidTxTime in V1 and V2, 
-      // it was added in V3
-    }
-  }
-
-  // package-private for unit-test access
-  static class TransactionEditCodecV2 implements TransactionEditCodec {
-    @Override
-    public void decode(TransactionEdit dest, DataInput in) throws IOException {
-      if (dest.changes == null) {
-        dest.changes = Sets.newHashSet();
-      } else {
-        dest.changes.clear();
-      }
-
-      dest.writePointer = in.readLong();
-      int stateIdx = in.readInt();
-      try {
-        dest.state = TransactionEdit.State.values()[stateIdx];
-      } catch (ArrayIndexOutOfBoundsException e) {
-        throw new IOException("State enum ordinal value is out of range: " + stateIdx);
-      }
-      dest.expirationDate = in.readLong();
-      dest.commitPointer = in.readLong();
-      dest.canCommit = in.readBoolean();
-      int changeSize = in.readInt();
-      for (int i = 0; i < changeSize; i++) {
-        int currentLength = in.readInt();
-        byte[] currentBytes = new byte[currentLength];
-        in.readFully(currentBytes);
-        dest.changes.add(new ChangeId(currentBytes));
-      }
-      dest.visibilityUpperBound = in.readLong();
-    }
-
-    /** @deprecated use {@link TransactionEditCodecV3} instead, it is still here for unit-tests only */
-    @Override
-    public void encode(TransactionEdit src, DataOutput out) throws IOException {
-      out.writeByte(V2);
-      out.writeLong(src.writePointer);
-      // use ordinal for predictable size, though this does not support evolution
-      out.writeInt(src.state.ordinal());
-      out.writeLong(src.expirationDate);
-      out.writeLong(src.commitPointer);
-      out.writeBoolean(src.canCommit);
-      if (src.changes == null) {
-        out.writeInt(0);
-      } else {
-        out.writeInt(src.changes.size());
-        for (ChangeId c : src.changes) {
-          byte[] cKey = c.getKey();
-          out.writeInt(cKey.length);
-          out.write(cKey);
-        }
-      }
-      out.writeLong(src.visibilityUpperBound);
-      // NOTE: we didn't have transaction type, truncateInvalidTx and truncateInvalidTxTime in V1 and V2, 
-      // it was added in V3
-    }
-  }
-  
-  // TODO: refactor to avoid duplicate code among different version of codecs
-  // package-private for unit-test access
-  static class TransactionEditCodecV3 implements TransactionEditCodec {
-    @Override
-    public void decode(TransactionEdit dest, DataInput in) throws IOException {
-      dest.writePointer = in.readLong();
-      int stateIdx = in.readInt();
-      try {
-        dest.state = TransactionEdit.State.values()[stateIdx];
-      } catch (ArrayIndexOutOfBoundsException e) {
-        throw new IOException("State enum ordinal value is out of range: " + stateIdx);
-      }
-      dest.expirationDate = in.readLong();
-      dest.commitPointer = in.readLong();
-      dest.canCommit = in.readBoolean();
-      int changeSize = in.readInt();
-      dest.changes = emptySet(dest.changes);
-      for (int i = 0; i < changeSize; i++) {
-        int currentLength = in.readInt();
-        byte[] currentBytes = new byte[currentLength];
-        in.readFully(currentBytes);
-        dest.changes.add(new ChangeId(currentBytes));
-      }
-      dest.visibilityUpperBound = in.readLong();
-      int typeIdx = in.readInt();
-      // null transaction type is represented as -1
-      if (typeIdx < 0) {
-        dest.type = null;
-      } else {
-        try {
-          dest.type = TransactionType.values()[typeIdx];
-        } catch (ArrayIndexOutOfBoundsException e) {
-          throw new IOException("Type enum ordinal value is out of range: " + typeIdx);
-        }
-      }
-      
-      int truncateInvalidTxSize = in.readInt();
-      dest.truncateInvalidTx = emptySet(dest.truncateInvalidTx);
-      for (int i = 0; i < truncateInvalidTxSize; i++) {
-        dest.truncateInvalidTx.add(in.readLong());
-      }
-      dest.truncateInvalidTxTime = in.readLong();
-    }
-    
-    private <T> Set<T> emptySet(Set<T> set) {
-      if (set == null) {
-        return Sets.newHashSet();
-      }
-      set.clear();
-      return set;
-    }
-
-    @Override
-    public void encode(TransactionEdit src, DataOutput out) throws IOException {
-      writeVersion(out);
-      out.writeLong(src.writePointer);
-      // use ordinal for predictable size, though this does not support evolution
-      out.writeInt(src.state.ordinal());
-      out.writeLong(src.expirationDate);
-      out.writeLong(src.commitPointer);
-      out.writeBoolean(src.canCommit);
-      if (src.changes == null) {
-        out.writeInt(0);
-      } else {
-        out.writeInt(src.changes.size());
-        for (ChangeId c : src.changes) {
-          byte[] cKey = c.getKey();
-          out.writeInt(cKey.length);
-          out.write(cKey);
-        }
-      }
-      out.writeLong(src.visibilityUpperBound);
-      // null transaction type is represented as -1
-      if (src.type == null) {
-        out.writeInt(-1);
-      } else {
-        out.writeInt(src.type.ordinal());
-      }
-      
-      if (src.truncateInvalidTx == null) {
-        out.writeInt(0);
-      } else {
-        out.writeInt(src.truncateInvalidTx.size());
-        for (long id : src.truncateInvalidTx) {
-          out.writeLong(id);
-        }
-      }
-      out.writeLong(src.truncateInvalidTxTime);
-    }
-
-    protected void writeVersion(DataOutput out) throws IOException {
-      out.writeByte(V3);
-    }
-  }
-
-  static class TransactionEditCodeV4 extends TransactionEditCodecV3 {
-    @Override
-    public void decode(TransactionEdit dest, DataInput in) throws IOException {
-      super.decode(dest, in);
-      dest.parentWritePointer = in.readLong();
-      int checkpointPointersLen = in.readInt();
-      dest.checkpointPointers = new long[checkpointPointersLen];
-      for (int i = 0; i < checkpointPointersLen; i++) {
-        dest.checkpointPointers[i] = in.readLong();
-      }
-    }
-
-    @Override
-    public void encode(TransactionEdit src, DataOutput out) throws IOException {
-      super.encode(src, out);
-      out.writeLong(src.parentWritePointer);
-      if (src.checkpointPointers == null) {
-        out.writeInt(0);
-      } else {
-        out.writeInt(src.checkpointPointers.length);
-        for (int i = 0; i < src.checkpointPointers.length; i++) {
-          out.writeLong(src.checkpointPointers[i]);
-        }
-      }
-    }
-
-    @Override
-    protected void writeVersion(DataOutput out) throws IOException {
-      out.writeByte(V4);
-    }
-  }
 }
