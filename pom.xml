@@ -33,6 +33,7 @@
     <module>tephra-hbase-compat-0.98</module>
     <module>tephra-hbase-compat-1.0</module>
     <module>tephra-hbase-compat-1.0-cdh</module>
+    <module>tephra-hbase-compat-1.1</module>
     <module>tephra-distribution</module>
   </modules>
 
@@ -97,6 +98,7 @@
     <hbase98.version>0.98.11-hadoop2</hbase98.version>
     <hbase10.version>1.0.1.1</hbase10.version>
     <hbase10cdh.version>1.0.0-cdh5.4.2</hbase10cdh.version>
+    <hbase11.version>1.1.1</hbase11.version>
     <junit.version>4.11</junit.version>
     <slf4j.version>1.7.5</slf4j.version>
     <thrift.version>0.9.0</thrift.version>
