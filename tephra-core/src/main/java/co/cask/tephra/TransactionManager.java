@@ -1377,6 +1377,7 @@ public class TransactionManager extends AbstractService {
           .add("visibilityUpperBound", visibilityUpperBound)
           .add("expiration", expiration)
           .add("type", type)
+          .add("checkpointWritePointers", checkpointWritePointers)
           .toString();
     }
   }

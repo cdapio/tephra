@@ -49,7 +49,7 @@ public class SnapshotCodecV4 extends SnapshotCodecV2 {
         encoder.writeInt(entry.getValue().getType().ordinal());
         // write checkpoint tx IDs
         LongArrayList checkpointPointers = entry.getValue().getCheckpointWritePointers();
-        if (checkpointPointers == null && !checkpointPointers.isEmpty()) {
+        if (checkpointPointers != null && !checkpointPointers.isEmpty()) {
           encoder.writeInt(checkpointPointers.size());
           for (int i = 0; i < checkpointPointers.size(); i++) {
             encoder.writeLong(checkpointPointers.getLong(i));
@@ -86,7 +86,7 @@ public class SnapshotCodecV4 extends SnapshotCodecV2 {
           for (int checkpointRemaining = checkpointPointerSize; checkpointRemaining > 0; --checkpointRemaining) {
             checkpointPointers.add(decoder.readLong());
           }
-          size = decoder.readInt();
+          checkpointPointerSize = decoder.readInt();
         }
         inProgress.put(txId,
             new TransactionManager.InProgressTx(visibilityUpperBound, expiration, txType, checkpointPointers));
