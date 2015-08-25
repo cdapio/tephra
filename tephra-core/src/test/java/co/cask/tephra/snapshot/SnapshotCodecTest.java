@@ -17,7 +17,9 @@
 package co.cask.tephra.snapshot;
 
 import co.cask.tephra.ChangeId;
+import co.cask.tephra.Transaction;
 import co.cask.tephra.TransactionManager;
+import co.cask.tephra.TransactionNotInProgressException;
 import co.cask.tephra.TransactionType;
 import co.cask.tephra.TxConstants;
 import co.cask.tephra.persist.TransactionSnapshot;
@@ -33,6 +35,7 @@ import com.google.common.collect.Sets;
 import com.google.inject.Guice;
 import com.google.inject.Injector;
 import org.apache.hadoop.conf.Configuration;
+import org.junit.Assert;
 import org.junit.ClassRule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
@@ -40,6 +43,8 @@ import org.junit.rules.TemporaryFolder;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
+import java.io.IOException;
+import java.util.Collections;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
@@ -147,6 +152,7 @@ public class SnapshotCodecTest {
     Map.Entry<Long, TransactionManager.InProgressTx> entry =
         snapshot.getInProgress().entrySet().iterator().next();
     assertNull(entry.getValue().getType());
+    txStorage.stopAndWait();
 
 
     // start a new Tx manager to test fixup
@@ -177,6 +183,7 @@ public class SnapshotCodecTest {
     // full snapshot should have deserialized correctly without any fixups
     assertEquals(snapshot2.getInProgress(), snapshot3.getInProgress());
     assertEquals(snapshot2, snapshot3);
+    txStorage2.stopAndWait();
   }
 
   @Test
@@ -207,5 +214,74 @@ public class SnapshotCodecTest {
     SnapshotCodec v4codec = codecProvider.getCodecForVersion(new SnapshotCodecV4().getVersion());
     assertNotNull(v4codec);
     assertTrue(v4codec instanceof SnapshotCodecV4);
+  }
+
+  @Test
+  public void testSnapshotCodecV4() throws IOException, TransactionNotInProgressException {
+    File testDir = tmpDir.newFolder("testSnapshotCodecV4");
+    Configuration conf = new Configuration();
+    conf.set(TxConstants.Persist.CFG_TX_SNAPHOT_CODEC_CLASSES, SnapshotCodecV4.class.getName());
+    conf.set(TxConstants.Manager.CFG_TX_SNAPSHOT_LOCAL_DIR, testDir.getAbsolutePath());
+
+    Injector injector = Guice.createInjector(new ConfigModule(conf),
+                                             new DiscoveryModules().getSingleNodeModules(),
+                                             new TransactionModules().getSingleNodeModules());
+
+    TransactionManager txManager = injector.getInstance(TransactionManager.class);
+    txManager.startAndWait();
+
+    // Create a transaction and a checkpoint transaction
+    Transaction transaction = txManager.startLong();
+    Transaction checkpointTx = txManager.checkpoint(transaction);
+
+    // shutdown to force a snapshot
+    txManager.stopAndWait();
+
+    // Validate the snapshot on disk
+    TransactionStateStorage txStorage = injector.getInstance(TransactionStateStorage.class);
+    txStorage.startAndWait();
+
+    TransactionSnapshot snapshot = txStorage.getLatestSnapshot();
+    Map<Long, TransactionManager.InProgressTx> inProgress = snapshot.getInProgress();
+    Assert.assertEquals(1, inProgress.size());
+
+    TransactionManager.InProgressTx inProgressTx = inProgress.get(transaction.getTransactionId());
+    Assert.assertNotNull(inProgressTx);
+    Assert.assertArrayEquals(checkpointTx.getCheckpointWritePointers(),
+                             inProgressTx.getCheckpointWritePointers().toLongArray());
+
+    txStorage.stopAndWait();
+
+    // start a new Tx manager to see if the transaction is restored correctly.
+    Injector injector2 = Guice.createInjector(new ConfigModule(conf),
+                                              new DiscoveryModules().getSingleNodeModules(),
+                                              new TransactionModules().getSingleNodeModules());
+
+    txManager = injector2.getInstance(TransactionManager.class);
+    txManager.startAndWait();
+
+    // state should be recovered
+    snapshot = txManager.getCurrentState();
+    inProgress = snapshot.getInProgress();
+    Assert.assertEquals(1, inProgress.size());
+
+    inProgressTx = inProgress.get(transaction.getTransactionId());
+    Assert.assertNotNull(inProgressTx);
+    Assert.assertArrayEquals(checkpointTx.getCheckpointWritePointers(),
+                             inProgressTx.getCheckpointWritePointers().toLongArray());
+
+    // Should be able to commit the transaction
+    Assert.assertTrue(txManager.canCommit(checkpointTx, Collections.<byte[]>emptyList()));
+    Assert.assertTrue(txManager.commit(checkpointTx));
+
+    // save a new snapshot
+    txManager.stopAndWait();
+
+    TransactionStateStorage txStorage2 = injector2.getInstance(TransactionStateStorage.class);
+    txStorage2.startAndWait();
+
+    snapshot = txStorage2.getLatestSnapshot();
+    Assert.assertTrue(snapshot.getInProgress().isEmpty());
+    txStorage2.stopAndWait();
   }
 }
