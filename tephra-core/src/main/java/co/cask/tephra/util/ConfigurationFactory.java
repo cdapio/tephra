@@ -41,6 +41,11 @@ public class ConfigurationFactory implements Provider<Configuration> {
     }
 
     @Override
+    protected String getHBase11Classname() {
+      return "co.cask.tephra.hbase11.HBase11ConfigurationProvider";
+    }
+
+    @Override
     protected String getHBase10CDHClassname() {
       return "co.cask.tephra.hbase10cdh.HBase10ConfigurationProvider";
     }
