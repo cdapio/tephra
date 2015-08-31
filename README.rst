@@ -602,11 +602,21 @@ Bug Reports & Feature Requests
 
 Bugs and tasks are tracked in a public JIRA `issue tracker <https://issues.cask.co/browse/TEPHRA>`__.
 
-Mailing List
-............
+Tephra User Groups and Mailing Lists
+....................................
 
-Tephra User Group and Development Discussions: `tephra-dev@googlegroups.com 
-<https://groups.google.com/d/forum/tephra-dev>`__
+- Tephra User Group: `tigon-user@googlegroups.com <https://groups.google.com/d/forum/tigon-user>`__
+
+  The *tigon-user* mailing list is primarily for users using the product to develop
+  applications. You can expect questions from users, release announcements, and any other
+  discussions that we think will be helpful to the users.
+
+- Tephra Developer Group and Development Discussions: `tephra-dev@googlegroups.com 
+  <https://groups.google.com/d/forum/tephra-dev>`__
+
+  The *tigon-dev* mailing list is essentially for developers actively working on the
+  product, and should be used for all our design, architecture and technical discussions
+  moving forward. This mailing list will also receive all JIRA and GitHub notifications.
 
 IRC
 ...
