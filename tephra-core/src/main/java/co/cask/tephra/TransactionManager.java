@@ -390,8 +390,8 @@ public class TransactionManager extends AbstractService {
     // copy in memory state
     snapshot = getCurrentState();
 
-    LOG.info("Starting snapshot of transaction state with timestamp {}", snapshot.getTimestamp());
-    LOG.info("Returning snapshot of state: " + snapshot);
+    LOG.debug("Starting snapshot of transaction state with timestamp {}", snapshot.getTimestamp());
+    LOG.debug("Returning snapshot of state: " + snapshot);
     return snapshot;
   }
 

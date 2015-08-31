@@ -114,7 +114,7 @@ public class HDFSTransactionLog extends AbstractTransactionLog {
       // TODO: retry a few times to ride over transient failures?
       this.internalWriter =
         SequenceFile.createWriter(fs, hConf, logPath, LongWritable.class, TransactionEdit.class);
-      LOG.info("Created a new TransactionLog writer for " + logPath);
+      LOG.debug("Created a new TransactionLog writer for " + logPath);
     }
 
     @Override

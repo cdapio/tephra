@@ -120,7 +120,7 @@ public class HDFSTransactionStateStorage extends AbstractTransactionStateStorage
   public void writeSnapshot(TransactionSnapshot snapshot) throws IOException {
     // create a temporary file, and save the snapshot
     Path snapshotTmpFile = new Path(snapshotDir, TMP_SNAPSHOT_FILE_PREFIX + snapshot.getTimestamp());
-    LOG.info("Writing snapshot to temporary file {}", snapshotTmpFile);
+    LOG.debug("Writing snapshot to temporary file {}", snapshotTmpFile);
 
     FSDataOutputStream out = fs.create(snapshotTmpFile, false, BUFFER_SIZE);
     // encode the snapshot and stream the serialized version to the file
@@ -133,7 +133,7 @@ public class HDFSTransactionStateStorage extends AbstractTransactionStateStorage
     // move the temporary file into place with the correct filename
     Path finalFile = new Path(snapshotDir, SNAPSHOT_FILE_PREFIX + snapshot.getTimestamp());
     fs.rename(snapshotTmpFile, finalFile);
-    LOG.info("Completed snapshot to file {}", finalFile);
+    LOG.debug("Completed snapshot to file {}", finalFile);
   }
 
   @Override
@@ -206,7 +206,7 @@ public class HDFSTransactionStateStorage extends AbstractTransactionStateStorage
       fs.delete(f.getPath(), false);
     }
     long oldestTimestamp = snapshots[numberToKeep - 1].getTimestamp();
-    LOG.info("Removed {} old snapshot files prior to {}", toRemoveCount, oldestTimestamp);
+    LOG.debug("Removed {} old snapshot files prior to {}", toRemoveCount, oldestTimestamp);
     return oldestTimestamp;
   }
 
@@ -260,7 +260,7 @@ public class HDFSTransactionStateStorage extends AbstractTransactionStateStorage
         LOG.error("Failed to delete transaction log file {}", status.getPath());
       }
     }
-    LOG.info("Removed {} transaction logs older than {}", removedCnt, timestamp);
+    LOG.debug("Removed {} transaction logs older than {}", removedCnt, timestamp);
   }
 
   @Override
