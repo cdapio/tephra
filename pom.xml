@@ -34,6 +34,7 @@
     <module>tephra-hbase-compat-1.0</module>
     <module>tephra-hbase-compat-1.0-cdh</module>
     <module>tephra-hbase-compat-1.1</module>
+    <module>tephra-examples</module>
     <module>tephra-distribution</module>
   </modules>
 
