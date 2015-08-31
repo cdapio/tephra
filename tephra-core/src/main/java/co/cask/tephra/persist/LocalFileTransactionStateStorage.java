@@ -104,7 +104,7 @@ public class LocalFileTransactionStateStorage extends AbstractTransactionStateSt
   public void writeSnapshot(TransactionSnapshot snapshot) throws IOException {
     // save the snapshot to a temporary file
     File snapshotTmpFile = new File(snapshotDir, TMP_SNAPSHOT_FILE_PREFIX + snapshot.getTimestamp());
-    LOG.info("Writing snapshot to temporary file {}", snapshotTmpFile);
+    LOG.debug("Writing snapshot to temporary file {}", snapshotTmpFile);
     OutputStream out = Files.newOutputStreamSupplier(snapshotTmpFile).getOutput();
     boolean threw = true;
     try {
@@ -121,7 +121,7 @@ public class LocalFileTransactionStateStorage extends AbstractTransactionStateSt
           finalFile.getName());
     }
 
-    LOG.info("Completed snapshot to file {}", finalFile);
+    LOG.debug("Completed snapshot to file {}", finalFile);
   }
 
   @Override
@@ -241,7 +241,7 @@ public class LocalFileTransactionStateStorage extends AbstractTransactionStateSt
         LOG.warn("Failed to remove log file {}", file.getAbsolutePath());
       }
     }
-    LOG.info("Removed {} transaction logs older than {}", removedCnt, timestamp);
+    LOG.debug("Removed {} transaction logs older than {}", removedCnt, timestamp);
   }
 
   @Override
