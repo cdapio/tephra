@@ -709,6 +709,12 @@ public class TransactionManager extends AbstractService {
    * @param timeoutInSeconds the time out period in seconds.
    */
   public Transaction startShort(int timeoutInSeconds) {
+    try {
+      LOG.error("############## Waiting in startShort for 60 seconds");
+      TimeUnit.SECONDS.sleep(60);
+    } catch (InterruptedException e) {
+      e.printStackTrace();
+    }
     Preconditions.checkArgument(timeoutInSeconds > 0, "timeout must be positive but is %s", timeoutInSeconds);
     txMetricsCollector.rate("start.short");
     Stopwatch timer = new Stopwatch().start();

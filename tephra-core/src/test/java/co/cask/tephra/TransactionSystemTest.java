@@ -21,15 +21,20 @@ import co.cask.tephra.persist.TransactionStateStorage;
 import com.google.common.collect.ImmutableSet;
 import org.junit.Assert;
 import org.junit.Test;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
 /**
  *
  */
 public abstract class TransactionSystemTest {
+  private static final Logger LOG = LoggerFactory.getLogger(TransactionSystemTest.class);
 
   public static final byte[] C1 = new byte[] { 'c', '1' };
   public static final byte[] C2 = new byte[] { 'c', '2' };
@@ -39,6 +44,29 @@ public abstract class TransactionSystemTest {
   protected abstract TransactionSystemClient getClient() throws Exception;
 
   protected abstract TransactionStateStorage getStateStorage() throws Exception;
+
+  @Test
+  public void test() throws Exception {
+    int nThreads = 55;
+    ExecutorService executorService = Executors.newFixedThreadPool(nThreads);
+    for (int i = 0; i < nThreads; ++i) {
+      final int finalI = i;
+      executorService.submit(new Runnable() {
+        @Override
+        public void run() {
+          try {
+            LOG.error("############## Starting client " + finalI);
+            TransactionSystemClient client1 = getClient();
+            client1.startShort();
+          } catch (Exception e) {
+            e.printStackTrace();
+          }
+        }
+      });
+    }
+    LOG.error("################# Sleeping for 20 seconds before stopping");
+    TimeUnit.SECONDS.sleep(20);
+  }
 
   @Test
   public void testCommitRaceHandling() throws Exception {

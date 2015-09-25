@@ -40,6 +40,8 @@ import org.junit.rules.TemporaryFolder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.concurrent.TimeUnit;
+
 public class ThriftTransactionSystemTest extends TransactionSystemTest {
   private static final Logger LOG = LoggerFactory.getLogger(ThriftTransactionSystemTest.class);
   
@@ -48,6 +50,7 @@ public class ThriftTransactionSystemTest extends TransactionSystemTest {
   private static TransactionService txService;
   private static TransactionStateStorage storage;
   private static TransactionSystemClient txClient;
+  static Injector injector;
 
   @ClassRule
   public static TemporaryFolder tmpFolder = new TemporaryFolder();
@@ -62,8 +65,10 @@ public class ThriftTransactionSystemTest extends TransactionSystemTest {
     conf.set(TxConstants.Service.CFG_DATA_TX_ZOOKEEPER_QUORUM, zkServer.getConnectionStr());
     conf.set(TxConstants.Service.CFG_DATA_TX_CLIENT_RETRY_STRATEGY, "n-times");
     conf.setInt(TxConstants.Service.CFG_DATA_TX_CLIENT_ATTEMPTS, 1);
+    conf.setInt(TxConstants.Service.CFG_DATA_TX_CLIENT_COUNT, 55);
+    conf.setLong(TxConstants.Service.CFG_DATA_TX_CLIENT_TIMEOUT, TimeUnit.HOURS.toMillis(1));
 
-    Injector injector = Guice.createInjector(
+    injector = Guice.createInjector(
       new ConfigModule(conf),
       new ZKModule(),
       new DiscoveryModules().getDistributedModules(),
@@ -99,15 +104,20 @@ public class ThriftTransactionSystemTest extends TransactionSystemTest {
   
   @AfterClass
   public static void stop() throws Exception {
-    txService.stopAndWait();
-    storage.stopAndWait();
-    zkClientService.stopAndWait();
-    zkServer.stopAndWait();
+    LOG.error("################### Stopping thrift server");
+//    zkServer.stopAndWait();
+    txService.stopThrift();
+//    TimeUnit.SECONDS.sleep(2);
+    LOG.error("################### Done stopping thrift server. Sleeping for 60 seconds");
+    TimeUnit.SECONDS.sleep(60);
+//    txService.stopAndWait();
+//    storage.stopAndWait();
+//    zkClientService.stopAndWait();
   }
   
   @Override
   protected TransactionSystemClient getClient() throws Exception {
-    return txClient;
+    return injector.getInstance(TransactionSystemClient.class);
   }
 
   @Override

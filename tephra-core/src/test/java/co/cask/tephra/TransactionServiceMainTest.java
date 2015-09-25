@@ -23,16 +23,26 @@ import org.apache.twill.internal.zookeeper.InMemoryZKServer;
 import org.junit.ClassRule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Test for verifying TransactionServiceMain works correctly.
  */
 public class TransactionServiceMainTest {
+  private static final Logger LOG = LoggerFactory.getLogger(TransactionServiceMainTest.class);
 
   @ClassRule
   public static TemporaryFolder tmpFolder = new TemporaryFolder();
+
+  public static Thread.State toThreadState(int var0) {
+    return (var0 & 4) != 0? Thread.State.RUNNABLE:((var0 & 1024) != 0? Thread.State.BLOCKED:((var0 & 16) != 0? Thread.State.WAITING:((var0 & 32) != 0? Thread.State.TIMED_WAITING:((var0 & 2) != 0? Thread.State.TERMINATED:((var0 & 1) == 0? Thread.State.NEW: Thread.State.RUNNABLE)))));
+  }
 
   @Test
   public void testClientServer() throws Exception {
@@ -41,7 +51,7 @@ public class TransactionServiceMainTest {
     zkServer.startAndWait();
 
     try {
-      Configuration conf = new Configuration();
+      final Configuration conf = new Configuration();
       conf.set(TxConstants.Service.CFG_DATA_TX_ZOOKEEPER_QUORUM, zkServer.getConnectionStr());
       conf.set(TxConstants.Manager.CFG_TX_SNAPSHOT_DIR, tmpFolder.newFolder().getAbsolutePath());
 
@@ -63,8 +73,25 @@ public class TransactionServiceMainTest {
         t.start();
         // Wait for service to startup
         latch.await();
-        TransactionServiceClient.doMain(true, conf);
+        ExecutorService executorService = Executors.newFixedThreadPool(15);
+        for (int i = 0; i < 15; ++i) {
+          final int finalI = i;
+          executorService.submit(new Runnable() {
+            @Override
+            public void run() {
+              try {
+                LOG.error("############## Starting client " + finalI);
+                TransactionServiceClient.doMain(true, conf);
+              } catch (Exception e) {
+                e.printStackTrace();
+              }
+            }
+          });
+        }
       } finally {
+        LOG.error("############### Waiting for 10 seconds");
+        TimeUnit.SECONDS.sleep(10);
+
         main.stop();
         t.join();
       }

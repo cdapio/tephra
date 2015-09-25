@@ -36,8 +36,8 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
 import java.net.InetSocketAddress;
 import java.util.Map;
+import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.SynchronousQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
@@ -167,9 +167,9 @@ public final class ThriftRPCServer<T extends RPCServiceHandler, I> extends Abstr
     }
     bindAddress = listenOn;
 
-    executor = new ThreadPoolExecutor(0, workerThreads,
+    executor = new ThreadPoolExecutor(0, 4,
                                       60L, TimeUnit.SECONDS,
-                                      new SynchronousQueue<Runnable>(),
+                                      new ArrayBlockingQueue<Runnable>(4),
                                       Threads.createDaemonThreadFactory(String.format("%s-rpc-%%d", name)),
                                       new ThreadPoolExecutor.CallerRunsPolicy());
     serviceHandler.init();
@@ -179,7 +179,7 @@ public final class ThriftRPCServer<T extends RPCServiceHandler, I> extends Abstr
         .selectorThreads(ioThreads)
         .protocolFactory(new TBinaryProtocol.Factory())
         .transportFactory(new TFramedTransport.Factory())
-        .processor(processor)
+        .processor(processor).acceptQueueSizePerThread(4)
         .executorService(executor);
 
     // ENG-443 - Set the max read buffer size. This is important as this will
@@ -201,6 +201,7 @@ public final class ThriftRPCServer<T extends RPCServiceHandler, I> extends Abstr
   protected void triggerShutdown() {
     LOG.info("Request to stop RPC server for {}", name);
     server.stop();
+    LOG.info("Done request to stop RPC server for {}", name);
   }
 
   @Override

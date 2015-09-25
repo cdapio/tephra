@@ -45,7 +45,7 @@ import java.util.concurrent.TimeoutException;
  */
 public final class TransactionService extends InMemoryTransactionService {
   private static final Logger LOG = LoggerFactory.getLogger(TransactionService.class);
-  private LeaderElection leaderElection;
+  public LeaderElection leaderElection;
   private final ZKClient zkClient;
 
   private ThriftRPCServer<TransactionServiceThriftHandler, TTransactionServer> server;
@@ -116,6 +116,13 @@ public final class TransactionService extends InMemoryTransactionService {
     leaderElection.start();
 
     notifyStarted();
+  }
+
+  public void stopThrift() {
+    undoRegiser();
+    if (server != null && server.isRunning()) {
+      server.stopAndWait();
+    }
   }
 
   @Override
