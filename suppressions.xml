@@ -32,5 +32,6 @@
 
   <!-- do not check thrift generated files -->
   <suppress checks=".*" files=".*/tephra/distributed/thrift/.*" />
+  <suppress checks=".*" files=".*/org/apache/thrift/.*" />
 
 </suppressions>

@@ -79,7 +79,7 @@ public class InMemoryTransactionService extends AbstractService {
                ", max read buffer (bytes): " + maxReadBufferBytes);
   }
 
-  protected void undoRegiser() {
+  protected void undoRegister() {
     if (cancelDiscovery != null) {
       cancelDiscovery.cancel();
     }
@@ -119,7 +119,7 @@ public class InMemoryTransactionService extends AbstractService {
 
   @Override
   protected void doStop() {
-    undoRegiser();
+    undoRegister();
     txManager.stopAndWait();
     notifyStopped();
   }
