@@ -121,11 +121,11 @@ public class InMemoryTransactionStateStorage extends AbstractIdleService impleme
     return "in-memory";
   }
 
-  private static class InMemoryTransactionLog implements TransactionLog {
+  public static class InMemoryTransactionLog implements TransactionLog {
     private long timestamp;
     private List<TransactionEdit> edits = Lists.newArrayList();
     boolean isClosed = false;
-    InMemoryTransactionLog(long timestamp) {
+    public InMemoryTransactionLog(long timestamp) {
       this.timestamp = timestamp;
     }
 
@@ -166,7 +166,7 @@ public class InMemoryTransactionStateStorage extends AbstractIdleService impleme
     }
   }
 
-  private static class InMemoryLogReader implements TransactionLogReader {
+  public static class InMemoryLogReader implements TransactionLogReader {
     private final Iterator<TransactionEdit> editIterator;
 
     public InMemoryLogReader(Iterator<TransactionEdit> editIterator) {

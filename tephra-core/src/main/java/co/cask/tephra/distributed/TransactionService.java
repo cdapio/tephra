@@ -20,6 +20,7 @@ import co.cask.tephra.TransactionManager;
 import co.cask.tephra.distributed.thrift.TTransactionServer;
 import co.cask.tephra.inmemory.InMemoryTransactionService;
 import co.cask.tephra.rpc.ThriftRPCServer;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.util.concurrent.MoreExecutors;
 import com.google.common.util.concurrent.Uninterruptibles;
 import com.google.inject.Inject;
@@ -107,15 +108,22 @@ public final class TransactionService extends InMemoryTransactionService {
 
       @Override
       public void follower() {
-        undoRegiser();
+        // First stop the transaction server as un-registering from discovery can block sometimes.
+        // That can lead to multiple transaction servers being active at the same time.
         if (server != null && server.isRunning()) {
           server.stopAndWait();
         }
+        undoRegister();
       }
     });
     leaderElection.start();
 
     notifyStarted();
+  }
+
+  @VisibleForTesting
+  State thriftRPCServerState() {
+    return server.state();
   }
 
   @Override
