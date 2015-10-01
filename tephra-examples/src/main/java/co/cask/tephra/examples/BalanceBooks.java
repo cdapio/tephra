@@ -122,7 +122,7 @@ public class BalanceBooks implements Closeable {
    * Runs all clients and waits for them to complete.
    */
   public void run() throws IOException, InterruptedException {
-    List<Client> clients = new ArrayList<Client>(totalClients);
+    List<Client> clients = new ArrayList<>(totalClients);
     for (int i = 0; i < totalClients; i++) {
       Client c = new Client(i, totalClients, iterations);
       c.init(txClient, conn.getTable(TABLE));

@@ -89,7 +89,7 @@ public class TransactionStateCache extends AbstractIdleService implements Config
         // Since this is only used for background loading of transaction snapshots, we use the no-op metrics collector,
         // as there are no relevant metrics to report
         this.storage = new HDFSTransactionStateStorage(conf, new SnapshotCodecProvider(conf),
-            new TxMetricsCollector());
+                                                       new TxMetricsCollector());
         this.storage.startAndWait();
         this.snapshotRefreshFrequency = conf.getLong(TxConstants.Manager.CFG_TX_SNAPSHOT_INTERVAL,
                                                      TxConstants.Manager.DEFAULT_TX_SNAPSHOT_INTERVAL) * 1000;

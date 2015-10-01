@@ -75,19 +75,7 @@ public class LocalFileTransactionStateStorage extends AbstractTransactionStateSt
     Preconditions.checkState(configuredSnapshotDir != null,
         "Snapshot directory is not configured.  Please set " + TxConstants.Manager.CFG_TX_SNAPSHOT_LOCAL_DIR +
         " in configuration.");
-    // create the directory if it doesn't exist
     snapshotDir = new File(configuredSnapshotDir);
-    if (!snapshotDir.exists()) {
-      if (!snapshotDir.mkdirs()) {
-        throw new IOException("Failed to create directory " + configuredSnapshotDir +
-                              " for transaction snapshot storage");
-      }
-    } else {
-      Preconditions.checkState(snapshotDir.isDirectory(),
-          "Configured snapshot directory " + configuredSnapshotDir + " is not a directory!");
-      Preconditions.checkState(snapshotDir.canWrite(),
-          "Configured snapshot directory " + configuredSnapshotDir + " exists but is not writable!");
-    }
   }
 
   @Override
@@ -245,6 +233,22 @@ public class LocalFileTransactionStateStorage extends AbstractTransactionStateSt
   }
 
   @Override
+  public void setupStorage() throws IOException {
+    // create the directory if it doesn't exist
+    if (!snapshotDir.exists()) {
+      if (!snapshotDir.mkdirs()) {
+        throw new IOException("Failed to create directory " + configuredSnapshotDir +
+                                " for transaction snapshot storage");
+      }
+    } else {
+      Preconditions.checkState(snapshotDir.isDirectory(),
+                               "Configured snapshot directory " + configuredSnapshotDir + " is not a directory!");
+      Preconditions.checkState(snapshotDir.canWrite(), "Configured snapshot directory " +
+        configuredSnapshotDir + " exists but is not writable!");
+    }
+  }
+
+  @Override
   public List<String> listLogs() throws IOException {
     File[] logs = snapshotDir.listFiles(new LogFileFilter(0, Long.MAX_VALUE));
     return Lists.transform(Arrays.asList(logs), new Function<File, String>() {
@@ -281,7 +285,6 @@ public class LocalFileTransactionStateStorage extends AbstractTransactionStateSt
       return false;
     }
   }
-
 
   /**
    * Represents a filename composed of a prefix and a ".timestamp" suffix.  This is useful for manipulating both

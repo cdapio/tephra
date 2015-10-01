@@ -67,12 +67,12 @@ public class NoOpTransactionStateStorage extends AbstractIdleService implements 
 
   @Override
   public List<String> listSnapshots() throws IOException {
-    return new ArrayList<String>(0);
+    return new ArrayList<>(0);
   }
 
   @Override
   public List<TransactionLog> getLogsSince(long timestamp) throws IOException {
-    return new ArrayList<TransactionLog>(0);
+    return new ArrayList<>(0);
   }
 
   @Override
@@ -85,8 +85,12 @@ public class NoOpTransactionStateStorage extends AbstractIdleService implements 
   }
 
   @Override
+  public void setupStorage() throws IOException {
+  }
+
+  @Override
   public List<String> listLogs() throws IOException {
-    return new ArrayList<String>(0);
+    return new ArrayList<>(0);
   }
 
   @Override
