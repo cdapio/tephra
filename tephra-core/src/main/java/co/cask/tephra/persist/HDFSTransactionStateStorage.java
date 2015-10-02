@@ -105,10 +105,6 @@ public class HDFSTransactionStateStorage extends AbstractTransactionStateStorage
     }
     snapshotDir = new Path(configuredSnapshotDir);
     LOG.info("Using snapshot dir " + snapshotDir);
-    if (!fs.exists(snapshotDir)) {
-      LOG.info("Creating snapshot dir at {}", snapshotDir);
-      fs.mkdirs(snapshotDir);
-    }
   }
 
   @Override
@@ -261,6 +257,17 @@ public class HDFSTransactionStateStorage extends AbstractTransactionStateStorage
       }
     }
     LOG.debug("Removed {} transaction logs older than {}", removedCnt, timestamp);
+  }
+
+  @Override
+  public void setupStorage() throws IOException {
+    if (!fs.exists(snapshotDir)) {
+      LOG.info("Creating snapshot dir at {}", snapshotDir);
+      fs.mkdirs(snapshotDir);
+    } else {
+      Preconditions.checkState(fs.isDirectory(snapshotDir),
+                               "Configured snapshot directory " + snapshotDir + " is not a directory!");
+    }
   }
 
   @Override

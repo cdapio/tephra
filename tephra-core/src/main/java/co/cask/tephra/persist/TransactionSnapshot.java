@@ -189,12 +189,12 @@ public class TransactionSnapshot {
     // for committing and committed maps, we need to copy each individual Set as well to prevent modification
     Map<Long, Set<ChangeId>> committingCopy = Maps.newHashMap();
     for (Map.Entry<Long, Set<ChangeId>> entry : committing.entrySet()) {
-      committingCopy.put(entry.getKey(), new HashSet<ChangeId>(entry.getValue()));
+      committingCopy.put(entry.getKey(), new HashSet<>(entry.getValue()));
     }
 
-    NavigableMap<Long, Set<ChangeId>> committedCopy = new TreeMap<Long, Set<ChangeId>>();
+    NavigableMap<Long, Set<ChangeId>> committedCopy = new TreeMap<>();
     for (Map.Entry<Long, Set<ChangeId>> entry : committed.entrySet()) {
-      committedCopy.put(entry.getKey(), new HashSet<ChangeId>(entry.getValue()));
+      committedCopy.put(entry.getKey(), new HashSet<>(entry.getValue()));
     }
 
     return new TransactionSnapshot(snapshotTime, readPointer, writePointer,

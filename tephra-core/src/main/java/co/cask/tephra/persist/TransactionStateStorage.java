@@ -82,6 +82,12 @@ public interface TransactionStateStorage extends Service {
   public void deleteLogsOlderThan(long timestamp) throws IOException;
 
   /**
+   * Create the directories required for the transaction state stage.
+   * @throws IOException If an error occurred during the creation of required directories for transaction state storage.
+   */
+  public void setupStorage() throws IOException;
+
+  /**
    * Returns a string representation of the location used for persistence.
    */
   public String getLocation();

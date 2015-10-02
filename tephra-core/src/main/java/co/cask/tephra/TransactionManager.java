@@ -212,6 +212,11 @@ public class TransactionManager extends AbstractService {
     txMetricsCollector.start();
     // start up the persistor
     persistor.startAndWait();
+    try {
+      persistor.setupStorage();
+    } catch (IOException e) {
+      Throwables.propagate(e);
+    }
     // establish defaults in case there is no persistence
     clear();
     // attempt to recover state from last run

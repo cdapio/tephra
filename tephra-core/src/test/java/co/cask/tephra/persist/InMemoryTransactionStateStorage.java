@@ -36,7 +36,7 @@ public class InMemoryTransactionStateStorage extends AbstractIdleService impleme
   // only keeps the most recent snapshot in memory
   private TransactionSnapshot lastSnapshot;
 
-  private NavigableMap<Long, TransactionLog> logs = new TreeMap<Long, TransactionLog>();
+  private NavigableMap<Long, TransactionLog> logs = new TreeMap<>();
 
   @Override
   protected void startUp() throws Exception {
@@ -45,7 +45,7 @@ public class InMemoryTransactionStateStorage extends AbstractIdleService impleme
   @Override
   protected void shutDown() throws Exception {
     lastSnapshot = null;
-    logs = new TreeMap<Long, TransactionLog>();
+    logs = new TreeMap<>();
   }
 
   @Override
@@ -99,6 +99,10 @@ public class InMemoryTransactionStateStorage extends AbstractIdleService impleme
         logIter.remove();
       }
     }
+  }
+
+  @Override
+  public void setupStorage() throws IOException {
   }
 
   @Override
