@@ -1064,7 +1064,7 @@ public class TransactionAwareHTableTest {
   private void majorCompact(HTableDescriptor tableDescriptor, byte[] family) throws Exception {
     long before = System.currentTimeMillis();
     testUtil.compact(tableDescriptor.getTableName(), true);
-    while(true) {
+    while (true) {
       for (StoreFileInfo storeFileInfo : getStoreFiles(tableDescriptor, family)) {
         LOG.error("Store file = {}, start time = {}, modification time = {}",
                   storeFileInfo.getPath().toUri(), before, storeFileInfo.getModificationTime());
