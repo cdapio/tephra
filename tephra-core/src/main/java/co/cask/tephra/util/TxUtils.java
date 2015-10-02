@@ -29,6 +29,7 @@ import java.util.Map;
  * Utility methods supporting transaction operations.
  */
 public class TxUtils {
+  private static long EARLIEST_TX_TIMESTAMP = System.currentTimeMillis() * TxConstants.MAX_TX_PER_MS / 1000;
 
   /**
    * Returns the oldest visible timestamp for the given transaction, based on the TTLs configured for each column
@@ -87,5 +88,10 @@ public class TxUtils {
       }
     }
     return firstShort;
+  }
+
+  public static long cellTimestampToTxTimestamp(long cellTs) {
+    System.out.println("111111111 CellTs = " + cellTs + " EarliestTxTs = " + EARLIEST_TX_TIMESTAMP);
+    return cellTs > EARLIEST_TX_TIMESTAMP ? cellTs : cellTs * TxConstants.MAX_TX_PER_MS;
   }
 }

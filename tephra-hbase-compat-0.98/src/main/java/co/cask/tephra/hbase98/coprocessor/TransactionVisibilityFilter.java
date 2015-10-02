@@ -18,6 +18,7 @@ package co.cask.tephra.hbase98.coprocessor;
 
 import co.cask.tephra.Transaction;
 import co.cask.tephra.TxConstants;
+import co.cask.tephra.util.TxUtils;
 import com.google.common.collect.Maps;
 import org.apache.hadoop.hbase.Cell;
 import org.apache.hadoop.hbase.CellUtil;
@@ -105,7 +106,7 @@ public class TransactionVisibilityFilter extends FilterBase {
       deleteTracker.reset();
     }
     // need to apply TTL for the column family here
-    long kvTimestamp = cell.getTimestamp();
+    long kvTimestamp = TxUtils.cellTimestampToTxTimestamp(cell.getTimestamp());
     if (kvTimestamp < currentOldestTs) {
       // passed TTL for this column, seek to next
       return ReturnCode.NEXT_COL;

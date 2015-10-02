@@ -27,10 +27,13 @@ import co.cask.tephra.metrics.TxMetricsCollector;
 import co.cask.tephra.persist.InMemoryTransactionStateStorage;
 import co.cask.tephra.persist.TransactionStateStorage;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hbase.Cell;
 import org.apache.hadoop.hbase.CellUtil;
+import org.apache.hadoop.hbase.HBaseConfiguration;
 import org.apache.hadoop.hbase.HBaseTestingUtility;
 import org.apache.hadoop.hbase.HColumnDescriptor;
+import org.apache.hadoop.hbase.HRegionInfo;
 import org.apache.hadoop.hbase.HTableDescriptor;
 import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.client.Delete;
@@ -42,19 +45,27 @@ import org.apache.hadoop.hbase.client.Put;
 import org.apache.hadoop.hbase.client.Result;
 import org.apache.hadoop.hbase.client.ResultScanner;
 import org.apache.hadoop.hbase.client.Scan;
+import org.apache.hadoop.hbase.regionserver.HRegionFileSystem;
+import org.apache.hadoop.hbase.regionserver.StoreFileInfo;
 import org.apache.hadoop.hbase.util.Bytes;
+import org.apache.hadoop.hbase.util.FSUtils;
 import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.BeforeClass;
+import org.junit.ClassRule;
 import org.junit.Test;
+import org.junit.rules.TemporaryFolder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.TimeUnit;
 
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
@@ -70,6 +81,9 @@ import static org.junit.Assert.fail;
  */
 public class TransactionAwareHTableTest {
   private static final Logger LOG = LoggerFactory.getLogger(TransactionAwareHTableTest.class);
+
+  @ClassRule
+  public static TemporaryFolder tmpFolder = new TemporaryFolder();
 
   private static HBaseTestingUtility testUtil;
   private static HBaseAdmin hBaseAdmin;
@@ -95,7 +109,9 @@ public class TransactionAwareHTableTest {
 
   @BeforeClass
   public static void setupBeforeClass() throws Exception {
-    testUtil = new HBaseTestingUtility();
+    conf = HBaseConfiguration.create();
+    conf.set(TxConstants.Manager.CFG_TX_SNAPSHOT_DIR, tmpFolder.newFolder().getAbsolutePath());
+    testUtil = new HBaseTestingUtility(conf);
     testUtil.startMiniCluster();
     conf = testUtil.getConfiguration();
     hBaseAdmin = testUtil.getHBaseAdmin();
@@ -124,16 +140,30 @@ public class TransactionAwareHTableTest {
   }
 
   private HTable createTable(byte[] tableName, byte[][] columnFamilies) throws Exception {
+    HTableDescriptor desc = getTableDescriptor(tableName, columnFamilies);
+    desc.addCoprocessor(TransactionProcessor.class.getName());
+    return doCreateTable(tableName, desc);
+  }
+
+  private HTable createNonTxTable(byte[] tableName, byte[][] columnFamilies) throws Exception {
+    HTableDescriptor desc = getTableDescriptor(tableName, columnFamilies);
+    return doCreateTable(tableName, desc);
+  }
+
+  private HTable doCreateTable(byte[] tableName, HTableDescriptor desc) throws IOException, InterruptedException {
+    hBaseAdmin.createTable(desc);
+    testUtil.waitTableAvailable(tableName, 5000);
+    return new HTable(testUtil.getConfiguration(), tableName);
+  }
+
+  private HTableDescriptor getTableDescriptor(byte[] tableName, byte[][] columnFamilies) {
     HTableDescriptor desc = new HTableDescriptor(TableName.valueOf(tableName));
     for (byte[] family : columnFamilies) {
       HColumnDescriptor columnDesc = new HColumnDescriptor(family);
       columnDesc.setMaxVersions(Integer.MAX_VALUE);
       desc.addFamily(columnDesc);
     }
-    desc.addCoprocessor(TransactionProcessor.class.getName());
-    hBaseAdmin.createTable(desc);
-    testUtil.waitTableAvailable(tableName, 5000);
-    return new HTable(testUtil.getConfiguration(), tableName);
+    return desc;
   }
 
   /**
@@ -914,7 +944,146 @@ public class TransactionAwareHTableTest {
       assertTrue(result.isEmpty());
     } else {
       assertFalse(result.isEmpty());
-      assertArrayEquals(expectedValue, result.getValue(TestBytes.family, TestBytes.qualifier));
+      if (get.hasFamilies()) {
+        byte[] family = get.getFamilyMap().keySet().iterator().next();
+        byte[] col = get.getFamilyMap().get(family).first();
+        assertArrayEquals(expectedValue, result.getValue(family, col));
+      } else {
+        assertArrayEquals(expectedValue, result.getValue(TestBytes.family, TestBytes.qualifier));
+      }
     }
+  }
+
+  @Test
+  public void testExistingData() throws Exception {
+    byte[] row1 = Bytes.toBytes("row1");
+    byte[] row2 = Bytes.toBytes("row2");
+    byte[] row3 = Bytes.toBytes("row3");
+    byte[] col1 = Bytes.toBytes("c1");
+    byte[] col2 = Bytes.toBytes("c2");
+    byte[] val11 = Bytes.toBytes("val11");
+    byte[] val12 = Bytes.toBytes("val12");
+    byte[] val21 = Bytes.toBytes("val21");
+    byte[] val22 = Bytes.toBytes("val22");
+    byte[] val31 = Bytes.toBytes("val31");
+
+    long ttl = TimeUnit.DAYS.toMillis(6);
+
+    // Write some data to a non-transactional table
+    byte[] tableName = Bytes.toBytes("testExistingData");
+    try {
+      try (HTable noTxTable = createNonTxTable(tableName, new byte[][]{TestBytes.family})) {
+        long existingDataTimestamp1 = System.currentTimeMillis() - ttl / 2;
+        long existingDataTimestamp2 = System.currentTimeMillis() - ttl / 3;
+        noTxTable.put(new Put(row1).add(TestBytes.family, col1, existingDataTimestamp1, val11));
+        noTxTable.put(new Put(row1).add(TestBytes.family, col2, existingDataTimestamp2, val12));
+        noTxTable.put(new Put(row2).add(TestBytes.family, col1, existingDataTimestamp1, val21));
+        noTxTable.put(new Put(row2).add(TestBytes.family, col2, existingDataTimestamp2, val22));
+        noTxTable.flushCommits();
+
+        verifyRow(noTxTable, new Get(row1).addColumn(TestBytes.family, col1), val11);
+        verifyRow(noTxTable, new Get(row1).addColumn(TestBytes.family, col2), val12);
+        verifyRow(noTxTable, new Get(row2).addColumn(TestBytes.family, col1), val21);
+        verifyRow(noTxTable, new Get(row2).addColumn(TestBytes.family, col2), val22);
+      }
+
+      // Now try reading the data as a transactional table
+      // Attach co-processor to the table
+      HTableDescriptor tableDescriptor = hBaseAdmin.getTableDescriptor(tableName);
+      tableDescriptor.addCoprocessor(TransactionProcessor.class.getName());
+      hBaseAdmin.modifyTable(tableName, tableDescriptor);
+      setTtl(tableDescriptor, TestBytes.family, ttl);
+
+      InMemoryTxSystemClient txClient = new InMemoryTxSystemClient(txManager);
+      try (TransactionAwareHTable txTable = new TransactionAwareHTable(new HTable(conf, tableName))) {
+        TransactionContext txContext = new TransactionContext(txClient, txTable);
+        txContext.start();
+        txTable.put(new Put(row3).add(TestBytes.family, col1, val31));
+        txContext.finish();
+        txTable.flushCommits();
+
+        // Should be able to read existing data after major compaction
+        LOG.error("111111111 running major compaction");
+        majorCompact(tableDescriptor, TestBytes.family);
+        LOG.error("111111111 done running major compaction");
+
+        txContext = new TransactionContext(txClient, txTable);
+        txContext.start();
+        verifyRow(txTable, new Get(row3).addColumn(TestBytes.family, col1), val31);
+        verifyRow(txTable, new Get(row1).addColumn(TestBytes.family, col1), val11);
+        verifyRow(txTable, new Get(row1).addColumn(TestBytes.family, col2), val12);
+        verifyRow(txTable, new Get(row2).addColumn(TestBytes.family, col1), val21);
+        verifyRow(txTable, new Get(row2).addColumn(TestBytes.family, col2), val22);
+        txContext.finish();
+
+        setTtl(tableDescriptor, TestBytes.family, ttl / 2);
+
+        LOG.error("111111111 running major compaction");
+        majorCompact(tableDescriptor, TestBytes.family);
+        LOG.error("111111111 done running major compaction");
+
+        txContext = new TransactionContext(txClient, txTable);
+        txContext.start();
+        verifyRow(txTable, new Get(row3).addColumn(TestBytes.family, col1), val31);
+        verifyRow(txTable, new Get(row1).addColumn(TestBytes.family, col1), null);
+        verifyRow(txTable, new Get(row1).addColumn(TestBytes.family, col2), val12);
+        verifyRow(txTable, new Get(row2).addColumn(TestBytes.family, col1), null);
+        verifyRow(txTable, new Get(row2).addColumn(TestBytes.family, col2), val22);
+        txContext.finish();
+
+        setTtl(tableDescriptor, TestBytes.family, 1);
+
+        LOG.error("111111111 running major compaction");
+        majorCompact(tableDescriptor, TestBytes.family);
+        LOG.error("111111111 done running major compaction");
+
+        txContext = new TransactionContext(txClient, txTable);
+        txContext.start();
+        verifyRow(txTable, new Get(row3).addColumn(TestBytes.family, col1), null);
+        verifyRow(txTable, new Get(row1).addColumn(TestBytes.family, col1), null);
+        verifyRow(txTable, new Get(row1).addColumn(TestBytes.family, col2), null);
+        verifyRow(txTable, new Get(row2).addColumn(TestBytes.family, col1), null);
+        verifyRow(txTable, new Get(row2).addColumn(TestBytes.family, col2), null);
+        txContext.finish();
+      }
+    } finally {
+      if (hBaseAdmin.tableExists(tableName)) {
+        hBaseAdmin.disableTable(tableName);
+        hBaseAdmin.deleteTable(tableName);
+      }
+    }
+  }
+
+  private void setTtl(HTableDescriptor tableDescriptor, byte[] family, long ttl) throws Exception {
+    HColumnDescriptor familyDescriptor = new HColumnDescriptor(family);
+    familyDescriptor.setValue(TxConstants.PROPERTY_TTL, String.valueOf(ttl));
+    tableDescriptor.addFamily(familyDescriptor);
+    hBaseAdmin.modifyTable(tableDescriptor.getTableName(), tableDescriptor);
+  }
+
+  private void majorCompact(HTableDescriptor tableDescriptor, byte[] family) throws Exception {
+    long before = System.currentTimeMillis();
+    testUtil.compact(tableDescriptor.getTableName(), true);
+    while(true) {
+      for (StoreFileInfo storeFileInfo : getStoreFiles(tableDescriptor, family)) {
+        LOG.error("Store file = {}, start time = {}, modification time = {}",
+                  storeFileInfo.getPath().toUri(), before, storeFileInfo.getModificationTime());
+        if (storeFileInfo.getModificationTime() > before) {
+          return;
+        }
+      }
+      TimeUnit.MILLISECONDS.sleep(10);
+    }
+  }
+
+  private Set<StoreFileInfo> getStoreFiles(HTableDescriptor tableDescriptor, byte[] family) throws Exception {
+    Set<StoreFileInfo> storeFiles = new HashSet<>();
+    Path tableDir = FSUtils.getTableDir(testUtil.getDefaultRootDirPath(), tableDescriptor.getTableName());
+    for (HRegionInfo regionInfo : hBaseAdmin.getTableRegions(tableDescriptor.getTableName())) {
+      HRegionFileSystem hRegionFileSystem =
+        HRegionFileSystem.openRegionFromFileSystem(conf, testUtil.getTestFileSystem(), tableDir, regionInfo, true);
+      storeFiles.addAll(hRegionFileSystem.getStoreFiles(family));
+    }
+    return storeFiles;
   }
 }

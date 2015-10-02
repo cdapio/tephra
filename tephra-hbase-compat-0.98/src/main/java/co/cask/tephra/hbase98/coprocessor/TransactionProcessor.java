@@ -151,7 +151,7 @@ public class TransactionProcessor extends BaseRegionObserver {
     if (tx != null) {
       projectFamilyDeletes(get);
       get.setMaxVersions();
-      get.setTimeRange(TxUtils.getOldestVisibleTimestamp(ttlByFamily, tx), TxUtils.getMaxVisibleTimestamp(tx));
+      get.setTimeRange(0, TxUtils.getMaxVisibleTimestamp(tx));
       Filter newFilter = Filters.combine(getTransactionFilter(tx, ScanType.USER_SCAN), get.getFilter());
       get.setFilter(newFilter);
     }
@@ -203,7 +203,7 @@ public class TransactionProcessor extends BaseRegionObserver {
     if (tx != null) {
       projectFamilyDeletes(scan);
       scan.setMaxVersions();
-      scan.setTimeRange(TxUtils.getOldestVisibleTimestamp(ttlByFamily, tx), TxUtils.getMaxVisibleTimestamp(tx));
+      scan.setTimeRange(0, TxUtils.getMaxVisibleTimestamp(tx));
       Filter newFilter = Filters.combine(getTransactionFilter(tx, ScanType.USER_SCAN), scan.getFilter());
       scan.setFilter(newFilter);
     }
@@ -248,6 +248,7 @@ public class TransactionProcessor extends BaseRegionObserver {
   public InternalScanner preFlushScannerOpen(ObserverContext<RegionCoprocessorEnvironment> c, Store store,
                                              KeyValueScanner memstoreScanner, InternalScanner scanner)
       throws IOException {
+    LOG.error("111111111 creating store scanner for flush");
     return createStoreScanner(c.getEnvironment(), "flush", cache.getLatestState(), store,
                               Collections.singletonList(memstoreScanner), ScanType.COMPACT_RETAIN_DELETES,
                               HConstants.OLDEST_TIMESTAMP);
@@ -258,6 +259,8 @@ public class TransactionProcessor extends BaseRegionObserver {
       List<? extends KeyValueScanner> scanners, ScanType scanType, long earliestPutTs, InternalScanner s,
       CompactionRequest request)
       throws IOException {
+    LOG.error("111111111 creating store scanner for compaction");
+    System.out.println("111111111 creating store scanner for compaction");
     return createStoreScanner(c.getEnvironment(), "compaction", cache.getLatestState(), store, scanners,
                               scanType, earliestPutTs);
   }
@@ -324,7 +327,7 @@ public class TransactionProcessor extends BaseRegionObserver {
     @Override
     public ReturnCode filterKeyValue(Cell cell) throws IOException {
       // include all cells visible to in-progress transactions, except for those already marked as invalid
-      long ts = cell.getTimestamp();
+      long ts = TxUtils.cellTimestampToTxTimestamp(cell.getTimestamp());
       if (ts > visibilityUpperBound) {
         // include everything that could still be in-progress except invalids
         if (invalidIds.contains(ts)) {
