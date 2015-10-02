@@ -18,6 +18,7 @@ package co.cask.tephra.snapshot;
 
 import co.cask.tephra.TxConstants;
 import co.cask.tephra.persist.TransactionSnapshot;
+import co.cask.tephra.persist.TransactionVisibilityState;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Throwables;
 import com.google.common.collect.Lists;
@@ -109,14 +110,8 @@ public class SnapshotCodecProvider implements SnapshotCodec {
     return codecs.get(codecs.lastKey());
   }
 
-  @Override
-  public int getVersion() {
-    return getCurrentCodec().getVersion();
-  }
-
-  @Override
-  public TransactionSnapshot decode(InputStream in) {
-    // Picking at version to create appropriate codec
+  // Return the appropriate codec for the version in InputStream
+  private SnapshotCodec getCodec(InputStream in) {
     BinaryDecoder decoder = new BinaryDecoder(in);
     int persistedVersion;
     try {
@@ -125,8 +120,22 @@ public class SnapshotCodecProvider implements SnapshotCodec {
       LOG.error("Unable to read transaction state version: ", e);
       throw Throwables.propagate(e);
     }
-    SnapshotCodec codec = getCodecForVersion(persistedVersion);
-    return codec.decode(in);
+    return getCodecForVersion(persistedVersion);
+  }
+
+  @Override
+  public int getVersion() {
+    return getCurrentCodec().getVersion();
+  }
+
+  @Override
+  public TransactionSnapshot decode(InputStream in) {
+    return getCodec(in).decode(in);
+  }
+
+  @Override
+  public TransactionVisibilityState decodeTransactionVisibilityState(InputStream in) {
+    return getCodec(in).decodeTransactionVisibilityState(in);
   }
 
   @Override

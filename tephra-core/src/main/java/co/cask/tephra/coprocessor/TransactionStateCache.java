@@ -19,8 +19,8 @@ package co.cask.tephra.coprocessor;
 import co.cask.tephra.TxConstants;
 import co.cask.tephra.metrics.TxMetricsCollector;
 import co.cask.tephra.persist.HDFSTransactionStateStorage;
-import co.cask.tephra.persist.TransactionSnapshot;
 import co.cask.tephra.persist.TransactionStateStorage;
+import co.cask.tephra.persist.TransactionVisibilityState;
 import co.cask.tephra.snapshot.SnapshotCodecProvider;
 import co.cask.tephra.util.ConfigurationFactory;
 import com.google.common.util.concurrent.AbstractIdleService;
@@ -45,7 +45,7 @@ public class TransactionStateCache extends AbstractIdleService implements Config
   private Configuration hConf;
 
   private TransactionStateStorage storage;
-  private volatile TransactionSnapshot latestState;
+  private volatile TransactionVisibilityState latestState;
 
   private Thread refreshService;
   private long lastRefresh;
@@ -149,13 +149,13 @@ public class TransactionStateCache extends AbstractIdleService implements Config
     // only continue if initialization was successful
     if (initialized) {
       long now = System.currentTimeMillis();
-      TransactionSnapshot currentSnapshot = storage.getLatestSnapshot();
-      if (currentSnapshot != null) {
-        if (currentSnapshot.getTimestamp() < (now - 2 * snapshotRefreshFrequency)) {
+      TransactionVisibilityState currentState = storage.getLatestTransactionVisibilityState();
+      if (currentState != null) {
+        if (currentState.getTimestamp() < (now - 2 * snapshotRefreshFrequency)) {
           LOG.info("Current snapshot is old, will force a refresh on next run.");
           reset();
         } else {
-          latestState = currentSnapshot;
+          latestState = currentState;
           LOG.info("Transaction state reloaded with snapshot from " + latestState.getTimestamp());
           if (LOG.isDebugEnabled()) {
             LOG.debug("Latest transaction snapshot: " + latestState.toString());
@@ -168,7 +168,7 @@ public class TransactionStateCache extends AbstractIdleService implements Config
     }
   }
 
-  public TransactionSnapshot getLatestState() {
+  public TransactionVisibilityState getLatestState() {
     return latestState;
   }
 }

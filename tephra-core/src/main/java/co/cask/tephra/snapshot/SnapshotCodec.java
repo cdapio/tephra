@@ -17,6 +17,7 @@
 package co.cask.tephra.snapshot;
 
 import co.cask.tephra.persist.TransactionSnapshot;
+import co.cask.tephra.persist.TransactionVisibilityState;
 
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -46,4 +47,10 @@ public interface SnapshotCodec {
    */
   TransactionSnapshot decode(InputStream in);
 
+  /**
+   * Decode transaction visibility state from an input stream.
+   * @param in the input stream to read from
+   * @return {@link TransactionVisibilityState}
+   */
+  TransactionVisibilityState decodeTransactionVisibilityState(InputStream in);
 }

@@ -61,6 +61,11 @@ public class NoOpTransactionStateStorage extends AbstractIdleService implements 
   }
 
   @Override
+  public TransactionVisibilityState getLatestTransactionVisibilityState() throws IOException {
+    return null;
+  }
+
+  @Override
   public long deleteOldSnapshots(int numberToKeep) throws IOException {
     return 0;
   }

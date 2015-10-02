@@ -23,6 +23,7 @@ import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.NavigableMap;
@@ -32,7 +33,7 @@ import java.util.TreeMap;
 /**
  * Represents an in-memory snapshot of the full transaction state.
  */
-public class TransactionSnapshot {
+public class TransactionSnapshot implements TransactionVisibilityState {
   private long timestamp;
   private long readPointer;
   private long writePointer;
@@ -44,49 +45,57 @@ public class TransactionSnapshot {
   public TransactionSnapshot(long timestamp, long readPointer, long writePointer, Collection<Long> invalid,
                              NavigableMap<Long, TransactionManager.InProgressTx> inProgress,
                              Map<Long, Set<ChangeId>> committing, Map<Long, Set<ChangeId>> committed) {
+    this(timestamp, readPointer, writePointer, invalid, inProgress);
+    this.committingChangeSets = committing;
+    this.committedChangeSets = committed;
+  }
+
+  public TransactionSnapshot(long timestamp, long readPointer, long writePointer, Collection<Long> invalid,
+                             NavigableMap<Long, TransactionManager.InProgressTx> inProgress) {
     this.timestamp = timestamp;
     this.readPointer = readPointer;
     this.writePointer = writePointer;
     this.invalid = invalid;
     this.inProgress = inProgress;
-    this.committingChangeSets = committing;
-    this.committedChangeSets = committed;
+    this.committingChangeSets = Collections.emptyMap();
+    this.committedChangeSets = Collections.emptyMap();
   }
 
-  /**
-   * Returns the timestamp from when this snapshot was created.
-   */
+  @Override
   public long getTimestamp() {
     return timestamp;
   }
 
-  /**
-   * Returns the read pointer at the time of the snapshot.
-   */
+  @Override
   public long getReadPointer() {
     return readPointer;
   }
 
-  /**
-   * Returns the next write pointer at the time of the snapshot.
-   */
+  @Override
   public long getWritePointer() {
     return writePointer;
   }
 
-  /**
-   * Returns the list of invalid write pointers at the time of the snapshot.
-   */
+  @Override
   public Collection<Long> getInvalid() {
     return invalid;
   }
 
-  /**
-   * Returns the map of in-progress transaction write pointers at the time of the snapshot.
-   * @return a map of write pointer to expiration timestamp (in milliseconds) for all transactions in-progress.
-   */
-  public Map<Long, TransactionManager.InProgressTx> getInProgress() {
+  @Override
+  public NavigableMap<Long, TransactionManager.InProgressTx> getInProgress() {
     return inProgress;
+  }
+
+  @Override
+  public long getVisibilityUpperBound() {
+    // the readPointer of the oldest in-progress tx is the oldest in use
+    // todo: potential problem with not moving visibility upper bound for the whole duration of long-running tx
+    Map.Entry<Long, TransactionManager.InProgressTx> firstInProgress = inProgress.firstEntry();
+    if (firstInProgress == null) {
+      // using readPointer as smallest visible when non txs are there
+      return readPointer;
+    }
+    return firstInProgress.getValue().getVisibilityUpperBound();
   }
 
   /**
@@ -108,22 +117,6 @@ public class TransactionSnapshot {
    */
   public Map<Long, Set<ChangeId>> getCommittedChangeSets() {
     return committedChangeSets;
-  }
-
-  /**
-   * @return transaction id {@code X} such that any of the transactions newer than {@code X} might be invisible to
-   *         some of the currently in-progress transactions or to those that will be started <p>
-   *         NOTE: the returned tx id can be invalid.
-   */
-  public long getVisibilityUpperBound() {
-    // the readPointer of the oldest in-progress tx is the oldest in use
-    // todo: potential problem with not moving visibility upper bound for the whole duration of long-running tx
-    Map.Entry<Long, TransactionManager.InProgressTx> firstInProgress = inProgress.firstEntry();
-    if (firstInProgress == null) {
-      // using readPointer as smallest visible when non txs are there
-      return readPointer;
-    }
-    return firstInProgress.getValue().getVisibilityUpperBound();
   }
 
   /**
@@ -200,4 +193,5 @@ public class TransactionSnapshot {
     return new TransactionSnapshot(snapshotTime, readPointer, writePointer,
                                    invalidCopy, inProgressCopy, committingCopy, committedCopy);
   }
+
 }

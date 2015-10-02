@@ -25,6 +25,7 @@ import co.cask.tephra.coprocessor.TransactionStateCacheSupplier;
 import co.cask.tephra.metrics.TxMetricsCollector;
 import co.cask.tephra.persist.HDFSTransactionStateStorage;
 import co.cask.tephra.persist.TransactionSnapshot;
+import co.cask.tephra.persist.TransactionVisibilityState;
 import co.cask.tephra.snapshot.DefaultSnapshotCodec;
 import co.cask.tephra.snapshot.SnapshotCodecProvider;
 import co.cask.tephra.util.TxUtils;
@@ -45,13 +46,10 @@ import org.apache.hadoop.hbase.ServerName;
 import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.client.Delete;
 import org.apache.hadoop.hbase.client.Put;
-import org.apache.hadoop.hbase.client.Result;
-import org.apache.hadoop.hbase.client.ResultScanner;
 import org.apache.hadoop.hbase.client.Scan;
 import org.apache.hadoop.hbase.regionserver.HRegion;
 import org.apache.hadoop.hbase.regionserver.HRegionFileSystem;
 import org.apache.hadoop.hbase.regionserver.RegionScanner;
-import org.apache.hadoop.hbase.regionserver.RegionServerServices;
 import org.apache.hadoop.hbase.regionserver.ScanType;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.hbase.wal.WAL;
@@ -101,7 +99,7 @@ public class TransactionProcessorTest {
   private static MiniDFSCluster dfsCluster;
   private static Configuration conf;
   private static LongArrayList invalidSet = new LongArrayList(new long[]{V[3], V[5], V[7]});
-  private static TransactionSnapshot txSnapshot;
+  private static TransactionVisibilityState txVisibilityState;
 
   @BeforeClass
   public static void setupBeforeClass() throws Exception {
@@ -119,12 +117,15 @@ public class TransactionProcessorTest {
     conf.set(TxConstants.Persist.CFG_TX_SNAPHOT_CODEC_CLASSES, DefaultSnapshotCodec.class.getName());
 
     // write an initial transaction snapshot
-    txSnapshot = TransactionSnapshot.copyFrom(
-        System.currentTimeMillis(), V[6] - 1, V[7], invalidSet,
-        // this will set visibility upper bound to V[6]
-        Maps.newTreeMap(ImmutableSortedMap.of(V[6], new TransactionManager.InProgressTx(V[6] - 1, Long.MAX_VALUE,
-                                                                                        TransactionType.SHORT))),
-        new HashMap<Long, Set<ChangeId>>(), new TreeMap<Long, Set<ChangeId>>());
+    TransactionSnapshot txSnapshot = TransactionSnapshot.copyFrom(
+      System.currentTimeMillis(), V[6] - 1, V[7], invalidSet,
+      // this will set visibility upper bound to V[6]
+      Maps.newTreeMap(ImmutableSortedMap.of(V[6], new TransactionManager.InProgressTx(V[6] - 1, Long.MAX_VALUE,
+                                                                                      TransactionType.SHORT))),
+      new HashMap<Long, Set<ChangeId>>(), new TreeMap<Long, Set<ChangeId>>());
+    txVisibilityState = new TransactionSnapshot(txSnapshot.getTimestamp(), txSnapshot.getReadPointer(),
+                                                txSnapshot.getWritePointer(), txSnapshot.getInvalid(),
+                                                txSnapshot.getInProgress());
     HDFSTransactionStateStorage tmpStorage =
       new HDFSTransactionStateStorage(conf, new SnapshotCodecProvider(conf), new TxMetricsCollector());
     tmpStorage.startAndWait();
@@ -236,8 +237,8 @@ public class TransactionProcessorTest {
       // should be only one row
       assertFalse(regionScanner.next(results));
       assertKeyValueMatches(results, 1,
-          new long[]{V[8], V[6], deleteTs},
-          new byte[][]{Bytes.toBytes(V[8]), Bytes.toBytes(V[6]), new byte[0]});
+                            new long[]{V[8], V[6], deleteTs},
+                            new byte[][]{Bytes.toBytes(V[8]), Bytes.toBytes(V[6]), new byte[0]});
     } finally {
       region.close();
     }
@@ -252,7 +253,7 @@ public class TransactionProcessorTest {
       region.initialize();
 
       // all puts use a timestamp before the tx snapshot's visibility upper bound, making them eligible for removal
-      long writeTs = txSnapshot.getVisibilityUpperBound() - 10;
+      long writeTs = txVisibilityState.getVisibilityUpperBound() - 10;
       // deletes are performed after the writes, but still before the visibility upper bound
       long deleteTs = writeTs + 1;
       // write separate columns to confirm that delete markers survive across flushes
@@ -295,7 +296,7 @@ public class TransactionProcessorTest {
       // read all back
       scan = new Scan(row);
       scan.setFilter(new TransactionVisibilityFilter(
-          TxUtils.createDummyTransaction(txSnapshot), new TreeMap<byte[], Long>(), false, ScanType.USER_SCAN));
+        TxUtils.createDummyTransaction(txVisibilityState), new TreeMap<byte[], Long>(), false, ScanType.USER_SCAN));
       regionScanner = region.getScanner(scan);
       results = Lists.newArrayList();
       assertFalse(regionScanner.next(results));
@@ -317,7 +318,7 @@ public class TransactionProcessorTest {
 
       scan = new Scan(row);
       scan.setFilter(new TransactionVisibilityFilter(
-          TxUtils.createDummyTransaction(txSnapshot), new TreeMap<byte[], Long>(), false, ScanType.USER_SCAN));
+        TxUtils.createDummyTransaction(txVisibilityState), new TreeMap<byte[], Long>(), false, ScanType.USER_SCAN));
       regionScanner = region.getScanner(scan);
       results = Lists.newArrayList();
       assertFalse(regionScanner.next(results));
@@ -403,7 +404,7 @@ public class TransactionProcessorTest {
       scan = new Scan();
       scan.setMaxVersions();
       scan.setFilter(new TransactionVisibilityFilter(
-          TxUtils.createDummyTransaction(txSnapshot), new TreeMap<byte[], Long>(), false, ScanType.USER_SCAN));
+        TxUtils.createDummyTransaction(txVisibilityState), new TreeMap<byte[], Long>(), false, ScanType.USER_SCAN));
       scanner = region.getScanner(scan);
       results = Lists.newArrayList();
       scanner.next(results);
@@ -431,8 +432,8 @@ public class TransactionProcessorTest {
     HRegionInfo regionInfo = new HRegionInfo(TableName.valueOf(tableName));
     HRegionFileSystem regionFS = HRegionFileSystem.createRegionOnFileSystem(conf, fs, tablePath, regionInfo);
     return new HRegion(regionFS, hLog, conf, htd,
-        new LocalRegionServerServices(conf, ServerName.valueOf(
-            InetAddress.getLocalHost().getHostName(), 0, System.currentTimeMillis())));
+                       new LocalRegionServerServices(conf, ServerName.valueOf(
+                         InetAddress.getLocalHost().getHostName(), 0, System.currentTimeMillis())));
   }
 
   private void assertKeyValueMatches(List<Cell> results, int index, long[] versions) {
@@ -460,7 +461,7 @@ public class TransactionProcessorTest {
     cache.setConf(conf);
     cache.startAndWait();
     // verify that the transaction snapshot read matches what we wrote in setupBeforeClass()
-    TransactionSnapshot cachedSnapshot = cache.getLatestState();
+    TransactionVisibilityState cachedSnapshot = cache.getLatestState();
     assertNotNull(cachedSnapshot);
     assertEquals(invalidSet, cachedSnapshot.getInvalid());
     cache.stopAndWait();
