@@ -29,7 +29,7 @@ import java.util.Map;
  * Utility methods supporting transaction operations.
  */
 public class TxUtils {
-  private static long EARLIEST_TX_TIMESTAMP = System.currentTimeMillis() * TxConstants.MAX_TX_PER_MS / 1000;
+  private static final long EARLIEST_TX_TIMESTAMP = System.currentTimeMillis() * TxConstants.MAX_TX_PER_MS / 1000;
 
   /**
    * Returns the oldest visible timestamp for the given transaction, based on the TTLs configured for each column
