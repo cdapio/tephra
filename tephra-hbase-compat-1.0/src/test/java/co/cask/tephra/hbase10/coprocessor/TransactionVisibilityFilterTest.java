@@ -122,6 +122,25 @@ public class TransactionVisibilityFilterTest extends AbstractTransactionVisibili
                  filter.filterKeyValue(newKeyValue("row2", FAM, "val1", now)));
     assertEquals(Filter.ReturnCode.INCLUDE_AND_NEXT_COL,
                  filter.filterKeyValue(newKeyValue("row2", FAM, "val1", now - 1 * TxConstants.MAX_TX_PER_MS)));
+
+    // Verify ttl for pre-existing, non-transactional data
+    long preNow = now / TxConstants.MAX_TX_PER_MS;
+    assertEquals(Filter.ReturnCode.INCLUDE_AND_NEXT_COL,
+                 filter.filterKeyValue(newKeyValue("row1", FAM, "val1", preNow)));
+    assertEquals(Filter.ReturnCode.INCLUDE_AND_NEXT_COL,
+                 filter.filterKeyValue(newKeyValue("row1", FAM, "val1", preNow - 9L)));
+    assertEquals(Filter.ReturnCode.INCLUDE_AND_NEXT_COL,
+                 filter.filterKeyValue(newKeyValue("row1", FAM, "val1", preNow - 10L)));
+    assertEquals(Filter.ReturnCode.NEXT_COL,
+                 filter.filterKeyValue(newKeyValue("row1", FAM, "val1", preNow - 11L)));
+    assertEquals(Filter.ReturnCode.INCLUDE_AND_NEXT_COL,
+                 filter.filterKeyValue(newKeyValue("row1", FAM3, "val1", preNow)));
+    assertEquals(Filter.ReturnCode.INCLUDE_AND_NEXT_COL,
+                 filter.filterKeyValue(newKeyValue("row1", FAM3, "val1", preNow - 9L)));
+    assertEquals(Filter.ReturnCode.INCLUDE_AND_NEXT_COL,
+                 filter.filterKeyValue(newKeyValue("row1", FAM3, "val1", preNow - 10L)));
+    assertEquals(Filter.ReturnCode.INCLUDE_AND_NEXT_COL,
+                 filter.filterKeyValue(newKeyValue("row1", FAM3, "val1", preNow - 1001L)));
   }
 
   protected Filter createFilter(Transaction tx, Map<byte[], Long> familyTTLs) {
