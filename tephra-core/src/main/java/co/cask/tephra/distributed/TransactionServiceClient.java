@@ -131,7 +131,6 @@ public class TransactionServiceClient implements TransactionSystemClient {
    * for service discovery. Otherwise it will look for the port in the
    * config and use localhost.
    * @param config a configuration containing the zookeeper properties
-   * @throws TException
    */
   @Inject
   public TransactionServiceClient(Configuration config,
@@ -428,7 +427,9 @@ public class TransactionServiceClient implements TransactionSystemClient {
       return this.execute(
         new Operation<String>("status") {
           @Override
-          public String execute(TransactionServiceThriftClient client) throws Exception { return client.status(); }
+          public String execute(TransactionServiceThriftClient client) throws Exception {
+            return client.status();
+          }
         });
     } catch (Exception e) {
       throw Throwables.propagate(e);
