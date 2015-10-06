@@ -17,14 +17,10 @@
 package co.cask.tephra;
 
 /**
- *
+ * Thrown when transaction has timed out.
  */
-public class TransactionFailureException extends Exception {
-  public TransactionFailureException(String message) {
+public class TransactionNotInProgressException extends TransactionFailureException {
+  public TransactionNotInProgressException(String message) {
     super(message);
-  }
-
-  public TransactionFailureException(String message, Throwable cause) {
-    super(message, cause);
   }
 }

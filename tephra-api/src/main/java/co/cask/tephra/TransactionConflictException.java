@@ -17,10 +17,14 @@
 package co.cask.tephra;
 
 /**
- * Thrown when transaction has timed out.
+ * Thrown to indicate transaction conflict occurred when trying to commit a transaction.
  */
-public class TransactionNotInProgressException extends Exception {
-  public TransactionNotInProgressException(String message) {
+public class TransactionConflictException extends TransactionFailureException {
+  public TransactionConflictException(String message) {
     super(message);
+  }
+
+  public TransactionConflictException(String message, Throwable cause) {
+    super(message, cause);
   }
 }

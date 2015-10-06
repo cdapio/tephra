@@ -17,14 +17,14 @@
 package co.cask.tephra;
 
 /**
- *
+ * Thrown to indicate execution of a transaction failed.
  */
-public class TransactionConflictException extends TransactionFailureException {
-  public TransactionConflictException(String message) {
+public class TransactionFailureException extends Exception {
+  public TransactionFailureException(String message) {
     super(message);
   }
 
-  public TransactionConflictException(String message, Throwable cause) {
+  public TransactionFailureException(String message, Throwable cause) {
     super(message, cause);
   }
 }
