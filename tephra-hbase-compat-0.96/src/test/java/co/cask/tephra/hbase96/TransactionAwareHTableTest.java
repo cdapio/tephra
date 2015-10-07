@@ -1,5 +1,5 @@
  /*
- * Copyright © 2014 Cask Data, Inc.
+ * Copyright �� 2014 Cask Data, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not
  * use this file except in compliance with the License. You may obtain a copy of
@@ -31,6 +31,8 @@ import com.google.common.collect.Lists;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.Cell;
 import org.apache.hadoop.hbase.CellUtil;
+import org.apache.hadoop.hbase.Coprocessor;
+import org.apache.hadoop.hbase.DoNotRetryIOException;
 import org.apache.hadoop.hbase.HBaseTestingUtility;
 import org.apache.hadoop.hbase.HColumnDescriptor;
 import org.apache.hadoop.hbase.HConstants;
@@ -38,6 +40,7 @@ import org.apache.hadoop.hbase.HTableDescriptor;
 import org.apache.hadoop.hbase.KeyValue;
 import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.client.Delete;
+import org.apache.hadoop.hbase.client.Durability;
 import org.apache.hadoop.hbase.client.Get;
 import org.apache.hadoop.hbase.client.HBaseAdmin;
 import org.apache.hadoop.hbase.client.HTable;
@@ -46,6 +49,10 @@ import org.apache.hadoop.hbase.client.Put;
 import org.apache.hadoop.hbase.client.Result;
 import org.apache.hadoop.hbase.client.ResultScanner;
 import org.apache.hadoop.hbase.client.Scan;
+import org.apache.hadoop.hbase.coprocessor.BaseRegionObserver;
+import org.apache.hadoop.hbase.coprocessor.ObserverContext;
+import org.apache.hadoop.hbase.coprocessor.RegionCoprocessorEnvironment;
+import org.apache.hadoop.hbase.regionserver.wal.WALEdit;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.junit.After;
 import org.junit.AfterClass;
@@ -56,9 +63,11 @@ import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -102,6 +111,28 @@ public class TransactionAwareHTableTest {
     private static final byte[] value3 = Bytes.toBytes("value3");
   }
 
+  private static final String TEST_ATTRIBUTE = "TEST_ATTRIBUTE";
+  
+  public static class TestRegionObserver extends BaseRegionObserver {
+      @Override
+      public void prePut(final ObserverContext<RegionCoprocessorEnvironment> c,
+          final Put put, final WALEdit edit,
+          final Durability durability) throws IOException {
+          if (put.getAttribute(TEST_ATTRIBUTE) == null) {
+              throw new DoNotRetryIOException("Put should preserve attributes");
+          }
+      }
+            
+      @Override
+      public void preDelete(final ObserverContext<RegionCoprocessorEnvironment> c,
+          final Delete delete, final WALEdit edit,
+          final Durability durability) throws IOException {
+          if (delete.getAttribute(TEST_ATTRIBUTE) == null) {
+              throw new DoNotRetryIOException("Delete should preserve attributes");
+          }
+      }
+  }
+  
   @BeforeClass
   public static void setupBeforeClass() throws Exception {
     testUtil = new HBaseTestingUtility();
@@ -146,10 +177,11 @@ public class TransactionAwareHTableTest {
   }
 
   private HTable createTable(byte[] tableName, byte[][] columnFamilies) throws Exception {
-    return createTable(tableName, columnFamilies, false);
+    return createTable(tableName, columnFamilies, false, Collections.<String>emptyList());
   }
 
-  private HTable createTable(byte[] tableName, byte[][] columnFamilies, boolean existingData) throws Exception {
+  private HTable createTable(byte[] tableName, byte[][] columnFamilies, boolean existingData, 
+    List<String> coprocessors) throws Exception {
     HTableDescriptor desc = new HTableDescriptor(TableName.valueOf(tableName));
     for (byte[] family : columnFamilies) {
       HColumnDescriptor columnDesc = new HColumnDescriptor(family);
@@ -160,11 +192,17 @@ public class TransactionAwareHTableTest {
     if (existingData) {
       desc.setValue(TxConstants.READ_NON_TX_DATA, "true");
     }
-    desc.addCoprocessor(TransactionProcessor.class.getName());
+    // Divide individually to prevent any overflow
+    int priority  = Coprocessor.PRIORITY_USER; 
+    desc.addCoprocessor(TransactionProcessor.class.getName(), null, priority, null);
+    // order in list is the same order that coprocessors will be invoked  
+    for (String coprocessor : coprocessors) {
+      desc.addCoprocessor(coprocessor, null, ++priority, null);
+    }
     hBaseAdmin.createTable(desc);
     testUtil.waitTableAvailable(tableName, 5000);
     return new HTable(testUtil.getConfiguration(), tableName);
-  }
+   }
 
   /**
    * Test transactional put and get requests.
@@ -353,6 +391,53 @@ public class TransactionAwareHTableTest {
     }
   }
 
+  /**
+   * Test that put and delete attributes are preserved
+   *
+   * @throws Exception
+   */
+  @Test
+  public void testAttributesPreserved() throws Exception {
+    HTable hTable = createTable(Bytes.toBytes("TestAttributesPreserved"),
+        new byte[][]{TestBytes.family, TestBytes.family2}, false,
+        Lists.newArrayList(TestRegionObserver.class.getName()));
+    try {
+      TransactionAwareHTable txTable = new TransactionAwareHTable(hTable);
+      TransactionContext txContext = new TransactionContext(new InMemoryTxSystemClient(txManager), txTable);
+
+      txContext.start();
+      Put put = new Put(TestBytes.row);
+      put.add(TestBytes.family, TestBytes.qualifier, TestBytes.value);
+      put.add(TestBytes.family2, TestBytes.qualifier, TestBytes.value2);
+      // set an attribute on the put, TestRegionObserver will verify it still exists
+      put.setAttribute(TEST_ATTRIBUTE, new byte[]{});
+      txTable.put(put);
+      txContext.finish();
+
+      txContext.start();
+      Result result = txTable.get(new Get(TestBytes.row));
+      txContext.finish();
+      byte[] value = result.getValue(TestBytes.family, TestBytes.qualifier);
+      assertArrayEquals(TestBytes.value, value);
+      value = result.getValue(TestBytes.family2, TestBytes.qualifier);
+      assertArrayEquals(TestBytes.value2, value);
+
+      // test full row delete, TestRegionObserver will verify it still exists
+      txContext.start();
+      Delete delete = new Delete(TestBytes.row);
+      delete.setAttribute(TEST_ATTRIBUTE, new byte[]{});
+      txTable.delete(delete);
+      txContext.finish();
+
+      txContext.start();
+      result = txTable.get(new Get(TestBytes.row));
+      txContext.finish();
+      assertTrue(result.isEmpty());
+    } finally {
+        hTable.close();
+      }
+    }
+  
   /**
    * Test aborted transactional delete requests, that must be rolled back.
    *
@@ -1028,7 +1113,8 @@ public class TransactionAwareHTableTest {
     byte[] val111 = Bytes.toBytes("val111");
 
     TransactionAwareHTable txTable =
-      new TransactionAwareHTable(createTable(Bytes.toBytes("testExistingData"), new byte[][]{TestBytes.family}, true));
+      new TransactionAwareHTable(createTable(Bytes.toBytes("testExistingData"), new byte[][]{TestBytes.family}, true, 
+      Collections.<String>emptyList()));
     TransactionContext txContext = new TransactionContext(new InMemoryTxSystemClient(txManager), txTable);
 
     // Add some pre-existing, non-transactional data
@@ -1178,7 +1264,7 @@ public class TransactionAwareHTableTest {
   @Test
   public void testVisibilityAll() throws Exception {
     HTable nonTxTable = createTable(Bytes.toBytes("testVisibilityAll"),
-                                    new byte[][]{TestBytes.family, TestBytes.family2}, true);
+      new byte[][]{TestBytes.family, TestBytes.family2}, true, Collections.<String>emptyList());
     TransactionAwareHTable txTable =
       new TransactionAwareHTable(nonTxTable,
                                  TxConstants.ConflictDetection.ROW); // ROW conflict detection to verify family deletes

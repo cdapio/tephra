@@ -19,8 +19,10 @@ import co.cask.tephra.AbstractTransactionAwareTable;
 import co.cask.tephra.Transaction;
 import co.cask.tephra.TransactionAware;
 import co.cask.tephra.TxConstants;
+
 import com.google.protobuf.Service;
 import com.google.protobuf.ServiceException;
+
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.Cell;
 import org.apache.hadoop.hbase.CellUtil;
@@ -584,6 +586,10 @@ public class TransactionAwareHTable extends AbstractTransactionAwareTable
         }
       }
     }
+    for (Map.Entry<String, byte[]> entry : delete.getAttributesMap().entrySet()) {
+        txDelete.setAttribute(entry.getKey(), entry.getValue());
+    }
+    txDelete.setWriteToWAL(delete.getWriteToWAL());
     return txDelete;
   }
 

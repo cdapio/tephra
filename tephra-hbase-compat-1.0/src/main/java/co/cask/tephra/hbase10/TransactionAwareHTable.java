@@ -643,6 +643,10 @@ public class TransactionAwareHTable extends AbstractTransactionAwareTable
         }
       }
     }
+    for (Map.Entry<String, byte[]> entry : delete.getAttributesMap().entrySet()) {
+        txDelete.setAttribute(entry.getKey(), entry.getValue());
+    }
+    txDelete.setWriteToWAL(delete.getWriteToWAL());
     return txDelete;
   }
 
