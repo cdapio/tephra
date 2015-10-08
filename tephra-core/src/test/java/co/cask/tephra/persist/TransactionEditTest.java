@@ -18,13 +18,22 @@ package co.cask.tephra.persist;
 
 import co.cask.tephra.ChangeId;
 import co.cask.tephra.TransactionType;
+import co.cask.tephra.snapshot.DefaultSnapshotCodec;
+import co.cask.tephra.snapshot.SnapshotCodecProvider;
 import com.google.common.collect.Sets;
 import com.google.common.io.ByteArrayDataOutput;
 import com.google.common.io.ByteStreams;
+import org.apache.commons.io.IOUtils;
+import org.apache.hadoop.conf.Configuration;
 import org.junit.Assert;
 import org.junit.Test;
 
+
 import java.io.DataInput;
+import java.io.DataInputStream;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 
 /**
@@ -68,6 +77,19 @@ public class TransactionEditTest {
     decodedEdit.readFields(in);
 
     Assert.assertEquals(edit, decodedEdit);
+  }
+
+  @Test
+  public void decodeProblematicTxLog() throws Exception {
+    DataInput in = ByteStreams.newDataInput(
+      IOUtils.toByteArray(
+        new FileInputStream(new File("/Users/shankar/tx.snapshot/latest/tx.snapshot/snapshot.1443792213636"))));
+//    TransactionEdit decodedEdit = new TransactionEdit();
+//    decodedEdit.readFields(in);
+    SnapshotCodecProvider provider1 = new SnapshotCodecProvider(new Configuration());
+    provider1.decode(new FileInputStream(
+      new File("/Users/shankar/tx.snapshot/latest/tx.snapshot/snapshot.1443792213636")));
+
   }
 
   @Test

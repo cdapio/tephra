@@ -21,10 +21,12 @@ import co.cask.tephra.metrics.TxMetricsCollector;
 import co.cask.tephra.snapshot.SnapshotCodecProvider;
 import co.cask.tephra.snapshot.SnapshotCodecV2;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.ClassRule;
+import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 
 import java.io.IOException;
@@ -68,5 +70,24 @@ public class HDFSTransactionStateStorageTest extends AbstractTransactionStateSto
   @Override
   protected AbstractTransactionStateStorage getStorage(Configuration conf) {
     return new HDFSTransactionStateStorage(conf, new SnapshotCodecProvider(conf), new TxMetricsCollector());
+  }
+
+
+  @Test
+  public void testTxEdits() throws Exception {
+    HDFSTransactionStateStorage
+      hdfsTransactionStateStorage = (HDFSTransactionStateStorage) getStorage(getConfiguration("testingEdits"));
+    hdfsTransactionStateStorage.startAndWait();
+    TransactionLog transactionLog = hdfsTransactionStateStorage.getTransactionLog(
+      new Path("/Users/shankar/tx.snapshot/latest/tx.snapshot/txlog.1443792213636"), 1443792213636L);
+    TransactionLogReader reader = transactionLog.getReader();
+    TransactionEdit transactionEdit;
+    int count = 0;
+    while((transactionEdit = reader.next()) != null) {
+      System.out.println(count++);
+//      if (count > 118355) {
+//        System.out.println(transactionEdit);
+//      }
+    }
   }
 }

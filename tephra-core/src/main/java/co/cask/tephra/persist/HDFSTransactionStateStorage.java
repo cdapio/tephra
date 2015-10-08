@@ -111,6 +111,12 @@ public class HDFSTransactionStateStorage extends AbstractTransactionStateStorage
     }
   }
 
+  public TransactionLog getTransactionLog(Path path, long timestamp) throws IOException {
+    Path destination = new Path(snapshotDir, LOG_FILE_PREFIX + timestamp);
+    fs.copyFromLocalFile(path, destination);
+    return new HDFSTransactionLog(fs, hConf, destination, 1443792213636L, metricsCollector);
+  }
+
   @Override
   protected void shutDown() throws Exception {
     fs.close();

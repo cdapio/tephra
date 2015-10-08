@@ -157,6 +157,7 @@ public class HDFSTransactionLog extends AbstractTransactionLog {
       if (closed) {
         return null;
       }
+      LOG.error("1111111 Position in file = {}", reader.getPosition());
       boolean successful = reader.next(key, reuse);
       if (successful) {
         return reuse;
