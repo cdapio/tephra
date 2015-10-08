@@ -310,4 +310,14 @@ public class TxConstants {
       { DefaultSnapshotCodec.class, SnapshotCodecV2.class, SnapshotCodecV3.class, SnapshotCodecV4.class };
   }
 
+  /**
+   * Configuration for transaction log edit entries
+   */
+  public static final class TransactionLog {
+    /**
+     * Key used to denote the number of entries appended.
+     */
+    public static final String NUM_ENTRIES_APPENDED = "entries.append.count";
+  }
+
 }

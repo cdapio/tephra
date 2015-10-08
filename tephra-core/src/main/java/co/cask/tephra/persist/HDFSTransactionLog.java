@@ -16,25 +16,37 @@
 
 package co.cask.tephra.persist;
 
+import co.cask.tephra.TxConstants;
 import co.cask.tephra.metrics.MetricsCollector;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Throwables;
+import com.google.common.io.Closeables;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.io.DataOutputBuffer;
 import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.io.SequenceFile;
+import org.apache.hadoop.io.Text;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.ByteArrayOutputStream;
+import java.io.DataOutputStream;
 import java.io.EOFException;
 import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 
 /**
  * Allows reading from and writing to a transaction write-ahead log stored in HDFS.
  */
 public class HDFSTransactionLog extends AbstractTransactionLog {
   private static final Logger LOG = LoggerFactory.getLogger(HDFSTransactionLog.class);
+  private static final int SIZEOF_INT = Integer.SIZE / Byte.SIZE;
 
   private final FileSystem fs;
   private final Configuration hConf;
@@ -107,45 +119,100 @@ public class HDFSTransactionLog extends AbstractTransactionLog {
     return reader;
   }
 
-  private static final class LogWriter implements TransactionLogWriter {
-    private final SequenceFile.Writer internalWriter;
+  @VisibleForTesting
+  static byte[] toBytes(int val) {
+    byte [] b = new byte[4];
+    for (int i = 3; i > 0; i--) {
+      b[i] = (byte) val;
+      val >>>= 8;
+    }
+    b[0] = (byte) val;
+    return b;
+  }
 
+  @VisibleForTesting
+  static final class LogWriter implements TransactionLogWriter {
+    private final SequenceFile.Writer internalWriter;
+    private int numEntries;
+    private List<Entry> transactionEntries;
     public LogWriter(FileSystem fs, Configuration hConf, Path logPath) throws IOException {
       // TODO: retry a few times to ride over transient failures?
+      SequenceFile.Metadata metadata = new SequenceFile.Metadata();
+      metadata.set(new Text("version"), new Text("v2"));
+
       this.internalWriter =
-        SequenceFile.createWriter(fs, hConf, logPath, LongWritable.class, TransactionEdit.class);
+        SequenceFile.createWriter(fs, hConf, logPath, LongWritable.class,
+                                  TransactionEdit.class, SequenceFile.CompressionType.NONE, null, null, metadata);
+      numEntries = 0;
+      transactionEntries = new ArrayList<>();
+
       LOG.debug("Created a new TransactionLog writer for " + logPath);
     }
 
     @Override
     public void append(Entry entry) throws IOException {
-      internalWriter.append(entry.getKey(), entry.getEdit());
+      transactionEntries.add(entry);
     }
 
     @Override
     public void sync() throws IOException {
+      // write the number of entries we are writing to the log
+      if (transactionEntries.size() > 0) {
+        String key = TxConstants.TransactionLog.NUM_ENTRIES_APPENDED;
+        internalWriter.appendRaw(key.getBytes(), 0, key.getBytes().length, new SequenceFile.ValueBytes() {
+          @Override
+          public void writeUncompressedBytes(DataOutputStream outStream) throws IOException {
+            outStream.write(toBytes(transactionEntries.size()));
+            outStream.flush();
+          }
+
+          @Override
+          public void writeCompressedBytes(DataOutputStream outStream) throws IllegalArgumentException, IOException {
+            throw new IllegalArgumentException("UncompressedBytes cannot be compressed!");
+          }
+
+          @Override
+          public int getSize() {
+            // size of value, which is an integer
+            return Integer.SIZE / Byte.SIZE;
+          }
+        });
+      }
+
+      // write the entries to the log
+      for (Entry entry : transactionEntries) {
+        internalWriter.append(entry.getKey(), entry.getEdit());
+      }
+      transactionEntries.clear();
       internalWriter.syncFs();
     }
 
     @Override
     public void close() throws IOException {
+      transactionEntries.clear();
       internalWriter.close();
     }
   }
 
   private static final class LogReader implements TransactionLogReader {
-
     private boolean closed;
     private SequenceFile.Reader reader;
     private LongWritable key = new LongWritable();
+    private boolean newVersion;
+    private List<TransactionEdit> transactionEdits;
 
     public LogReader(SequenceFile.Reader reader) {
       this.reader = reader;
+      newVersion = reader.getMetadata().getMetadata().containsKey(new Text("version"));
+      transactionEdits = new ArrayList<>();
     }
 
     @Override
     public TransactionEdit next() {
       try {
+        if (newVersion) {
+          return next(null);
+        }
         return next(new TransactionEdit());
       } catch (IOException ioe) {
         throw Throwables.propagate(ioe);
@@ -157,11 +224,69 @@ public class HDFSTransactionLog extends AbstractTransactionLog {
       if (closed) {
         return null;
       }
-      boolean successful = reader.next(key, reuse);
-      if (successful) {
-        return reuse;
+      if (transactionEdits.size() != 0) {
+        return transactionEdits.remove(0);
+      } else {
+        if (newVersion) {
+          // v2 format, buffer edits till we reach a marker
+          boolean successful;
+          DataOutputBuffer rawKey = new DataOutputBuffer();
+
+          if (reader.nextRawKey(rawKey) != -1) {
+            // has data and has not reached EOF
+            byte [] keyBytes = TxConstants.TransactionLog.NUM_ENTRIES_APPENDED.getBytes();
+
+            if (rawKey.getLength() == keyBytes.length &&
+              Arrays.equals(Arrays.copyOf(rawKey.getData(), rawKey.getLength()), keyBytes)) {
+              int numEntries;
+              SequenceFile.ValueBytes valueBytes = reader.createValueBytes();
+              Closeables.closeQuietly(rawKey);
+
+              // key matched, read the data now to determine numEntries to read.
+              reader.nextRawValue(valueBytes);
+              ByteArrayOutputStream value = new ByteArrayOutputStream(Integer.SIZE);
+              DataOutputStream outputStream = new DataOutputStream(value);
+              valueBytes.writeUncompressedBytes(outputStream);
+              outputStream.flush();
+              Closeables.closeQuietly(outputStream);
+              numEntries = ByteBuffer.wrap(value.toByteArray()).getInt();
+              Closeables.closeQuietly(value);
+
+              // read numEntries into the list
+              for (int i = 0; i < numEntries; i++) {
+                TransactionEdit edit = new TransactionEdit();
+                try {
+                  successful = reader.next(key, edit);
+                  if (successful) {
+                    transactionEdits.add(edit);
+                  } else {
+                    transactionEdits.clear();
+                    return null;
+                  }
+                } catch (EOFException e) {
+                  // if we have reached EOF before reading back the numEntries, we clear the partial list and return.
+                  transactionEdits.clear();
+                  return null;
+                }
+              }
+            } else {
+              LOG.error("Invalid key for num entries appended found, expected : {}",
+                        TxConstants.TransactionLog.NUM_ENTRIES_APPENDED);
+            }
+          }
+
+          if (!transactionEdits.isEmpty()) {
+            return transactionEdits.remove(0);
+          } else {
+            return null;
+          }
+
+        } else {
+          // does not have marker, version v1.
+          boolean successful = reader.next(key, reuse);
+          return successful ? reuse : null;
+        }
       }
-      return null;
     }
 
     @Override
