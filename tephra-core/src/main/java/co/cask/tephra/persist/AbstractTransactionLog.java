@@ -159,12 +159,17 @@ public abstract class AbstractTransactionLog implements TransactionLog {
       tmpWriter = writer;
 
       List<Entry> currentPending = getPendingWrites();
-      // write out all accumulated Entries to hdfs.
+      if (!currentPending.isEmpty()) {
+        tmpWriter.commitMarker(currentPending.size());
+      }
+
+      // write out all accumulated entries to log.
       for (Entry e : currentPending) {
         tmpWriter.append(e);
         latestSeq = Math.max(latestSeq, e.getKey().get());
       }
     }
+
     long lastSynced = syncedUpTo.get();
     // someone else might have already synced our edits, avoid double syncing
     if (lastSynced < latestSeq) {

@@ -263,4 +263,16 @@ public class TxConstants {
       { DefaultSnapshotCodec.class, SnapshotCodecV2.class };
   }
 
+  /**
+   * Configuration for transaction log edit entries
+   */
+  public static final class TransactionLog {
+    /**
+     * Key used to denote the number of entries appended.
+     */
+    public static final String NUM_ENTRIES_APPENDED = "count";
+    public static final String VERSION_KEY = "version";
+    public static final byte CURRENT_VERSION = 2;
+  }
+
 }

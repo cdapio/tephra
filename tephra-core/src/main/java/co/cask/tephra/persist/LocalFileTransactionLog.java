@@ -71,6 +71,11 @@ public class LocalFileTransactionLog extends AbstractTransactionLog {
     }
 
     @Override
+    public void commitMarker(int count) throws IOException {
+      // skip for local file
+    }
+
+    @Override
     public void sync() throws IOException {
       out.flush();
     }
