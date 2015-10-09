@@ -20,7 +20,7 @@ import co.cask.tephra.Transaction;
 import co.cask.tephra.TransactionManager;
 import co.cask.tephra.TransactionType;
 import co.cask.tephra.TxConstants;
-import co.cask.tephra.persist.TransactionSnapshot;
+import co.cask.tephra.persist.TransactionVisibilityState;
 import com.google.common.primitives.Longs;
 
 import java.util.Map;
@@ -61,17 +61,17 @@ public class TxUtils {
   }
 
   /**
-   * Creates a "dummy" transaction based on the given snapshot's state.  This is not a "real" transaction in the
-   * sense that it has not been started, data should not be written with it, and it cannot be committed.  However,
-   * this can still be useful for filtering data according to the snapshot's state.  Instead of the actual
-   * write pointer from the snapshot, however, we use {@code Long.MAX_VALUE} to avoid mis-identifying any cells as
-   * being written by this transaction (and therefore visible).
+   * Creates a "dummy" transaction based on the given txVisibilityState's state.  This is not a "real" transaction in
+   * the sense that it has not been started, data should not be written with it, and it cannot be committed.  However,
+   * this can still be useful for filtering data according to the txVisibilityState's state.  Instead of the actual
+   * write pointer from the txVisibilityState, however, we use {@code Long.MAX_VALUE} to avoid mis-identifying any cells
+   * as being written by this transaction (and therefore visible).
    */
-  public static Transaction createDummyTransaction(TransactionSnapshot snapshot) {
-    return new Transaction(snapshot.getReadPointer(), Long.MAX_VALUE,
-                           Longs.toArray(snapshot.getInvalid()),
-                           Longs.toArray(snapshot.getInProgress().keySet()),
-                           TxUtils.getFirstShortInProgress(snapshot.getInProgress()), TransactionType.SHORT);
+  public static Transaction createDummyTransaction(TransactionVisibilityState txVisibilityState) {
+    return new Transaction(txVisibilityState.getReadPointer(), Long.MAX_VALUE,
+                           Longs.toArray(txVisibilityState.getInvalid()),
+                           Longs.toArray(txVisibilityState.getInProgress().keySet()),
+                           TxUtils.getFirstShortInProgress(txVisibilityState.getInProgress()), TransactionType.SHORT);
   }
 
   /**

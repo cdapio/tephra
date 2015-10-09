@@ -44,6 +44,13 @@ public interface TransactionStateStorage extends Service {
   public TransactionSnapshot getLatestSnapshot() throws IOException;
 
   /**
+   * Returns the most recent transaction visibility state that has been successfully written.
+   * Note that this may return {@code null} if no completed snapshot files are found.
+   * @return {@link TransactionVisibilityState}
+   */
+  public TransactionVisibilityState getLatestTransactionVisibilityState() throws IOException;
+
+  /**
    * Removes any snapshots prior to the {@code numberToKeep} most recent.
    *
    * @param numberToKeep The number of most recent snapshots to keep.

@@ -24,6 +24,7 @@ import co.cask.tephra.TransactionType;
 import co.cask.tephra.TxConstants;
 import co.cask.tephra.persist.TransactionSnapshot;
 import co.cask.tephra.persist.TransactionStateStorage;
+import co.cask.tephra.persist.TransactionVisibilityState;
 import co.cask.tephra.runtime.ConfigModule;
 import co.cask.tephra.runtime.DiscoveryModules;
 import co.cask.tephra.runtime.TransactionModules;
@@ -61,6 +62,66 @@ import static org.junit.Assert.assertTrue;
 public class SnapshotCodecTest {
   @ClassRule
   public static TemporaryFolder tmpDir = new TemporaryFolder();
+
+  @Test
+  public void testMinimalDeserilization() throws Exception {
+    long now = System.currentTimeMillis();
+    long nowWritePointer = now * TxConstants.MAX_TX_PER_MS;
+    /*
+     * Snapshot consisting of transactions at:
+     */
+    long tInvalid = nowWritePointer - 5;    // t1 - invalid
+    long readPtr = nowWritePointer - 4;     // t2 - here and earlier committed
+    long tLong = nowWritePointer - 3;       // t3 - in-progress LONG
+    long tCommitted = nowWritePointer - 2;  // t4 - committed, changeset (r1, r2)
+    long tShort = nowWritePointer - 1;      // t5 - in-progress SHORT, canCommit called, changeset (r3, r4)
+
+    TreeMap<Long, TransactionManager.InProgressTx> inProgress = Maps.newTreeMap(ImmutableSortedMap.of(
+      tLong, new TransactionManager.InProgressTx(readPtr,
+                                                 TransactionManager.getTxExpirationFromWritePointer(
+                                                   tLong, TxConstants.Manager.DEFAULT_TX_LONG_TIMEOUT),
+                                                 TransactionType.LONG),
+      tShort, new TransactionManager.InProgressTx(readPtr, now + 1000, TransactionType.SHORT)));
+
+    TransactionSnapshot snapshot = new TransactionSnapshot(now, readPtr, nowWritePointer,
+                                                           Lists.newArrayList(tInvalid), // invalid
+                                                           inProgress, ImmutableMap.<Long, Set<ChangeId>>of(
+                                                             tShort, Sets.<ChangeId>newHashSet()),
+                                                           ImmutableMap.<Long, Set<ChangeId>>of(
+                                                             tCommitted, Sets.<ChangeId>newHashSet()));
+
+    Configuration conf1 = new Configuration();
+    conf1.set(TxConstants.Persist.CFG_TX_SNAPHOT_CODEC_CLASSES, SnapshotCodecV4.class.getName());
+    SnapshotCodecProvider provider1 = new SnapshotCodecProvider(conf1);
+
+    byte[] byteArray;
+    try (ByteArrayOutputStream out = new ByteArrayOutputStream()) {
+      provider1.encode(out, snapshot);
+      byteArray = out.toByteArray();
+    }
+
+    // TransactionSnapshot and TransactionVisibilityState decode should pass now
+    TransactionSnapshot txSnapshot = provider1.decode(new ByteArrayInputStream(byteArray));
+    TransactionVisibilityState txVisibilityState =
+      provider1.decodeTransactionVisibilityState(new ByteArrayInputStream(byteArray));
+    assertTransactionVisibilityStateEquals(txSnapshot, txVisibilityState);
+
+    // Corrupt the serialization byte array so that full deserialization will fail
+    byteArray[byteArray.length - 1] = 'a';
+
+    // TransactionVisibilityState decoding should pass since it doesn't decode the committing and committed changesets.
+    TransactionVisibilityState txVisibilityState2 = provider1.decodeTransactionVisibilityState(
+      new ByteArrayInputStream(byteArray));
+    Assert.assertNotNull(txVisibilityState2);
+    Assert.assertEquals(txVisibilityState, txVisibilityState2);
+    Assert.assertEquals(readPtr, txVisibilityState2.getReadPointer());
+    try {
+      provider1.decode(new ByteArrayInputStream(byteArray));
+      Assert.fail();
+    } catch (RuntimeException e) {
+      // expected since we modified the serialization bytes
+    }
+  }
 
   /**
    * In-progress LONG transactions written with DefaultSnapshotCodec will not have the type serialized as part of
@@ -106,6 +167,10 @@ public class SnapshotCodecTest {
     }
 
     TransactionSnapshot snapshot2 = provider1.decode(new ByteArrayInputStream(out.toByteArray()));
+    TransactionVisibilityState minTxSnapshot = provider1.decodeTransactionVisibilityState(
+      new ByteArrayInputStream(out.toByteArray()));
+    assertTransactionVisibilityStateEquals(snapshot2, minTxSnapshot);
+
     assertEquals(snapshot.getReadPointer(), snapshot2.getReadPointer());
     assertEquals(snapshot.getWritePointer(), snapshot2.getWritePointer());
     assertEquals(snapshot.getInvalid(), snapshot2.getInvalid());
@@ -147,6 +212,8 @@ public class SnapshotCodecTest {
 
     // confirm that the in-progress entry is missing a type
     TransactionSnapshot snapshot = txStorage.getLatestSnapshot();
+    TransactionVisibilityState txVisibilityState = txStorage.getLatestTransactionVisibilityState();
+    assertTransactionVisibilityStateEquals(snapshot, txVisibilityState);
     assertNotNull(snapshot);
     assertEquals(1, snapshot.getInProgress().size());
     Map.Entry<Long, TransactionManager.InProgressTx> entry =
@@ -159,7 +226,7 @@ public class SnapshotCodecTest {
     Configuration conf2 = new Configuration();
     conf2.set(TxConstants.Manager.CFG_TX_SNAPSHOT_LOCAL_DIR, testDir.getAbsolutePath());
     conf2.setStrings(TxConstants.Persist.CFG_TX_SNAPHOT_CODEC_CLASSES,
-        DefaultSnapshotCodec.class.getName(), SnapshotCodecV3.class.getName());
+                     DefaultSnapshotCodec.class.getName(), SnapshotCodecV3.class.getName());
     Injector injector2 = Guice.createInjector(new ConfigModule(conf2),
         new DiscoveryModules().getSingleNodeModules(), new TransactionModules().getSingleNodeModules());
 
@@ -242,6 +309,9 @@ public class SnapshotCodecTest {
     txStorage.startAndWait();
 
     TransactionSnapshot snapshot = txStorage.getLatestSnapshot();
+    TransactionVisibilityState txVisibilityState = txStorage.getLatestTransactionVisibilityState();
+    assertTransactionVisibilityStateEquals(snapshot, txVisibilityState);
+
     Map<Long, TransactionManager.InProgressTx> inProgress = snapshot.getInProgress();
     Assert.assertEquals(1, inProgress.size());
 
@@ -283,5 +353,14 @@ public class SnapshotCodecTest {
     snapshot = txStorage2.getLatestSnapshot();
     Assert.assertTrue(snapshot.getInProgress().isEmpty());
     txStorage2.stopAndWait();
+  }
+
+  private void assertTransactionVisibilityStateEquals(TransactionVisibilityState expected,
+                                                      TransactionVisibilityState input) {
+    Assert.assertEquals(expected.getTimestamp(), input.getTimestamp());
+    Assert.assertEquals(expected.getReadPointer(), input.getReadPointer());
+    Assert.assertEquals(expected.getWritePointer(), input.getWritePointer());
+    Assert.assertEquals(expected.getInProgress(), input.getInProgress());
+    Assert.assertEquals(expected.getInvalid(), input.getInvalid());
   }
 }

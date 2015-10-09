@@ -22,7 +22,7 @@ import co.cask.tephra.TxConstants;
 import co.cask.tephra.coprocessor.TransactionStateCache;
 import co.cask.tephra.coprocessor.TransactionStateCacheSupplier;
 import co.cask.tephra.hbase98.Filters;
-import co.cask.tephra.persist.TransactionSnapshot;
+import co.cask.tephra.persist.TransactionVisibilityState;
 import co.cask.tephra.util.TxUtils;
 import com.google.common.base.Supplier;
 import com.google.common.collect.Maps;
@@ -263,7 +263,7 @@ public class TransactionProcessor extends BaseRegionObserver {
   }
 
   protected InternalScanner createStoreScanner(RegionCoprocessorEnvironment env, String action,
-                                               TransactionSnapshot snapshot, Store store,
+                                               TransactionVisibilityState snapshot, Store store,
                                                List<? extends KeyValueScanner> scanners, ScanType type,
                                                long earliestPutTs) throws IOException {
     if (snapshot == null) {

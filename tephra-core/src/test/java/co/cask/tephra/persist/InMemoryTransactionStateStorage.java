@@ -64,6 +64,11 @@ public class InMemoryTransactionStateStorage extends AbstractIdleService impleme
   }
 
   @Override
+  public TransactionVisibilityState getLatestTransactionVisibilityState() throws IOException {
+    return lastSnapshot;
+  }
+
+  @Override
   public long deleteOldSnapshots(int numberToKeep) throws IOException {
     // always only keep the last snapshot
     return lastSnapshot.getTimestamp();

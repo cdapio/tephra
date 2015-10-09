@@ -25,6 +25,7 @@ import co.cask.tephra.coprocessor.TransactionStateCacheSupplier;
 import co.cask.tephra.metrics.TxMetricsCollector;
 import co.cask.tephra.persist.HDFSTransactionStateStorage;
 import co.cask.tephra.persist.TransactionSnapshot;
+import co.cask.tephra.persist.TransactionVisibilityState;
 import co.cask.tephra.snapshot.DefaultSnapshotCodec;
 import co.cask.tephra.snapshot.SnapshotCodecProvider;
 import co.cask.tephra.util.TxUtils;
@@ -119,7 +120,7 @@ public class TransactionProcessorTest {
   private static MiniDFSCluster dfsCluster;
   private static Configuration conf;
   private static LongArrayList invalidSet = new LongArrayList(new long[]{V[3], V[5], V[7]});
-  private static TransactionSnapshot txSnapshot;
+  private static TransactionVisibilityState txVisibilityState;
 
   @BeforeClass
   public static void setupBeforeClass() throws Exception {
@@ -137,12 +138,15 @@ public class TransactionProcessorTest {
     conf.set(TxConstants.Persist.CFG_TX_SNAPHOT_CODEC_CLASSES, DefaultSnapshotCodec.class.getName());
 
     // write an initial transaction snapshot
-    txSnapshot = TransactionSnapshot.copyFrom(
-        System.currentTimeMillis(), V[6] - 1, V[7], invalidSet,
-        // this will set visibility upper bound to V[6]
-        Maps.newTreeMap(ImmutableSortedMap.of(V[6], new TransactionManager.InProgressTx(V[6] - 1, Long.MAX_VALUE,
-                                                                                        TransactionType.SHORT))),
-        new HashMap<Long, Set<ChangeId>>(), new TreeMap<Long, Set<ChangeId>>());
+    TransactionSnapshot txSnapshot = TransactionSnapshot.copyFrom(
+      System.currentTimeMillis(), V[6] - 1, V[7], invalidSet,
+      // this will set visibility upper bound to V[6]
+      Maps.newTreeMap(ImmutableSortedMap.of(V[6], new TransactionManager.InProgressTx(V[6] - 1, Long.MAX_VALUE,
+                                                                                      TransactionType.SHORT))),
+      new HashMap<Long, Set<ChangeId>>(), new TreeMap<Long, Set<ChangeId>>());
+    txVisibilityState = new TransactionSnapshot(txSnapshot.getTimestamp(), txSnapshot.getReadPointer(),
+                                                txSnapshot.getWritePointer(), txSnapshot.getInvalid(),
+                                                txSnapshot.getInProgress());
     HDFSTransactionStateStorage tmpStorage =
       new HDFSTransactionStateStorage(conf, new SnapshotCodecProvider(conf), new TxMetricsCollector());
     tmpStorage.startAndWait();
@@ -254,8 +258,8 @@ public class TransactionProcessorTest {
       // should be only one row
       assertFalse(regionScanner.next(results));
       assertKeyValueMatches(results, 1,
-          new long[]{V[8], V[6], deleteTs},
-          new byte[][]{Bytes.toBytes(V[8]), Bytes.toBytes(V[6]), new byte[0]});
+                            new long[]{V[8], V[6], deleteTs},
+                            new byte[][]{Bytes.toBytes(V[8]), Bytes.toBytes(V[6]), new byte[0]});
     } finally {
       region.close();
     }
@@ -270,7 +274,7 @@ public class TransactionProcessorTest {
       region.initialize();
 
       // all puts use a timestamp before the tx snapshot's visibility upper bound, making them eligible for removal
-      long writeTs = txSnapshot.getVisibilityUpperBound() - 10;
+      long writeTs = txVisibilityState.getVisibilityUpperBound() - 10;
       // deletes are performed after the writes, but still before the visibility upper bound
       long deleteTs = writeTs + 1;
       // write separate columns to confirm that delete markers survive across flushes
@@ -313,7 +317,7 @@ public class TransactionProcessorTest {
       // read all back
       scan = new Scan(row);
       scan.setFilter(new TransactionVisibilityFilter(
-          TxUtils.createDummyTransaction(txSnapshot), new TreeMap<byte[], Long>(), false, ScanType.USER_SCAN));
+        TxUtils.createDummyTransaction(txVisibilityState), new TreeMap<byte[], Long>(), false, ScanType.USER_SCAN));
       regionScanner = region.getScanner(scan);
       results = Lists.newArrayList();
       assertFalse(regionScanner.next(results));
@@ -335,7 +339,7 @@ public class TransactionProcessorTest {
 
       scan = new Scan(row);
       scan.setFilter(new TransactionVisibilityFilter(
-          TxUtils.createDummyTransaction(txSnapshot), new TreeMap<byte[], Long>(), false, ScanType.USER_SCAN));
+        TxUtils.createDummyTransaction(txVisibilityState), new TreeMap<byte[], Long>(), false, ScanType.USER_SCAN));
       regionScanner = region.getScanner(scan);
       results = Lists.newArrayList();
       assertFalse(regionScanner.next(results));
@@ -421,7 +425,7 @@ public class TransactionProcessorTest {
       scan = new Scan();
       scan.setMaxVersions();
       scan.setFilter(new TransactionVisibilityFilter(
-          TxUtils.createDummyTransaction(txSnapshot), new TreeMap<byte[], Long>(), false, ScanType.USER_SCAN));
+        TxUtils.createDummyTransaction(txVisibilityState), new TreeMap<byte[], Long>(), false, ScanType.USER_SCAN));
       scanner = region.getScanner(scan);
       results = Lists.newArrayList();
       scanner.next(results);
@@ -476,7 +480,7 @@ public class TransactionProcessorTest {
     cache.setConf(conf);
     cache.startAndWait();
     // verify that the transaction snapshot read matches what we wrote in setupBeforeClass()
-    TransactionSnapshot cachedSnapshot = cache.getLatestState();
+    TransactionVisibilityState cachedSnapshot = cache.getLatestState();
     assertNotNull(cachedSnapshot);
     assertEquals(invalidSet, cachedSnapshot.getInvalid());
     cache.stopAndWait();
@@ -485,10 +489,9 @@ public class TransactionProcessorTest {
   private static class MockRegionServerServices implements RegionServerServices {
     private final Configuration hConf;
     private final ZooKeeperWatcher zookeeper;
-    private final Map<String, HRegion> regions = new HashMap<String, HRegion>();
+    private final Map<String, HRegion> regions = new HashMap<>();
     private boolean stopping = false;
-    private final ConcurrentSkipListMap<byte[], Boolean> rit =
-      new ConcurrentSkipListMap<byte[], Boolean>(Bytes.BYTES_COMPARATOR);
+    private final ConcurrentSkipListMap<byte[], Boolean> rit = new ConcurrentSkipListMap<>(Bytes.BYTES_COMPARATOR);
     private HFileSystem hfs = null;
     private ServerName serverName = null;
     private RpcServerInterface rpcServer = null;
@@ -650,15 +653,15 @@ public class TransactionProcessorTest {
 
     @Override
     public boolean reportRegionStateTransition(
-        RegionServerStatusProtos.RegionStateTransition.TransitionCode transitionCode,
-        long l, HRegionInfo... hRegionInfos) {
+      RegionServerStatusProtos.RegionStateTransition.TransitionCode transitionCode,
+      long l, HRegionInfo... hRegionInfos) {
       return false;
     }
 
     @Override
     public boolean reportRegionStateTransition(
-        RegionServerStatusProtos.RegionStateTransition.TransitionCode transitionCode,
-        HRegionInfo... hRegionInfos) {
+      RegionServerStatusProtos.RegionStateTransition.TransitionCode transitionCode,
+      HRegionInfo... hRegionInfos) {
       return false;
     }
 
