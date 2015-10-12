@@ -22,7 +22,7 @@ import com.google.common.util.concurrent.AbstractExecutionThreadService;
 import org.apache.thrift.TProcessor;
 import org.apache.thrift.protocol.TBinaryProtocol;
 import org.apache.thrift.server.TServer;
-import org.apache.thrift.server.TThreadedSelectorServer;
+import org.apache.thrift.server.TThreadedSelectorServerWithFix;
 import org.apache.thrift.transport.TFramedTransport;
 import org.apache.thrift.transport.TNonblockingServerSocket;
 import org.apache.twill.common.Threads;
@@ -174,8 +174,8 @@ public final class ThriftRPCServer<T extends RPCServiceHandler, I> extends Abstr
                                       new ThreadPoolExecutor.CallerRunsPolicy());
     serviceHandler.init();
 
-    TThreadedSelectorServer.Args args =
-      new TThreadedSelectorServer.Args(new TNonblockingServerSocket(listenOn))
+    TThreadedSelectorServerWithFix.Args args =
+      new TThreadedSelectorServerWithFix.Args(new TNonblockingServerSocket(listenOn))
         .selectorThreads(ioThreads)
         .protocolFactory(new TBinaryProtocol.Factory())
         .transportFactory(new TFramedTransport.Factory())
@@ -186,7 +186,7 @@ public final class ThriftRPCServer<T extends RPCServiceHandler, I> extends Abstr
     // prevent the server from throwing OOME if telnetd to the port
     // it's running on.
     args.maxReadBufferBytes = maxReadBufferBytes;
-    server = new TThreadedSelectorServer(args);
+    server = new TThreadedSelectorServerWithFix(args);
     LOG.info("Starting RPC server for {}", name);
   }
 
@@ -205,7 +205,9 @@ public final class ThriftRPCServer<T extends RPCServiceHandler, I> extends Abstr
 
   @Override
   protected void run() throws Exception {
+    LOG.info("Running RPC server for {}", name);
     server.serve();
+    LOG.info("Done running RPC server for {}", name);
   }
 
   @SuppressWarnings("unchecked")
