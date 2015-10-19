@@ -189,7 +189,7 @@ public class ThriftTransactionServerTest {
     final ZooKeeper dupZookeeper =
       new ZooKeeper(zkClientService.getConnectString(), zooKeeper.getSessionTimeout(), watcher,
                     zooKeeper.getSessionId(), zooKeeper.getSessionPasswd());
-    connectFuture.get(10, TimeUnit.SECONDS);
+    connectFuture.get(30, TimeUnit.SECONDS);
     Assert.assertEquals("Failed to re-create current session", dupZookeeper.getState(), ZooKeeper.States.CONNECTED);
     dupZookeeper.close();
   }

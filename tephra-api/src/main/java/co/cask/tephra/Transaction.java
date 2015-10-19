@@ -51,6 +51,9 @@ public class Transaction {
    *   <li><code>SNAPSHOT_EXCLUDE_CURRENT</code> - uses the transaction's read snapshot, plus includes all write
    *       pointers from the current transaction, <strong>except</strong> the current write pointer
    *       (see {@link #getWritePointer()})</li>
+   *   <li><code>SNAPSHOT_ALL</code> - uses the transaction's read snapshot, plus includes all write pointers from the
+   *       current transaction. This visibility level will lead to raw fetch operations, where all versions
+   *       (including deletes) visible to current transaction are returned.</li>
    * </ul>
    * </p>
    *
@@ -60,7 +63,8 @@ public class Transaction {
    */
   public enum VisibilityLevel {
     SNAPSHOT,
-    SNAPSHOT_EXCLUDE_CURRENT
+    SNAPSHOT_EXCLUDE_CURRENT,
+    SNAPSHOT_ALL
   }
 
   /**
@@ -224,8 +228,18 @@ public class Transaction {
   public boolean isVisible(long version) {
     // either it was committed before or the change belongs to current tx
     return (version <= getReadPointer() && !isExcluded(version)) ||
-        ((txId == version || isCheckpoint(version)) &&
-            (visibilityLevel == VisibilityLevel.SNAPSHOT || writePointer != version));
+        (isCurrentWrite(version) &&
+            (visibilityLevel != VisibilityLevel.SNAPSHOT_EXCLUDE_CURRENT || writePointer != version));
+  }
+
+  /**
+   * Returns whether the given version was written by the current transaction.
+   *
+   * @param version the data version
+   * @return true if version was written by current transaction, false otherwise.
+   */
+  public boolean isCurrentWrite(long version) {
+    return writePointer == version || txId == version || isCheckpoint(version);
   }
 
   /**

@@ -23,13 +23,10 @@
 package co.cask.tephra.distributed.thrift;
 
 
-import java.util.Map;
-import java.util.HashMap;
-import org.apache.thrift.TEnum;
-
 public enum TVisibilityLevel implements org.apache.thrift.TEnum {
   SNAPSHOT(1),
-  SNAPSHOT_EXCLUDE_CURRENT(2);
+  SNAPSHOT_EXCLUDE_CURRENT(2),
+  SNAPSHOT_ALL(3);
 
   private final int value;
 
@@ -54,6 +51,8 @@ public enum TVisibilityLevel implements org.apache.thrift.TEnum {
         return SNAPSHOT;
       case 2:
         return SNAPSHOT_EXCLUDE_CURRENT;
+      case 3:
+        return SNAPSHOT_ALL;
       default:
         return null;
     }
