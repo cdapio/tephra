@@ -100,6 +100,7 @@ public class TransactionProcessor extends BaseRegionObserver {
   private final TransactionCodec txCodec;
   protected Map<byte[], Long> ttlByFamily = Maps.newTreeMap(Bytes.BYTES_COMPARATOR);
   protected boolean allowEmptyValues = TxConstants.ALLOW_EMPTY_VALUES_DEFAULT;
+  protected boolean readNonTxnData = TxConstants.DEFAULT_READ_NON_TX_DATA;
 
   public TransactionProcessor() {
     this.txCodec = new TransactionCodec();
@@ -132,6 +133,7 @@ public class TransactionProcessor extends BaseRegionObserver {
 
       this.allowEmptyValues = env.getConfiguration().getBoolean(TxConstants.ALLOW_EMPTY_VALUES_KEY,
                                                                 TxConstants.ALLOW_EMPTY_VALUES_DEFAULT);
+      this.readNonTxnData = Boolean.valueOf(tableDesc.getValue(TxConstants.READ_NON_TX_DATA));
     }
   }
 
@@ -151,7 +153,8 @@ public class TransactionProcessor extends BaseRegionObserver {
     if (tx != null) {
       projectFamilyDeletes(get);
       get.setMaxVersions();
-      get.setTimeRange(TxUtils.getOldestVisibleTimestamp(ttlByFamily, tx), TxUtils.getMaxVisibleTimestamp(tx));
+      get.setTimeRange(TxUtils.getOldestVisibleTimestamp(ttlByFamily, tx, readNonTxnData),
+                       TxUtils.getMaxVisibleTimestamp(tx));
       Filter newFilter = Filters.combine(getTransactionFilter(tx, ScanType.USER_SCAN), get.getFilter());
       get.setFilter(newFilter);
     }
@@ -202,7 +205,8 @@ public class TransactionProcessor extends BaseRegionObserver {
     if (tx != null) {
       projectFamilyDeletes(scan);
       scan.setMaxVersions();
-      scan.setTimeRange(TxUtils.getOldestVisibleTimestamp(ttlByFamily, tx), TxUtils.getMaxVisibleTimestamp(tx));
+      scan.setTimeRange(TxUtils.getOldestVisibleTimestamp(ttlByFamily, tx, readNonTxnData),
+                        TxUtils.getMaxVisibleTimestamp(tx));
       Filter newFilter = Filters.combine(getTransactionFilter(tx, ScanType.USER_SCAN), scan.getFilter());
       scan.setFilter(newFilter);
     }

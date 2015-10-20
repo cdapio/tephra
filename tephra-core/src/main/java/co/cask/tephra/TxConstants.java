@@ -102,6 +102,14 @@ public class TxConstants {
   public static final String STATUS_NOTOK = "NOTOK";
 
   /**
+   * Indicates whether data written before Tephra was enabled on a table should be readable. Reading non-transactional
+   * data can lead to slight performance penalty. Hence it is disabled by default.
+   * @see <a href="https://issues.cask.co/browse/TEPHRA-89">TEPHRA-89</a>
+   */
+  public static final String READ_NON_TX_DATA = "data.tx.read.pre.existing";
+  public static final boolean DEFAULT_READ_NON_TX_DATA = false;
+
+  /**
    * TransactionManager configuration.
    */
   public static final class Manager {

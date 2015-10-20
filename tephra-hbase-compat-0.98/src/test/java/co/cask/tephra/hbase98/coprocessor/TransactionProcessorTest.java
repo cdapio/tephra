@@ -17,6 +17,7 @@
 package co.cask.tephra.hbase98.coprocessor;
 
 import co.cask.tephra.ChangeId;
+import co.cask.tephra.Transaction;
 import co.cask.tephra.TransactionManager;
 import co.cask.tephra.TransactionType;
 import co.cask.tephra.TxConstants;
@@ -41,8 +42,10 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hbase.Cell;
 import org.apache.hadoop.hbase.HBaseConfiguration;
 import org.apache.hadoop.hbase.HColumnDescriptor;
+import org.apache.hadoop.hbase.HConstants;
 import org.apache.hadoop.hbase.HRegionInfo;
 import org.apache.hadoop.hbase.HTableDescriptor;
+import org.apache.hadoop.hbase.KeyValue;
 import org.apache.hadoop.hbase.ServerName;
 import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.catalog.CatalogTracker;
@@ -70,6 +73,7 @@ import org.apache.hadoop.hbase.regionserver.ServerNonceManager;
 import org.apache.hadoop.hbase.regionserver.wal.HLog;
 import org.apache.hadoop.hbase.regionserver.wal.HLogFactory;
 import org.apache.hadoop.hbase.util.Bytes;
+import org.apache.hadoop.hbase.util.FSUtils;
 import org.apache.hadoop.hbase.zookeeper.ZooKeeperWatcher;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
 import org.apache.zookeeper.KeeperException;
@@ -83,6 +87,8 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -125,7 +131,9 @@ public class TransactionProcessorTest {
   @BeforeClass
   public static void setupBeforeClass() throws Exception {
     Configuration hConf = new Configuration();
-    hConf.set(MiniDFSCluster.HDFS_MINIDFS_BASEDIR, tmpFolder.newFolder().getAbsolutePath());
+    String rootDir = tmpFolder.newFolder().getAbsolutePath();
+    hConf.set(MiniDFSCluster.HDFS_MINIDFS_BASEDIR, rootDir);
+    hConf.set(HConstants.HBASE_DIR, rootDir + "/hbase");
 
     dfsCluster = new MiniDFSCluster.Builder(hConf).numDataNodes(1).build();
     dfsCluster.waitActive();
@@ -133,7 +141,7 @@ public class TransactionProcessorTest {
 
     conf.unset(TxConstants.Manager.CFG_TX_HDFS_USER);
     conf.unset(TxConstants.Persist.CFG_TX_SNAPHOT_CODEC_CLASSES);
-    String localTestDir = "/tmp/transactionDataJanitorTest";
+    String localTestDir = tmpFolder.newFolder().getAbsolutePath();
     conf.set(TxConstants.Manager.CFG_TX_SNAPSHOT_DIR, localTestDir);
     conf.set(TxConstants.Persist.CFG_TX_SNAPHOT_CODEC_CLASSES, DefaultSnapshotCodec.class.getName());
 
@@ -436,6 +444,132 @@ public class TransactionProcessorTest {
     }
   }
 
+  @Test
+  public void testPreExistingData() throws Exception {
+    String tableName = "TestPreExistingData";
+    byte[] familyBytes = Bytes.toBytes("f");
+    long ttlMillis = TimeUnit.DAYS.toMillis(14);
+    HRegion region = createRegion(tableName, familyBytes, ttlMillis);
+    try {
+      region.initialize();
+
+      // timestamps for pre-existing, non-transactional data
+      long now = txVisibilityState.getVisibilityUpperBound() / TxConstants.MAX_TX_PER_MS;
+      long older = now - ttlMillis / 2;
+      long newer = now - ttlMillis / 3;
+      // timestamps for transactional data
+      long nowTx = txVisibilityState.getVisibilityUpperBound();
+      long olderTx = nowTx - (ttlMillis / 2) * TxConstants.MAX_TX_PER_MS;
+      long newerTx = nowTx - (ttlMillis / 3) * TxConstants.MAX_TX_PER_MS;
+
+      Map<byte[], Long> ttls = Maps.newTreeMap(Bytes.BYTES_COMPARATOR);
+      ttls.put(familyBytes, ttlMillis);
+
+      List<Cell> cells = new ArrayList<>();
+      cells.add(new KeyValue(Bytes.toBytes("r1"), familyBytes, Bytes.toBytes("c1"), older, Bytes.toBytes("v11")));
+      cells.add(new KeyValue(Bytes.toBytes("r1"), familyBytes, Bytes.toBytes("c2"), newer, Bytes.toBytes("v12")));
+      cells.add(new KeyValue(Bytes.toBytes("r2"), familyBytes, Bytes.toBytes("c1"), older, Bytes.toBytes("v21")));
+      cells.add(new KeyValue(Bytes.toBytes("r2"), familyBytes, Bytes.toBytes("c2"), newer, Bytes.toBytes("v22")));
+      cells.add(new KeyValue(Bytes.toBytes("r3"), familyBytes, Bytes.toBytes("c1"), olderTx, Bytes.toBytes("v31")));
+      cells.add(new KeyValue(Bytes.toBytes("r3"), familyBytes, Bytes.toBytes("c2"), newerTx, Bytes.toBytes("v32")));
+
+      // Write non-transactional and transactional data
+      for (Cell c : cells) {
+        region.put(new Put(c.getRow()).add(c.getFamily(), c.getQualifier(), c.getTimestamp(), c.getValue()));
+      }
+
+      Scan rawScan = new Scan();
+      rawScan.setMaxVersions();
+
+      Transaction dummyTransaction = TxUtils.createDummyTransaction(txVisibilityState);
+      Scan txScan = new Scan();
+      txScan.setMaxVersions();
+      txScan.setTimeRange(TxUtils.getOldestVisibleTimestamp(ttls, dummyTransaction, true),
+                          TxUtils.getMaxVisibleTimestamp(dummyTransaction));
+      txScan.setFilter(new TransactionVisibilityFilter(dummyTransaction, ttls, false, ScanType.USER_SCAN));
+
+      // read all back with raw scanner
+      scanAndAssert(region, cells, rawScan);
+
+      // read all back with transaction filter
+      scanAndAssert(region, cells, txScan);
+
+      // force a flush to clear the memstore
+      region.flushcache();
+      scanAndAssert(region, cells, txScan);
+
+      // force a major compaction to remove any expired cells
+      region.compactStores(true);
+      scanAndAssert(region, cells, txScan);
+
+      // Reduce TTL, this should make cells with timestamps older and olderTx expire
+      long newTtl = ttlMillis / 2 - 1;
+      region = updateTtl(region, familyBytes, newTtl);
+      ttls.put(familyBytes, newTtl);
+      txScan.setTimeRange(TxUtils.getOldestVisibleTimestamp(ttls, dummyTransaction, true),
+                          TxUtils.getMaxVisibleTimestamp(dummyTransaction));
+      txScan.setFilter(new TransactionVisibilityFilter(dummyTransaction, ttls, false, ScanType.USER_SCAN));
+
+      // Raw scan should still give all cells
+      scanAndAssert(region, cells, rawScan);
+      // However, tx scan should not return expired cells
+      scanAndAssert(region, select(cells, 1, 3, 5), txScan);
+
+      region.flushcache();
+      scanAndAssert(region, cells, rawScan);
+
+      // force a major compaction to remove any expired cells
+      region.compactStores(true);
+      // This time raw scan too should not return expired cells, as they would be dropped during major compaction
+      scanAndAssert(region, select(cells, 1, 3, 5), rawScan);
+
+      // Reduce TTL again to 1 ms, this should expire all cells
+      newTtl = 1;
+      region = updateTtl(region, familyBytes, newTtl);
+      ttls.put(familyBytes, newTtl);
+      txScan.setTimeRange(TxUtils.getOldestVisibleTimestamp(ttls, dummyTransaction, true),
+                          TxUtils.getMaxVisibleTimestamp(dummyTransaction));
+      txScan.setFilter(new TransactionVisibilityFilter(dummyTransaction, ttls, false, ScanType.USER_SCAN));
+
+      // force a major compaction to remove expired cells
+      region.compactStores(true);
+      // This time raw scan should not return any cells, as all cells have expired.
+      scanAndAssert(region, Collections.<Cell>emptyList(), rawScan);
+    } finally {
+      region.close();
+    }
+  }
+
+  private List<Cell> select(List<Cell> cells, int... indexes) {
+    List<Cell> newCells = new ArrayList<>();
+    for (int i : indexes) {
+      newCells.add(cells.get(i));
+    }
+    return newCells;
+  }
+
+  @SuppressWarnings("StatementWithEmptyBody")
+  private void scanAndAssert(HRegion region, List<Cell> expected, Scan scan) throws Exception {
+    try (RegionScanner regionScanner = region.getScanner(scan)) {
+      List<Cell> results = Lists.newArrayList();
+      while (regionScanner.next(results)) { }
+      assertEquals(expected, results);
+    }
+  }
+
+  private HRegion updateTtl(HRegion region, byte[] family, long ttl) throws Exception {
+    region.close();
+    HTableDescriptor htd = region.getTableDesc();
+    HColumnDescriptor cfd = new HColumnDescriptor(family);
+    if (ttl > 0) {
+      cfd.setValue(TxConstants.PROPERTY_TTL, String.valueOf(ttl));
+    }
+    cfd.setMaxVersions(10);
+    htd.addFamily(cfd);
+    return HRegion.openHRegion(region.getRegionInfo(), htd, region.getLog(), conf,
+                                          new MockRegionServerServices(conf, null), null);
+  }
+
   private HRegion createRegion(String tableName, byte[] family, long ttl) throws IOException {
     HTableDescriptor htd = new HTableDescriptor(TableName.valueOf(tableName));
     HColumnDescriptor cfd = new HColumnDescriptor(family);
@@ -445,8 +579,8 @@ public class TransactionProcessorTest {
     cfd.setMaxVersions(10);
     htd.addFamily(cfd);
     htd.addCoprocessor(TransactionProcessor.class.getName());
-    Path tablePath = new Path("/tmp/" + tableName);
-    Path hlogPath = new Path("/tmp/hlog");
+    Path tablePath = FSUtils.getTableDir(FSUtils.getRootDir(conf), htd.getTableName());
+    Path hlogPath = new Path(FSUtils.getRootDir(conf) + "/hlog");
     FileSystem fs = FileSystem.get(conf);
     assertTrue(fs.mkdirs(tablePath));
     HLog hLog = HLogFactory.createHLog(fs, hlogPath, tableName, conf);
