@@ -1,5 +1,5 @@
 /*
- * Copyright © 2014 Cask Data, Inc.
+ * Copyright © 2014-2015 Cask Data, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not
  * use this file except in compliance with the License. You may obtain a copy of
@@ -26,6 +26,7 @@ import com.google.common.base.Throwables;
 import com.google.inject.Guice;
 import com.google.inject.Injector;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.thrift.TException;
 import org.apache.twill.discovery.DiscoveryServiceClient;
 import org.apache.twill.internal.zookeeper.InMemoryZKServer;
 import org.apache.twill.zookeeper.ZKClientService;
@@ -45,15 +46,16 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 
-public class PooledClientProviderTest {
-
-  public static final int MAX_CLIENT_COUNT = 3;
+public abstract class ClientProviderTestBase {
 
   @ClassRule
   public static TemporaryFolder tmpFolder = new TemporaryFolder();
 
+  protected abstract void startClientAndTestPool(Configuration conf) throws Exception;
+  protected abstract void configureConf(Configuration conf);
+
   @Test
-  public void testClientConnectionPoolMaximumNumberOfClients() throws Exception {
+  public void testClientProvider() throws Exception {
     // We need a server for the client to connect to
     InMemoryZKServer zkServer = InMemoryZKServer.builder().setDataDir(tmpFolder.newFolder()).build();
     zkServer.startAndWait();
@@ -62,7 +64,7 @@ public class PooledClientProviderTest {
       Configuration conf = new Configuration();
       conf.set(TxConstants.Service.CFG_DATA_TX_ZOOKEEPER_QUORUM, zkServer.getConnectionStr());
       conf.set(TxConstants.Manager.CFG_TX_SNAPSHOT_DIR, tmpFolder.newFolder().getAbsolutePath());
-      conf.set("data.tx.client.count", Integer.toString(MAX_CLIENT_COUNT));
+      configureConf(conf);
 
       final TransactionServiceMain main = new TransactionServiceMain(conf);
       final CountDownLatch latch = new CountDownLatch(1);
@@ -90,57 +92,6 @@ public class PooledClientProviderTest {
       }
     } finally {
       zkServer.stopAndWait();
-    }
-  }
-
-  private void startClientAndTestPool(Configuration conf) throws InterruptedException, ExecutionException {
-    Injector injector = Guice.createInjector(
-      new ConfigModule(conf),
-      new ZKModule(),
-      new DiscoveryModules().getDistributedModules(),
-      new TransactionModules().getDistributedModules(),
-      new TransactionClientModule()
-    );
-
-    ZKClientService zkClient = injector.getInstance(ZKClientService.class);
-    zkClient.startAndWait();
-
-    final PooledClientProvider clientProvider = new PooledClientProvider(conf,
-      injector.getInstance(DiscoveryServiceClient.class));
-
-    //Now race to get MAX_CLIENT_COUNT+1 clients, exhausting the pool and requesting 1 more.
-    List<Future<Integer>> clientIds = new ArrayList<Future<Integer>>();
-    ExecutorService executor = Executors.newFixedThreadPool(MAX_CLIENT_COUNT + 2);
-    for (int i = 0; i < MAX_CLIENT_COUNT + 1; i++) {
-      clientIds.add(executor.submit(new RetrieveClient(clientProvider)));
-    }
-
-    Set<Integer> ids = new HashSet<Integer>();
-    for (Future<Integer> id : clientIds) {
-      ids.add(id.get());
-    }
-    executor.shutdown();
-    Assert.assertEquals(MAX_CLIENT_COUNT, ids.size());
-  }
-
-  private static class RetrieveClient implements Callable<Integer> {
-    private final PooledClientProvider pool;
-
-    public RetrieveClient(PooledClientProvider pool) {
-      this.pool = pool;
-    }
-
-    @Override
-    public Integer call() throws Exception {
-      TransactionServiceThriftClient client = pool.getClient();
-      int id = System.identityHashCode(client);
-      try {
-        //"use" the client
-        Thread.sleep(100);
-      } finally {
-        pool.returnClient(client);
-      }
-      return id;
     }
   }
 }

@@ -218,6 +218,10 @@ public class TxConstants {
     public static final String CFG_DATA_TX_CLIENT_COUNT
       = "data.tx.client.count";
 
+    /** to specify the timeout (in milliseconds) for client provider "timed-pool". */
+    public static final String CFG_DATA_TX_CLIENT_POOL_TIMEOUT
+      = "data.tx.client.pool.timeout";
+
     /** to specify the retry strategy for a failed thrift call. */
     public static final String CFG_DATA_TX_CLIENT_RETRY_STRATEGY
       = "data.tx.client.retry.strategy";
@@ -227,7 +231,7 @@ public class TxConstants {
       = "data.tx.client.retry.attempts";
 
     /** to specify the initial sleep time for retry strategy backoff. */
-    public static final String CFG_DATA_TX_CLIENT_BACKOFF_INIITIAL
+    public static final String CFG_DATA_TX_CLIENT_BACKOFF_INITIAL
       = "data.tx.client.retry.backoff.initial";
 
     /** to specify the backoff factor for retry strategy backoff. */
@@ -239,16 +243,20 @@ public class TxConstants {
       = "data.tx.client.retry.backoff.limit";
 
     /** the default tx client socket timeout in milli seconds. */
-    public static final int DEFAULT_DATA_TX_CLIENT_TIMEOUT
+    public static final int DEFAULT_DATA_TX_CLIENT_TIMEOUT_MS
       = 30 * 1000;
 
-    /** default number of pooled tx clients. */
+    /** default number of tx clients for client provider "pool". */
     public static final int DEFAULT_DATA_TX_CLIENT_COUNT
       = 5;
 
+    /** default timeout of timed-pooled tx clients for client provider "timed-pool". */
+    public static final long DEFAULT_DATA_TX_CLIENT_POOL_TIMEOUT_MS
+      = TimeUnit.MINUTES.toMillis(1);
+
     /** default tx client provider strategy. */
     public static final String DEFAULT_DATA_TX_CLIENT_PROVIDER
-      = "pool";
+      = "timed-pool";
 
     /** retry strategy for thrift clients, e.g. backoff, or n-times. */
     public static final String DEFAULT_DATA_TX_CLIENT_RETRY_STRATEGY
@@ -259,7 +267,7 @@ public class TxConstants {
       = 2;
 
     /** default initial sleep is 100ms. */
-    public static final int DEFAULT_DATA_TX_CLIENT_BACKOFF_INIITIAL
+    public static final int DEFAULT_DATA_TX_CLIENT_BACKOFF_INITIAL
       = 100;
 
     /** default backoff factor is 4. */

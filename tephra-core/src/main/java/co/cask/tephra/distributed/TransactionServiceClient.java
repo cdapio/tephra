@@ -246,7 +246,7 @@ public class TransactionServiceClient implements TransactionSystemClient {
 
       } finally {
         // in case any other exception happens (other than TException), and
-        // also in case of succeess, the client must be returned to the pool.
+        // also in case of success, the client must be returned to the pool.
         if (client != null) {
           provider.returnClient(client);
         }

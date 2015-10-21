@@ -1,5 +1,5 @@
 /*
- * Copyright © 2012-2014 Cask Data, Inc.
+ * Copyright © 2015 Cask Data, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not
  * use this file except in compliance with the License. You may obtain a copy of
@@ -25,17 +25,17 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * This is an tx client provider that uses a bounded size pool of connections.
+ * This is an tx client provider that uses an object pool that times out its elements.
  */
-public class PooledClientProvider extends AbstractClientProvider {
+public class TimedPooledClientProvider extends AbstractClientProvider {
 
   private static final Logger LOG =
-      LoggerFactory.getLogger(PooledClientProvider.class);
+      LoggerFactory.getLogger(TimedPooledClientProvider.class);
 
   // we will use this as a pool of tx clients
-  class TxClientPool extends ElasticPool<TransactionServiceThriftClient, TException> {
-    TxClientPool(int sizeLimit) {
-      super(sizeLimit);
+  class TxClientPool extends TimedObjectPool<TransactionServiceThriftClient, TException> {
+    TxClientPool(long timeoutMillies) {
+      super(timeoutMillies);
     }
 
     @Override
@@ -52,10 +52,10 @@ public class PooledClientProvider extends AbstractClientProvider {
   // we will use this as a pool of tx clients
   private volatile TxClientPool clients;
 
-  // the limit for the number of active clients
-  private int maxClients;
+  // the timeout for the objects in the object pool
+  private long timeoutMillis;
 
-  public PooledClientProvider(Configuration conf, DiscoveryServiceClient discoveryServiceClient) {
+  public TimedPooledClientProvider(Configuration conf, DiscoveryServiceClient discoveryServiceClient) {
     super(conf, discoveryServiceClient);
   }
 
@@ -64,15 +64,16 @@ public class PooledClientProvider extends AbstractClientProvider {
     super.initialize();
 
     // create a (empty) pool of tx clients
-    maxClients = configuration.getInt(TxConstants.Service.CFG_DATA_TX_CLIENT_COUNT,
-        TxConstants.Service.DEFAULT_DATA_TX_CLIENT_COUNT);
-    if (maxClients < 1) {
-      LOG.warn("Configuration of " + TxConstants.Service.CFG_DATA_TX_CLIENT_COUNT +
-                                 " is invalid: value is " + maxClients + " but must be at least 1. " +
-                                 "Using 1 as a fallback. ");
-      maxClients = 1;
+    timeoutMillis = configuration.getLong(TxConstants.Service.CFG_DATA_TX_CLIENT_POOL_TIMEOUT,
+                                          TxConstants.Service.DEFAULT_DATA_TX_CLIENT_POOL_TIMEOUT_MS);
+
+    if (timeoutMillis < 1) {
+      LOG.warn("Configuration of " + TxConstants.Service.CFG_DATA_TX_CLIENT_POOL_TIMEOUT +
+                 " is invalid: value is " + timeoutMillis + " but must be at least 1. Using " +
+                 TxConstants.Service.DEFAULT_DATA_TX_CLIENT_POOL_TIMEOUT_MS + " as fallback.");
+      timeoutMillis = TxConstants.Service.DEFAULT_DATA_TX_CLIENT_POOL_TIMEOUT_MS;
     }
-    this.clients = new TxClientPool(maxClients);
+    this.clients = new TxClientPool(timeoutMillis);
   }
 
   @Override
@@ -88,12 +89,11 @@ public class PooledClientProvider extends AbstractClientProvider {
   @Override
   public void discardClient(TransactionServiceThriftClient client) {
     getClientPool().discard(client);
-    client.close();
   }
 
   @Override
   public String toString() {
-    return "Elastic pool of size " + this.maxClients;
+    return "TimedPool with timeout, in milliseconds, of " + this.timeoutMillis;
   }
 
   private TxClientPool getClientPool() {

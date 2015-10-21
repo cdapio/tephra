@@ -30,8 +30,7 @@ public class ThreadLocalClientProvider extends AbstractClientProvider {
   private static final Logger LOG =
       LoggerFactory.getLogger(ThreadLocalClientProvider.class);
 
-  ThreadLocal<TransactionServiceThriftClient> clients =
-      new ThreadLocal<TransactionServiceThriftClient>();
+  ThreadLocal<TransactionServiceThriftClient> clients = new ThreadLocal<>();
 
   public ThreadLocalClientProvider(Configuration conf, DiscoveryServiceClient discoveryServiceClient) {
     super(conf, discoveryServiceClient);
