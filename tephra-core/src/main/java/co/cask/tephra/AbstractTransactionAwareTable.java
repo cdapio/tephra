@@ -37,7 +37,7 @@ import java.util.TreeSet;
  */
 public abstract class AbstractTransactionAwareTable implements TransactionAware {
   protected final TransactionCodec txCodec;
-  // map of write pointers to change set assocaited with each
+  // map of write pointers to change set associated with each
   protected final Map<Long, Set<ActionChange>> changeSets;
   protected final TxConstants.ConflictDetection conflictLevel;
   protected Transaction tx;

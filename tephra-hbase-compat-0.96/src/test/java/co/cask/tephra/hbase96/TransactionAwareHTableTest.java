@@ -384,6 +384,74 @@ public class TransactionAwareHTableTest {
     assertArrayEquals(TestBytes.value, value);
   }
 
+  private void testDeleteRollback(TxConstants.ConflictDetection conflictDetection) throws Exception {
+    String tableName = String.format("%s%s", "TestColFamilyDelete", conflictDetection);
+    HTable hTable = createTable(Bytes.toBytes(tableName), new byte[][]{TestBytes.family});
+    try (TransactionAwareHTable txTable = new TransactionAwareHTable(hTable, conflictDetection)) {
+      TransactionContext txContext = new TransactionContext(new InMemoryTxSystemClient(txManager), txTable);
+      txContext.start();
+      txTable.put(new Put(TestBytes.row).add(TestBytes.family, TestBytes.qualifier, TestBytes.value));
+      txContext.finish();
+
+      // Start a tx, delete the row and then abort the tx
+      txContext.start();
+      txTable.delete(new Delete(TestBytes.row));
+      txContext.abort();
+
+      // Start a tx, delete a column family and then abort the tx
+      txContext.start();
+      txTable.delete(new Delete(TestBytes.row).deleteFamily(TestBytes.family));
+      txContext.abort();
+
+      // Above operations should have no effect on the row, since they were aborted
+      txContext.start();
+      Get get = new Get(TestBytes.row);
+      Result result = txTable.get(get);
+      assertFalse(result.isEmpty());
+      assertArrayEquals(TestBytes.value, result.getValue(TestBytes.family, TestBytes.qualifier));
+      txContext.finish();
+    }
+  }
+
+  @Test
+  public void testDeleteRollback() throws Exception {
+    testDeleteRollback(TxConstants.ConflictDetection.ROW);
+    testDeleteRollback(TxConstants.ConflictDetection.COLUMN);
+    testDeleteRollback(TxConstants.ConflictDetection.NONE);
+  }
+
+  @Test
+  public void testMultiColumnFamilyRowDeleteRollback() throws Exception {
+    HTable hTable = createTable(Bytes.toBytes("TestMultColFam"), new byte[][] {TestBytes.family, TestBytes.family2});
+    try (TransactionAwareHTable txTable = new TransactionAwareHTable(hTable, TxConstants.ConflictDetection.ROW)) {
+      TransactionContext txContext = new TransactionContext(new InMemoryTxSystemClient(txManager), txTable);
+      txContext.start();
+      txTable.put(new Put(TestBytes.row).add(TestBytes.family, TestBytes.qualifier, TestBytes.value));
+      txContext.finish();
+
+      txContext.start();
+      //noinspection ConstantConditions
+      txContext.getCurrentTransaction().setVisibility(Transaction.VisibilityLevel.SNAPSHOT_ALL);
+      Result result = txTable.get(new Get(TestBytes.row));
+      Assert.assertEquals(1, result.getFamilyMap(TestBytes.family).size());
+      Assert.assertEquals(0, result.getFamilyMap(TestBytes.family2).size());
+      txContext.finish();
+
+      //Start a tx, delete the row and then abort the tx
+      txContext.start();
+      txTable.delete(new Delete(TestBytes.row));
+      txContext.abort();
+
+      //Start a tx and scan all the col families to make sure none of them have delete markers
+      txContext.start();
+      txContext.getCurrentTransaction().setVisibility(Transaction.VisibilityLevel.SNAPSHOT_ALL);
+      result = txTable.get(new Get(TestBytes.row));
+      Assert.assertEquals(1, result.getFamilyMap(TestBytes.family).size());
+      Assert.assertEquals(0, result.getFamilyMap(TestBytes.family2).size());
+      txContext.finish();
+    }
+  }
+
   @Test
   public void testRowDelete() throws Exception {
     HTable hTable = createTable(Bytes.toBytes("TestRowDelete"), new byte[][] {TestBytes.family, TestBytes.family2});
