@@ -595,7 +595,7 @@ public class TransactionManager extends AbstractService {
               addCommittingChangeSet(edit.getWritePointer(), edit.getChanges());
               break;
             case COMMITTED:
-              doCommit(edit.getWritePointer(), edit.getChanges(),
+              doCommit(edit.getWritePointer(), edit.getCheckpointPointers(), edit.getChanges(),
                        edit.getCommitPointer(), edit.getCanCommit());
               break;
             case INVALID:
@@ -867,7 +867,7 @@ public class TransactionManager extends AbstractService {
           // no changes
           addToCommitted = false;
         }
-        doCommit(tx.getTransactionId(), changeSet, commitPointer, addToCommitted);
+        doCommit(tx.getTransactionId(), tx.getCheckpointWritePointers(), changeSet, commitPointer, addToCommitted);
       }
       appendToLog(TransactionEdit.createCommitted(tx.getTransactionId(), changeSet, commitPointer, addToCommitted));
     } finally {
@@ -877,7 +877,8 @@ public class TransactionManager extends AbstractService {
     return true;
   }
 
-  private void doCommit(long writePointer, Set<ChangeId> changes, long commitPointer, boolean addToCommitted) {
+  private void doCommit(long writePointer, long[] checkpointWritePointers, Set<ChangeId> changes, 
+    long commitPointer, boolean addToCommitted) {
     // In case this method is called when loading a previous WAL, we need to remove the tx from these sets
     committingChangeSets.remove(writePointer);
     if (addToCommitted && !changes.isEmpty()) {
@@ -905,6 +906,11 @@ public class TransactionManager extends AbstractService {
     }
     // moving read pointer
     moveReadPointerIfNeeded(writePointer);
+    if (checkpointWritePointers != null) {
+      for (long checkpointWritePointer : checkpointWritePointers) {
+        moveReadPointerIfNeeded(checkpointWritePointer);
+      }
+    }      
 
     // All committed change sets that are smaller than the earliest started transaction can be removed.
     // here we ignore transactions that have no timeout, they are long-running and don't participate in
