@@ -832,6 +832,30 @@ public class TransactionAwareHTableTest {
     TransactionAwareHTable txTable2 = new TransactionAwareHTable(new HTable(conf, TestBytes.table));
     TransactionContext txContext2 = new TransactionContext(new InMemoryTxSystemClient(txManager), txTable2);
 
+    // commit transaction, verify writes are visible
+    transactionContext.finish();
+    
+    transactionContext.start();
+    verifyRow(transactionAwareHTable, TestBytes.row, TestBytes.value);
+    verifyRow(transactionAwareHTable, TestBytes.row2, TestBytes.value2);
+    verifyRow(transactionAwareHTable, TestBytes.row3, TestBytes.value);
+    transactionContext.finish();
+  }
+  
+  @Test
+  public void testCheckpointWritesNotVisibleToOtherClients() throws Exception {
+    // start a transaction, using checkpoints between writes
+    transactionContext.start();
+    transactionAwareHTable.put(new Put(TestBytes.row).add(TestBytes.family, TestBytes.qualifier, TestBytes.value));
+    transactionContext.checkpoint();
+    transactionAwareHTable.put(new Put(TestBytes.row2).add(TestBytes.family, TestBytes.qualifier, TestBytes.value2));
+    transactionContext.checkpoint();
+    transactionAwareHTable.put(new Put(TestBytes.row3).add(TestBytes.family, TestBytes.qualifier, TestBytes.value));
+
+    // check that writes are still not visible to other clients
+    TransactionAwareHTable txTable2 = new TransactionAwareHTable(new HTable(conf, TestBytes.table));
+    TransactionContext txContext2 = new TransactionContext(new InMemoryTxSystemClient(txManager), txTable2);
+
     txContext2.start();
     verifyRow(txTable2, TestBytes.row, null);
     verifyRow(txTable2, TestBytes.row2, null);
