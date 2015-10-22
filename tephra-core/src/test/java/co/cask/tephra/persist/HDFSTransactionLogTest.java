@@ -25,9 +25,9 @@ import co.cask.tephra.snapshot.SnapshotCodecV2;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 import com.google.common.io.Closeables;
+import com.google.common.primitives.Ints;
 import com.google.common.primitives.Longs;
 import org.apache.hadoop.conf.Configuration;
-
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
@@ -42,7 +42,6 @@ import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 
 import java.io.DataOutputStream;
-import java.io.EOFException;
 import java.io.IOException;
 import java.util.List;
 import java.util.Random;
@@ -111,7 +110,7 @@ public class HDFSTransactionLogTest {
     internalWriter.appendRaw(key.getBytes(), 0, key.getBytes().length, new SequenceFile.ValueBytes() {
       @Override
       public void writeUncompressedBytes(DataOutputStream outStream) throws IOException {
-        outStream.write(HDFSTransactionLog.toBytes(size));
+        outStream.write(Ints.toByteArray(size));
         outStream.flush();
       }
 
@@ -219,11 +218,7 @@ public class HDFSTransactionLogTest {
   @Test
   public void testTransactionLogOldVersion() throws Exception {
     // in-complete sync
-    try {
-      testTransactionLogSync(1000, 1, false, false);
-    } catch (Exception e) {
-      Assert.assertEquals(EOFException.class, e.getCause().getClass());
-    }
+    testTransactionLogSync(1000, 1, false, false);
 
     // complete sync
     testTransactionLogSync(2000, 5, false, true);

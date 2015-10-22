@@ -21,6 +21,8 @@ import co.cask.tephra.metrics.MetricsCollector;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Throwables;
 import com.google.common.io.Closeables;
+import com.google.common.primitives.Bytes;
+import com.google.common.primitives.Ints;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
@@ -38,7 +40,6 @@ import java.io.EOFException;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 
 /**
@@ -46,7 +47,6 @@ import java.util.List;
  */
 public class HDFSTransactionLog extends AbstractTransactionLog {
   private static final Logger LOG = LoggerFactory.getLogger(HDFSTransactionLog.class);
-  private static final int SIZEOF_INT = Integer.SIZE / Byte.SIZE;
 
   private final FileSystem fs;
   private final Configuration hConf;
@@ -120,20 +120,8 @@ public class HDFSTransactionLog extends AbstractTransactionLog {
   }
 
   @VisibleForTesting
-  static byte[] toBytes(int val) {
-    byte [] b = new byte[4];
-    for (int i = 3; i > 0; i--) {
-      b[i] = (byte) val;
-      val >>>= 8;
-    }
-    b[0] = (byte) val;
-    return b;
-  }
-
-  @VisibleForTesting
   static final class LogWriter implements TransactionLogWriter {
     private final SequenceFile.Writer internalWriter;
-    private int numEntries;
     private List<Entry> transactionEntries;
     public LogWriter(FileSystem fs, Configuration hConf, Path logPath) throws IOException {
       // TODO: retry a few times to ride over transient failures?
@@ -143,7 +131,6 @@ public class HDFSTransactionLog extends AbstractTransactionLog {
       this.internalWriter =
         SequenceFile.createWriter(fs, hConf, logPath, LongWritable.class,
                                   TransactionEdit.class, SequenceFile.CompressionType.NONE, null, null, metadata);
-      numEntries = 0;
       transactionEntries = new ArrayList<>();
 
       LOG.debug("Created a new TransactionLog writer for " + logPath);
@@ -162,7 +149,7 @@ public class HDFSTransactionLog extends AbstractTransactionLog {
         internalWriter.appendRaw(key.getBytes(), 0, key.getBytes().length, new SequenceFile.ValueBytes() {
           @Override
           public void writeUncompressedBytes(DataOutputStream outStream) throws IOException {
-            outStream.write(toBytes(transactionEntries.size()));
+            outStream.write(Ints.toByteArray(transactionEntries.size()));
             outStream.flush();
           }
 
@@ -174,7 +161,7 @@ public class HDFSTransactionLog extends AbstractTransactionLog {
           @Override
           public int getSize() {
             // size of value, which is an integer
-            return Integer.SIZE / Byte.SIZE;
+            return Ints.BYTES;
           }
         });
       }
@@ -235,9 +222,7 @@ public class HDFSTransactionLog extends AbstractTransactionLog {
           if (reader.nextRawKey(rawKey) != -1) {
             // has data and has not reached EOF
             byte [] keyBytes = TxConstants.TransactionLog.NUM_ENTRIES_APPENDED.getBytes();
-
-            if (rawKey.getLength() == keyBytes.length &&
-              Arrays.equals(Arrays.copyOf(rawKey.getData(), rawKey.getLength()), keyBytes)) {
+            if (rawKey.getLength() == keyBytes.length && Bytes.indexOf(rawKey.getData(), keyBytes) != -1) {
               int numEntries;
               SequenceFile.ValueBytes valueBytes = reader.createValueBytes();
               Closeables.closeQuietly(rawKey);
@@ -282,9 +267,14 @@ public class HDFSTransactionLog extends AbstractTransactionLog {
           }
 
         } else {
-          // does not have marker, version v1.
-          boolean successful = reader.next(key, reuse);
-          return successful ? reuse : null;
+          try {
+            // does not have marker, version v1.
+            boolean successful = reader.next(key, reuse);
+            return successful ? reuse : null;
+          } catch (EOFException e) {
+            LOG.warn("Hit an unexpected EOF while trying to read the Transaction Edit. Skipping the entry. {}", e);
+            return null;
+          }
         }
       }
     }
