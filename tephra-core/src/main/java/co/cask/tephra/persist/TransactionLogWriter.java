@@ -32,6 +32,8 @@ public interface TransactionLogWriter extends Closeable {
    */
   void append(AbstractTransactionLog.Entry entry) throws IOException;
 
+  void commitMarker(int count) throws IOException;
+
   /**
    * Syncs any pending transaction edits added through {@link #append(AbstractTransactionLog.Entry)},
    * but not yet flushed to durable storage.

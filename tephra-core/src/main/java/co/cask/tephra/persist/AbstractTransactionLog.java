@@ -145,7 +145,7 @@ public abstract class AbstractTransactionLog implements TransactionLog {
   private List<Entry> getPendingWrites() {
     synchronized (this) {
       List<Entry> save = this.pendingWrites;
-      this.pendingWrites = new LinkedList<Entry>();
+      this.pendingWrites = new LinkedList<>();
       return save;
     }
   }
@@ -163,13 +163,18 @@ public abstract class AbstractTransactionLog implements TransactionLog {
       tmpWriter = writer;
 
       List<Entry> currentPending = getPendingWrites();
-      // write out all accumulated Entries to hdfs.
+      // write out all accumulated entries to log.
       for (Entry e : currentPending) {
         tmpWriter.append(e);
         entryCount++;
         latestSeq = Math.max(latestSeq, e.getKey().get());
       }
+
+      if (entryCount != 0) {
+        tmpWriter.commitMarker(entryCount);
+      }
     }
+
     long lastSynced = syncedUpTo.get();
     // someone else might have already synced our edits, avoid double syncing
     if (lastSynced < latestSeq) {

@@ -122,53 +122,43 @@ public class HDFSTransactionLog extends AbstractTransactionLog {
   @VisibleForTesting
   static final class LogWriter implements TransactionLogWriter {
     private final SequenceFile.Writer internalWriter;
-    private List<Entry> transactionEntries;
     public LogWriter(FileSystem fs, Configuration hConf, Path logPath) throws IOException {
       // TODO: retry a few times to ride over transient failures?
       SequenceFile.Metadata metadata = new SequenceFile.Metadata();
-      metadata.set(new Text("version"), new Text("v2"));
+      metadata.set(new Text(TxConstants.TransactionLog.VERSION_KEY),
+                   new Text(TxConstants.TransactionLog.CURRENT_VERSION));
 
-      this.internalWriter =
-        SequenceFile.createWriter(fs, hConf, logPath, LongWritable.class,
-                                  TransactionEdit.class, SequenceFile.CompressionType.NONE, null, null, metadata);
-      transactionEntries = new ArrayList<>();
-
+      this.internalWriter = SequenceFile.createWriter(fs, hConf, logPath, LongWritable.class, TransactionEdit.class,
+                                                      SequenceFile.CompressionType.NONE, null, null, metadata);
       LOG.debug("Created a new TransactionLog writer for " + logPath);
     }
 
     @Override
     public void append(Entry entry) throws IOException {
-      transactionEntries.add(entry);
+      internalWriter.append(entry.getKey(), entry.getEdit());
+    }
+
+    @Override
+    public void commitMarker(int count) throws IOException {
+      String key = TxConstants.TransactionLog.NUM_ENTRIES_APPENDED;
+      internalWriter.appendRaw(key.getBytes(), 0, key.getBytes().length, new CommitEntriesCount(count));
     }
 
     @Override
     public void sync() throws IOException {
-      // write the number of entries we are writing to the log
-      if (transactionEntries.size() > 0) {
-        String key = TxConstants.TransactionLog.NUM_ENTRIES_APPENDED;
-        internalWriter.appendRaw(key.getBytes(), 0, key.getBytes().length,
-                                 new NumEntriesBytes(transactionEntries.size()));
-      }
-
-      // write the entries to the log
-      for (Entry entry : transactionEntries) {
-        internalWriter.append(entry.getKey(), entry.getEdit());
-      }
-      transactionEntries.clear();
       internalWriter.syncFs();
     }
 
     @Override
     public void close() throws IOException {
-      transactionEntries.clear();
       internalWriter.close();
     }
   }
 
-  private static final class NumEntriesBytes implements SequenceFile.ValueBytes {
+  private static final class CommitEntriesCount implements SequenceFile.ValueBytes {
     private final int numEntries;
 
-    public NumEntriesBytes(int numEntries) {
+    public CommitEntriesCount(int numEntries) {
       this.numEntries = numEntries;
     }
 
@@ -279,7 +269,7 @@ public class HDFSTransactionLog extends AbstractTransactionLog {
             boolean successful = reader.next(key, reuse);
             return successful ? reuse : null;
           } catch (EOFException e) {
-            LOG.warn("Hit an unexpected EOF while trying to read the Transaction Edit. Skipping the entry. {}", e);
+            LOG.warn("Hit an unexpected EOF while trying to read the Transaction Edit. Skipping the entry.", e);
             return null;
           }
         }

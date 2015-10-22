@@ -318,6 +318,8 @@ public class TxConstants {
      * Key used to denote the number of entries appended.
      */
     public static final String NUM_ENTRIES_APPENDED = "entries.append.count";
+    public static final String VERSION_KEY = "version";
+    public static final String CURRENT_VERSION = "v2";
   }
 
 }
