@@ -823,6 +823,24 @@ public class TransactionAwareHTableTest {
     scanner.close();
     transactionContext.getCurrentTransaction().setVisibility(Transaction.VisibilityLevel.SNAPSHOT);
 
+    // commit transaction, verify writes are visible
+    transactionContext.finish();
+
+    transactionContext.start();
+    verifyRow(transactionAwareHTable, TestBytes.row, TestBytes.value);
+    verifyRow(transactionAwareHTable, TestBytes.row2, TestBytes.value2);
+    verifyRow(transactionAwareHTable, TestBytes.row3, TestBytes.value);
+    transactionContext.finish();
+  }
+
+  @Test
+  public void testInProgressCheckpoint() throws Exception {
+    // start a transaction, using checkpoints between writes
+    transactionContext.start();
+    transactionAwareHTable.put(new Put(TestBytes.row).add(TestBytes.family, TestBytes.qualifier, TestBytes.value));
+    transactionContext.checkpoint();
+    transactionAwareHTable.put(new Put(TestBytes.row2).add(TestBytes.family, TestBytes.qualifier, TestBytes.value2));
+
     // check that writes are still not visible to other clients
     TransactionAwareHTable txTable2 = new TransactionAwareHTable(new HTable(conf, TestBytes.table));
     TransactionContext txContext2 = new TransactionContext(new InMemoryTxSystemClient(txManager), txTable2);
@@ -830,18 +848,16 @@ public class TransactionAwareHTableTest {
     txContext2.start();
     verifyRow(txTable2, TestBytes.row, null);
     verifyRow(txTable2, TestBytes.row2, null);
-    verifyRow(txTable2, TestBytes.row3, null);
-    txContext2.finish();
-
-    // commit transaction, verify writes are visible
-    transactionContext.finish();
-
-    txContext2.start();
-    verifyRow(txTable2, TestBytes.row, TestBytes.value);
-    verifyRow(txTable2, TestBytes.row2, TestBytes.value2);
-    verifyRow(txTable2, TestBytes.row3, TestBytes.value);
     txContext2.finish();
     txTable2.close();
+
+    transactionContext.finish();
+
+    // verify writes are visible after commit
+    transactionContext.start();
+    verifyRow(transactionAwareHTable, TestBytes.row, TestBytes.value);
+    verifyRow(transactionAwareHTable, TestBytes.row2, TestBytes.value2);
+    transactionContext.finish();
   }
 
   @Test

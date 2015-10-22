@@ -595,7 +595,12 @@ public class TransactionManager extends AbstractService {
               addCommittingChangeSet(edit.getWritePointer(), edit.getChanges());
               break;
             case COMMITTED:
-              doCommit(edit.getWritePointer(), edit.getChanges(),
+              // TODO: need to reconcile usage of transaction id v/s write pointer TEPHRA-140
+              long transactionId = edit.getWritePointer();
+              long[] checkpointPointers = edit.getCheckpointPointers();
+              long writePointer = checkpointPointers == null || checkpointPointers.length == 0 ?
+                transactionId : checkpointPointers[checkpointPointers.length - 1];
+              doCommit(transactionId, writePointer, edit.getChanges(),
                        edit.getCommitPointer(), edit.getCanCommit());
               break;
             case INVALID:
@@ -867,7 +872,7 @@ public class TransactionManager extends AbstractService {
           // no changes
           addToCommitted = false;
         }
-        doCommit(tx.getTransactionId(), changeSet, commitPointer, addToCommitted);
+        doCommit(tx.getTransactionId(), tx.getWritePointer(), changeSet, commitPointer, addToCommitted);
       }
       appendToLog(TransactionEdit.createCommitted(tx.getTransactionId(), changeSet, commitPointer, addToCommitted));
     } finally {
@@ -877,9 +882,10 @@ public class TransactionManager extends AbstractService {
     return true;
   }
 
-  private void doCommit(long writePointer, Set<ChangeId> changes, long commitPointer, boolean addToCommitted) {
+  private void doCommit(long transactionId, long writePointer, Set<ChangeId> changes, long commitPointer,
+                        boolean addToCommitted) {
     // In case this method is called when loading a previous WAL, we need to remove the tx from these sets
-    committingChangeSets.remove(writePointer);
+    committingChangeSets.remove(transactionId);
     if (addToCommitted && !changes.isEmpty()) {
       // No need to add empty changes to the committed change sets, they will never trigger any conflict
 
@@ -895,12 +901,12 @@ public class TransactionManager extends AbstractService {
       committedChangeSets.put(commitPointer, changes);
     }
     // remove from in-progress set, so that it does not get excluded in the future
-    InProgressTx previous = inProgress.remove(writePointer);
+    InProgressTx previous = inProgress.remove(transactionId);
     if (previous == null) {
       // tx was not in progress! perhaps it timed out and is invalid? try to remove it there.
-      if (invalid.rem(writePointer)) {
+      if (invalid.rem(transactionId)) {
         invalidArray = invalid.toLongArray();
-        LOG.info("Tx invalid list: removed committed tx {}", writePointer);
+        LOG.info("Tx invalid list: removed committed tx {}", transactionId);
       }
     }
     // moving read pointer
