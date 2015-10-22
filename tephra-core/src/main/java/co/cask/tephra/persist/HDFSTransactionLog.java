@@ -146,24 +146,8 @@ public class HDFSTransactionLog extends AbstractTransactionLog {
       // write the number of entries we are writing to the log
       if (transactionEntries.size() > 0) {
         String key = TxConstants.TransactionLog.NUM_ENTRIES_APPENDED;
-        internalWriter.appendRaw(key.getBytes(), 0, key.getBytes().length, new SequenceFile.ValueBytes() {
-          @Override
-          public void writeUncompressedBytes(DataOutputStream outStream) throws IOException {
-            outStream.write(Ints.toByteArray(transactionEntries.size()));
-            outStream.flush();
-          }
-
-          @Override
-          public void writeCompressedBytes(DataOutputStream outStream) throws IllegalArgumentException, IOException {
-            throw new IllegalArgumentException("UncompressedBytes cannot be compressed!");
-          }
-
-          @Override
-          public int getSize() {
-            // size of value, which is an integer
-            return Ints.BYTES;
-          }
-        });
+        internalWriter.appendRaw(key.getBytes(), 0, key.getBytes().length,
+                                 new NumEntriesBytes(transactionEntries.size()));
       }
 
       // write the entries to the log
@@ -178,6 +162,29 @@ public class HDFSTransactionLog extends AbstractTransactionLog {
     public void close() throws IOException {
       transactionEntries.clear();
       internalWriter.close();
+    }
+  }
+
+  private static final class NumEntriesBytes implements SequenceFile.ValueBytes {
+    private final int numEntries;
+
+    public NumEntriesBytes(int numEntries) {
+      this.numEntries = numEntries;
+    }
+
+    @Override
+    public void writeUncompressedBytes(DataOutputStream outStream) throws IOException {
+      outStream.write(Ints.toByteArray(numEntries));
+    }
+
+    @Override
+    public void writeCompressedBytes(DataOutputStream outStream) throws IllegalArgumentException, IOException {
+      throw new IllegalArgumentException("UncompressedBytes cannot be compressed!");
+    }
+
+    @Override
+    public int getSize() {
+      return Ints.BYTES;
     }
   }
 
