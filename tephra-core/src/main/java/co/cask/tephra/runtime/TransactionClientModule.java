@@ -17,9 +17,10 @@
 package co.cask.tephra.runtime;
 
 import co.cask.tephra.TxConstants;
-import co.cask.tephra.distributed.PooledClientProvider;
+import co.cask.tephra.distributed.ElasticPooledClientProvider;
 import co.cask.tephra.distributed.ThreadLocalClientProvider;
 import co.cask.tephra.distributed.ThriftClientProvider;
+import co.cask.tephra.distributed.TimedPooledClientProvider;
 import com.google.inject.AbstractModule;
 import com.google.inject.Inject;
 import com.google.inject.Provider;
@@ -63,8 +64,10 @@ public class TransactionClientModule extends AbstractModule {
       String provider = cConf.get(TxConstants.Service.CFG_DATA_TX_CLIENT_PROVIDER,
                                   TxConstants.Service.DEFAULT_DATA_TX_CLIENT_PROVIDER);
       ThriftClientProvider clientProvider;
-      if ("pool".equals(provider)) {
-        clientProvider = new PooledClientProvider(cConf, discoveryServiceClient);
+      if ("timed-pool".equals(provider)) {
+        clientProvider = new TimedPooledClientProvider(cConf, discoveryServiceClient);
+      } else if ("pool".equals(provider)) {
+        clientProvider = new ElasticPooledClientProvider(cConf, discoveryServiceClient);
       } else if ("thread-local".equals(provider)) {
         clientProvider = new ThreadLocalClientProvider(cConf, discoveryServiceClient);
       } else {
