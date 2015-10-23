@@ -25,7 +25,6 @@ import co.cask.tephra.snapshot.SnapshotCodecV2;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 import com.google.common.io.Closeables;
-import com.google.common.primitives.Ints;
 import com.google.common.primitives.Longs;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
@@ -105,26 +104,8 @@ public class HDFSTransactionLogTest {
   }
 
 
-  private void writeNumWrites(SequenceFile.Writer internalWriter, final int size) throws Exception {
-    String key = TxConstants.TransactionLog.NUM_ENTRIES_APPENDED;
-    internalWriter.appendRaw(key.getBytes(), 0, key.getBytes().length, new SequenceFile.ValueBytes() {
-      @Override
-      public void writeUncompressedBytes(DataOutputStream outStream) throws IOException {
-        outStream.write(Ints.toByteArray(size));
-        outStream.flush();
-      }
-
-      @Override
-      public void writeCompressedBytes(DataOutputStream outStream) throws IllegalArgumentException, IOException {
-        throw new IllegalArgumentException("UncompressedBytes cannot be compressed!");
-      }
-
-      @Override
-      public int getSize() {
-        // size of value, which is an integer
-        return Integer.SIZE / Byte.SIZE;
-      }
-    });
+  private void writeNumWrites(TransactionLogWriter logWriter, final int size) throws Exception {
+    logWriter.commitMarker(size);
   }
 
   private void testTransactionLogSync(int totalCount, int batchSize, boolean withMarker,
@@ -140,7 +121,7 @@ public class HDFSTransactionLogTest {
 
     for (int i = 0; i < totalCount - batchSize; i += batchSize) {
       if (withMarker) {
-        writeNumWrites(writer, batchSize);
+        writeNumWrites(transactionLog.createWriter(), batchSize);
       }
       for (int j = 0; j < batchSize; j++) {
         entry = new AbstractTransactionLog.Entry(new LongWritable(logSequence.getAndIncrement()), edits.get(j));
@@ -150,7 +131,7 @@ public class HDFSTransactionLogTest {
     }
 
     if (withMarker) {
-      writeNumWrites(writer, batchSize);
+      writeNumWrites(transactionLog.createWriter(), batchSize);
     }
 
     for (int i = totalCount - batchSize; i < totalCount - 1; i++) {

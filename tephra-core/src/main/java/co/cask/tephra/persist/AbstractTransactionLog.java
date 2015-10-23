@@ -163,15 +163,15 @@ public abstract class AbstractTransactionLog implements TransactionLog {
       tmpWriter = writer;
 
       List<Entry> currentPending = getPendingWrites();
+      if (currentPending.size() != 0) {
+        tmpWriter.commitMarker(currentPending.size());
+      }
+
       // write out all accumulated entries to log.
       for (Entry e : currentPending) {
         tmpWriter.append(e);
         entryCount++;
         latestSeq = Math.max(latestSeq, e.getKey().get());
-      }
-
-      if (entryCount != 0) {
-        tmpWriter.commitMarker(entryCount);
       }
     }
 
