@@ -211,22 +211,12 @@ public class TransactionServiceClient implements TransactionSystemClient {
       if (provider == null) {
         provider = this.clientProvider;
       }
-      TransactionServiceThriftClient client = null;
-      try {
-        // this will throw a TException if it cannot get a client
-        client = provider.getClient();
-
+      // this will throw a TException if it cannot get a client
+      try (CloseableThriftClient closeable = provider.getCloseableClient()) {
         // note that this can throw exceptions other than TException
-        // hence the finally clause at the end
-        return operation.execute(client);
+        return operation.execute(closeable.getThriftClient());
 
       } catch (TException te) {
-        // a thrift error occurred, the thrift client may be in a bad state
-        if (client != null) {
-          provider.discardClient(client);
-          client = null;
-        }
-
         // determine whether we should retry
         boolean retry = retryStrategy.failOnce();
         if (!retry) {
@@ -244,12 +234,6 @@ public class TransactionServiceClient implements TransactionSystemClient {
           LOG.debug(msg, te);
         }
 
-      } finally {
-        // in case any other exception happens (other than TException), and
-        // also in case of succeess, the client must be returned to the pool.
-        if (client != null) {
-          provider.returnClient(client);
-        }
       }
     }
   }
@@ -312,11 +296,7 @@ public class TransactionServiceClient implements TransactionSystemClient {
           @Override
           public Boolean execute(TransactionServiceThriftClient client)
             throws Exception {
-            try {
-              return client.canCommit(tx, changeIds);
-            } catch (TTransactionNotInProgressException e) {
-              throw new TransactionNotInProgressException(e.getMessage());
-            }
+            return client.canCommit(tx, changeIds);
           }
         });
     } catch (TransactionNotInProgressException e) {
@@ -334,11 +314,7 @@ public class TransactionServiceClient implements TransactionSystemClient {
           @Override
           public Boolean execute(TransactionServiceThriftClient client)
             throws Exception {
-            try {
-              return client.commit(tx);
-            } catch (TTransactionNotInProgressException e) {
-              throw new TransactionNotInProgressException(e.getMessage());
-            }
+            return client.commit(tx);
           }
         });
     } catch (TransactionNotInProgressException e) {
@@ -392,8 +368,8 @@ public class TransactionServiceClient implements TransactionSystemClient {
             }
           }
       );
-    } catch (TransactionNotInProgressException te) {
-      throw te;
+    } catch (TransactionNotInProgressException e) {
+      throw e;
     } catch (Exception e) {
       throw Throwables.propagate(e);
     }
@@ -407,11 +383,7 @@ public class TransactionServiceClient implements TransactionSystemClient {
             @Override
             public InputStream execute(TransactionServiceThriftClient client)
                 throws Exception {
-              try {
-                return client.getSnapshotStream();
-              } catch (TTransactionCouldNotTakeSnapshotException e) {
-                throw new TransactionCouldNotTakeSnapshotException(e.getMessage());
-              }
+              return client.getSnapshotStream();
             }
           });
     } catch (TransactionCouldNotTakeSnapshotException e) {
@@ -475,11 +447,7 @@ public class TransactionServiceClient implements TransactionSystemClient {
         new Operation<Boolean>("truncateInvalidTxBefore") {
           @Override
           public Boolean execute(TransactionServiceThriftClient client) throws Exception {
-            try {
-              return client.truncateInvalidTxBefore(time);
-            } catch (TInvalidTruncateTimeException e) {
-              throw new InvalidTruncateTimeException(e.getMessage());
-            }
+            return client.truncateInvalidTxBefore(time);
           }
         });
     } catch (InvalidTruncateTimeException e) {

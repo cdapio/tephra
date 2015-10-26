@@ -263,11 +263,18 @@ properties can be added to the ``hbase-site.xml`` file on the client's ``CLASSPA
 +==========================================+===========+===============================================+
 | ``data.tx.client.timeout``               | 30000     | Client socket timeout (milliseconds)          |
 +------------------------------------------+-----------+-----------------------------------------------+
-| ``data.tx.client.provider``              | pool      | Client provider strategy: "pool" uses a pool  |
-|                                          |           | of clients; "thread-local" a client per       |
-|                                          |           | thread                                        |
+| ``data.tx.client.provider``              | pool      | Client provider strategy:                     |
+|                                          |           |                                               |
+|                                          |           | - "pool" uses a pool of clients               |
+|                                          |           | - "thread-local" a client per thread          |
+|                                          |           |                                               |
+|                                          |           | Note that "thread-local" provider can have a  |
+|                                          |           | resource leak if threads are recycled         |
 +------------------------------------------+-----------+-----------------------------------------------+
-| ``data.tx.client.count``                 | 5         | Max number of clients for "pool" provider     |
+| ``data.tx.client.count``                 | 50        | Max number of clients for "pool" provider     |
++------------------------------------------+-----------+-----------------------------------------------+
+| ``data.tx.client.obtain.timeout``        | 3000      | Timeout (milliseconds) to wait when obtaining |
+|                                          |           | clients from the "pool" provider              |
 +------------------------------------------+-----------+-----------------------------------------------+
 | ``data.tx.client.retry.strategy``        | backoff   | Client retry strategy: "backoff" for back off |
 |                                          |           | between attempts; "n-times" for fixed number  |
