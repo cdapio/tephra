@@ -22,13 +22,15 @@ import org.apache.twill.discovery.DiscoveryServiceClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.concurrent.TimeoutException;
+
 /**
  * An tx client provider that creates a new connection every time.
  */
 public class SingleUseClientProvider extends AbstractClientProvider {
 
   private static final Logger LOG =
-      LoggerFactory.getLogger(SingleUseClientProvider.class);
+    LoggerFactory.getLogger(SingleUseClientProvider.class);
 
   public SingleUseClientProvider(Configuration conf, DiscoveryServiceClient discoveryServiceClient, int timeout) {
     super(conf, discoveryServiceClient);
@@ -38,9 +40,9 @@ public class SingleUseClientProvider extends AbstractClientProvider {
   final int timeout;
 
   @Override
-  public TransactionServiceThriftClient getClient() throws TException {
+  public CloseableThriftClient getCloseableClient() throws TException, TimeoutException, InterruptedException {
     try {
-      return this.newClient(timeout);
+      return new CloseableThriftClient(this, newClient(timeout));
     } catch (TException e) {
       LOG.error("Unable to create new tx client: " + e.getMessage());
       throw e;
@@ -49,11 +51,6 @@ public class SingleUseClientProvider extends AbstractClientProvider {
 
   @Override
   public void returnClient(TransactionServiceThriftClient client) {
-    discardClient(client);
-  }
-
-  @Override
-  public void discardClient(TransactionServiceThriftClient client) {
     client.close();
   }
 

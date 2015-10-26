@@ -56,8 +56,9 @@ public abstract class AbstractClientProvider implements ThriftClientProvider {
   }
 
   public void initialize() throws TException {
-    // initialize the service discovery client
-    this.initDiscovery();
+    if (initialized.compareAndSet(false, true)) {
+      this.initDiscovery();
+    }
   }
 
   /**
@@ -83,9 +84,7 @@ public abstract class AbstractClientProvider implements ThriftClientProvider {
   }
 
   protected TransactionServiceThriftClient newClient(int timeout) throws TException {
-    if (initialized.compareAndSet(false, true)) {
-      initialize();
-    }
+    initialize();
     String address;
     int port;
 
@@ -112,13 +111,13 @@ public abstract class AbstractClientProvider implements ThriftClientProvider {
     // now we have an address and port, try to connect a client
     if (timeout < 0) {
       timeout = configuration.getInt(TxConstants.Service.CFG_DATA_TX_CLIENT_TIMEOUT,
-          TxConstants.Service.DEFAULT_DATA_TX_CLIENT_TIMEOUT);
+                                     TxConstants.Service.DEFAULT_DATA_TX_CLIENT_TIMEOUT_MS);
     }
     LOG.info("Attempting to connect to tx service at " +
                address + ":" + port + " with timeout " + timeout + " ms.");
     // thrift transport layer
     TTransport transport =
-        new TFramedTransport(new TSocket(address, port, timeout));
+      new TFramedTransport(new TSocket(address, port, timeout));
     try {
       transport.open();
     } catch (TTransportException e) {

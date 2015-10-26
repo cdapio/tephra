@@ -18,6 +18,8 @@ package co.cask.tephra.distributed;
 
 import org.apache.thrift.TException;
 
+import java.util.concurrent.TimeoutException;
+
 /**
  * This interface is used to provide thrift tx service clients:
  * there is only one (singleton)
@@ -43,25 +45,21 @@ public interface ThriftClientProvider {
   void initialize() throws TException;
 
   /**
-   * Retrieve an tx client for exclusive use by the current thread. The
-   * tx must be returned to the provider after use.
+   * Retrieve an AutoCloseable wrapper around  tx client for exclusive use by the
+   * current thread. The client must be closed (returned) to the provider after use.
    * @return an tx client, connected and fully functional
    */
-  TransactionServiceThriftClient getClient() throws TException;
+  CloseableThriftClient getCloseableClient() throws TException,
+    TimeoutException, InterruptedException;
 
   /**
-   * Release an tx client back to the provider's pool.
-   * @param client The client to release
-   */
-  void returnClient(TransactionServiceThriftClient client);
-
-  /**
-   * Discard an tx client from the provider's pool. This is called
-   * after a client becomes disfunctional, for instance, due to a socket
+   * Release an tx client back to the provider's pool, if the client is valid.
+   * If the client becomes disfunctional, for instance, due to a socket
    * exception. The provider must make sure to close the client, and it
    * must remove the client from its arsenal and be prepared to create
    * a new client subsequently.
-   * @param client The client to discard
+   *
+   * @param client The client to return
    */
-  void discardClient(TransactionServiceThriftClient client);
+  void returnClient(TransactionServiceThriftClient client);
 }

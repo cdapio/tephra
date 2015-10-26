@@ -1,5 +1,5 @@
 /*
- * Copyright © 2012-2014 Cask Data, Inc.
+ * Copyright © 2012-2015 Cask Data, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not
  * use this file except in compliance with the License. You may obtain a copy of
@@ -29,7 +29,7 @@ import org.slf4j.LoggerFactory;
 public class RetryWithBackoff extends RetryStrategy {
 
   private static final Logger LOG =
-      LoggerFactory.getLogger(RetryWithBackoff.class);
+    LoggerFactory.getLogger(RetryWithBackoff.class);
 
   int initialSleep; // initial sleep time
   int backoffFactor; // factor by which to increase sleep for each retry
@@ -81,13 +81,13 @@ public class RetryWithBackoff extends RetryStrategy {
     int maxSleep; // max sleep time. stop retrying when we exceed this
 
     public Provider() {
-      initialSleep = TxConstants.Service.DEFAULT_DATA_TX_CLIENT_BACKOFF_INIITIAL;
+      initialSleep = TxConstants.Service.DEFAULT_DATA_TX_CLIENT_BACKOFF_INITIAL;
       backoffFactor = TxConstants.Service.DEFAULT_DATA_TX_CLIENT_BACKOFF_FACTOR;
       maxSleep = TxConstants.Service.DEFAULT_DATA_TX_CLIENT_BACKOFF_LIMIT;
     }
 
     public void configure(Configuration config) {
-      initialSleep = config.getInt(TxConstants.Service.CFG_DATA_TX_CLIENT_BACKOFF_INIITIAL, initialSleep);
+      initialSleep = config.getInt(TxConstants.Service.CFG_DATA_TX_CLIENT_BACKOFF_INITIAL, initialSleep);
       backoffFactor = config.getInt(TxConstants.Service.CFG_DATA_TX_CLIENT_BACKOFF_FACTOR, backoffFactor);
       maxSleep = config.getInt(TxConstants.Service.CFG_DATA_TX_CLIENT_BACKOFF_LIMIT, maxSleep);
     }
@@ -100,7 +100,7 @@ public class RetryWithBackoff extends RetryStrategy {
     @Override
     public String toString() {
       return "sleep " + initialSleep + " ms with back off factor " +
-          backoffFactor + " and limit " + maxSleep + " ms";
+        backoffFactor + " and limit " + maxSleep + " ms";
     }
   }
 }
