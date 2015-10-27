@@ -155,7 +155,7 @@ public class HDFSTransactionLog extends AbstractTransactionLog {
     }
   }
 
-  private static final class CommitEntriesCount implements SequenceFile.ValueBytes {
+  static final class CommitEntriesCount implements SequenceFile.ValueBytes {
     private final int numEntries;
 
     public CommitEntriesCount(int numEntries) {

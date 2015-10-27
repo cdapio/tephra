@@ -103,13 +103,13 @@ public class HDFSTransactionLogTest {
                                      TransactionEdit.class, SequenceFile.CompressionType.NONE, null, null, metadata);
   }
 
-
-  private void writeNumWrites(TransactionLogWriter logWriter, final int size) throws Exception {
-    logWriter.commitMarker(size);
+  private void writeNumWrites(SequenceFile.Writer writer, final int size) throws Exception {
+    String key = TxConstants.TransactionLog.NUM_ENTRIES_APPENDED;
+    writer.appendRaw(key.getBytes(), 0, key.getBytes().length, new HDFSTransactionLog.CommitEntriesCount(size));
   }
 
-  private void testTransactionLogSync(int totalCount, int batchSize, boolean withMarker,
-                                      boolean isComplete) throws Exception {
+  private void testTransactionLogSync(int totalCount, int batchSize, boolean withMarker, boolean isComplete)
+    throws Exception {
     List<TransactionEdit> edits = createRandomEdits(totalCount);
     long timestamp = System.currentTimeMillis();
     Configuration configuration = getConfiguration();
@@ -121,7 +121,7 @@ public class HDFSTransactionLogTest {
 
     for (int i = 0; i < totalCount - batchSize; i += batchSize) {
       if (withMarker) {
-        writeNumWrites(transactionLog.createWriter(), batchSize);
+        writeNumWrites(writer, batchSize);
       }
       for (int j = 0; j < batchSize; j++) {
         entry = new AbstractTransactionLog.Entry(new LongWritable(logSequence.getAndIncrement()), edits.get(j));
@@ -131,7 +131,7 @@ public class HDFSTransactionLogTest {
     }
 
     if (withMarker) {
-      writeNumWrites(transactionLog.createWriter(), batchSize);
+      writeNumWrites(writer, batchSize);
     }
 
     for (int i = totalCount - batchSize; i < totalCount - 1; i++) {
@@ -171,9 +171,8 @@ public class HDFSTransactionLogTest {
 
     // now let's try to read this log
     TransactionLogReader reader = transactionLog.getReader();
-    TransactionEdit transactionEdit;
     int syncedEdits = 0;
-    while ((transactionEdit = reader.next()) != null) {
+    while (reader.next() != null) {
       // testing reading the transaction edits
       syncedEdits++;
     }
@@ -183,7 +182,6 @@ public class HDFSTransactionLogTest {
       Assert.assertEquals(totalCount - batchSize, syncedEdits);
     }
   }
-
 
   @Test
   public void testTransactionLogNewVersion() throws Exception {
