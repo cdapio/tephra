@@ -134,6 +134,9 @@ public class TransactionProcessor extends BaseRegionObserver {
       this.allowEmptyValues = env.getConfiguration().getBoolean(TxConstants.ALLOW_EMPTY_VALUES_KEY,
                                                                 TxConstants.ALLOW_EMPTY_VALUES_DEFAULT);
       this.readNonTxnData = Boolean.valueOf(tableDesc.getValue(TxConstants.READ_NON_TX_DATA));
+      if (readNonTxnData) {
+        LOG.info("Reading pre-existing data enabled for table " + tableDesc.getNameAsString());
+      }
     }
   }
 

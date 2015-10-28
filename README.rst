@@ -330,6 +330,20 @@ You may configure the ``TransactionProcessor`` to be loaded only on HBase tables
 be using for transaction reads and writes.  However, you must ensure that the coprocessor is 
 available on all impacted tables in order for Tephra to function correctly.
 
+Using Existing HBase Tables Transactionally
+...........................................
+
+Tephra overrides HBase cell timestamps with transaction IDs, and uses these transaction
+IDs to filter out cells older than the TTL (Time-To-Live). Transaction IDs are at a higher
+scale than cell timestamps. When a regular HBase table that has existing data is
+converted to a transactional table, existing data may be filtered out during reads. To
+allow reading of existing data from a transactional table, you will need to set the
+property ``data.tx.read.pre.existing`` as ``true`` on the table's table descriptor.
+
+Note that even without the property ``data.tx.read.pre.existing`` being set to ``true``,
+any existing data will not be removed during compactions. Existing data simply won't be
+visible during reads.
+
 Metrics Reporting
 .................
 
