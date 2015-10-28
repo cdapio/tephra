@@ -165,9 +165,7 @@ public class HDFSTransactionLogTest {
       });
     }
     writer.syncFs();
-
     Closeables.closeQuietly(writer);
-
 
     // now let's try to read this log
     TransactionLogReader reader = transactionLog.getReader();

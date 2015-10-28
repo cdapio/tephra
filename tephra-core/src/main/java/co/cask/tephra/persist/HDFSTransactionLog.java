@@ -1,5 +1,5 @@
 /*
- * Copyright © 2012-2014 Cask Data, Inc.
+ * Copyright © 2012-2015 Cask Data, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not
  * use this file except in compliance with the License. You may obtain a copy of
@@ -16,31 +16,24 @@
 
 package co.cask.tephra.persist;
 
+import co.cask.tephra.HDFSTransactionLogReaderSupplier;
 import co.cask.tephra.TxConstants;
 import co.cask.tephra.metrics.MetricsCollector;
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Throwables;
-import com.google.common.io.Closeables;
-import com.google.common.primitives.Bytes;
 import com.google.common.primitives.Ints;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.io.DataOutputBuffer;
 import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.io.SequenceFile;
 import org.apache.hadoop.io.Text;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.ByteArrayOutputStream;
 import java.io.DataOutputStream;
 import java.io.EOFException;
 import java.io.IOException;
-import java.nio.ByteBuffer;
-import java.util.ArrayList;
-import java.util.List;
 
 /**
  * Allows reading from and writing to a transaction write-ahead log stored in HDFS.
@@ -81,7 +74,7 @@ public class HDFSTransactionLog extends AbstractTransactionLog {
     FileStatus status = fs.getFileStatus(logPath);
     long length = status.getLen();
 
-    LogReader reader = null;
+    TransactionLogReader reader = null;
     // check if this file needs to be recovered due to failure
     // Check for possibly empty file. With appends, currently Hadoop reports a
     // zero length even if the file has been sync'd. Revisit if HDFS-376 or
@@ -97,7 +90,7 @@ public class HDFSTransactionLog extends AbstractTransactionLog {
         FileStatus newStatus = fs.getFileStatus(logPath);
         LOG.info("New file size for " + logPath + " is " + newStatus.getLen());
         SequenceFile.Reader fileReader = new SequenceFile.Reader(fs, logPath, hConf);
-        reader = new LogReader(fileReader);
+        reader = new HDFSTransactionLogReaderSupplier(fileReader).get();
       } catch (EOFException e) {
         if (length <= 0) {
           // TODO should we ignore an empty, not-last log file if skip.errors
@@ -115,7 +108,6 @@ public class HDFSTransactionLog extends AbstractTransactionLog {
     } catch (IOException e) {
       throw e;
     }
-
     return reader;
   }
 
@@ -155,6 +147,7 @@ public class HDFSTransactionLog extends AbstractTransactionLog {
     }
   }
 
+  @VisibleForTesting
   static final class CommitEntriesCount implements SequenceFile.ValueBytes {
     private final int numEntries;
 
@@ -175,114 +168,6 @@ public class HDFSTransactionLog extends AbstractTransactionLog {
     @Override
     public int getSize() {
       return Ints.BYTES;
-    }
-  }
-
-  private static final class LogReader implements TransactionLogReader {
-    private boolean closed;
-    private SequenceFile.Reader reader;
-    private LongWritable key = new LongWritable();
-    private boolean newVersion;
-    private List<TransactionEdit> transactionEdits;
-
-    public LogReader(SequenceFile.Reader reader) {
-      this.reader = reader;
-      newVersion = reader.getMetadata().getMetadata().containsKey(new Text("version"));
-      transactionEdits = new ArrayList<>();
-    }
-
-    @Override
-    public TransactionEdit next() {
-      try {
-        if (newVersion) {
-          return next(null);
-        }
-        return next(new TransactionEdit());
-      } catch (IOException ioe) {
-        throw Throwables.propagate(ioe);
-      }
-    }
-
-    @Override
-    public TransactionEdit next(TransactionEdit reuse) throws IOException {
-      if (closed) {
-        return null;
-      }
-      if (transactionEdits.size() != 0) {
-        return transactionEdits.remove(0);
-      } else {
-        if (newVersion) {
-          // v2 format, buffer edits till we reach a marker
-          boolean successful;
-          DataOutputBuffer rawKey = new DataOutputBuffer();
-
-          if (reader.nextRawKey(rawKey) != -1) {
-            // has data and has not reached EOF
-            byte [] keyBytes = TxConstants.TransactionLog.NUM_ENTRIES_APPENDED.getBytes();
-            if (rawKey.getLength() == keyBytes.length && Bytes.indexOf(rawKey.getData(), keyBytes) != -1) {
-              int numEntries;
-              SequenceFile.ValueBytes valueBytes = reader.createValueBytes();
-              Closeables.closeQuietly(rawKey);
-
-              // key matched, read the data now to determine numEntries to read.
-              reader.nextRawValue(valueBytes);
-              ByteArrayOutputStream value = new ByteArrayOutputStream(Integer.SIZE);
-              DataOutputStream outputStream = new DataOutputStream(value);
-              valueBytes.writeUncompressedBytes(outputStream);
-              outputStream.flush();
-              Closeables.closeQuietly(outputStream);
-              numEntries = ByteBuffer.wrap(value.toByteArray()).getInt();
-              Closeables.closeQuietly(value);
-
-              // read numEntries into the list
-              for (int i = 0; i < numEntries; i++) {
-                TransactionEdit edit = new TransactionEdit();
-                try {
-                  successful = reader.next(key, edit);
-                  if (successful) {
-                    transactionEdits.add(edit);
-                  } else {
-                    transactionEdits.clear();
-                    return null;
-                  }
-                } catch (EOFException e) {
-                  // if we have reached EOF before reading back the numEntries, we clear the partial list and return.
-                  transactionEdits.clear();
-                  return null;
-                }
-              }
-            } else {
-              LOG.error("Invalid key for num entries appended found, expected : {}",
-                        TxConstants.TransactionLog.NUM_ENTRIES_APPENDED);
-            }
-          }
-
-          if (!transactionEdits.isEmpty()) {
-            return transactionEdits.remove(0);
-          } else {
-            return null;
-          }
-
-        } else {
-          try {
-            // does not have marker, version v1.
-            boolean successful = reader.next(key, reuse);
-            return successful ? reuse : null;
-          } catch (EOFException e) {
-            LOG.warn("Hit an unexpected EOF while trying to read the Transaction Edit. Skipping the entry.", e);
-            return null;
-          }
-        }
-      }
-    }
-
-    @Override
-    public void close() throws IOException {
-      if (closed) {
-        return;
-      }
-      reader.close();
-      closed = true;
     }
   }
 }

@@ -32,6 +32,12 @@ public interface TransactionLogWriter extends Closeable {
    */
   void append(AbstractTransactionLog.Entry entry) throws IOException;
 
+  /**
+   * Makes an entry of number of transaction entries that will follow in that log in a single sync.
+   *
+   * @param count Number of transaction entries.
+   * @throws IOException If an error occurs while writing the count to storage.
+   */
   void commitMarker(int count) throws IOException;
 
   /**
