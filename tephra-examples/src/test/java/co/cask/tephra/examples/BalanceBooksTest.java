@@ -32,7 +32,6 @@ import com.google.inject.Scopes;
 import com.google.inject.util.Modules;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.HBaseTestingUtility;
-import org.apache.hadoop.yarn.lib.ZKClient;
 import org.apache.twill.zookeeper.ZKClientService;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
@@ -57,6 +56,19 @@ public class BalanceBooksTest {
     Configuration conf = testUtil.getConfiguration();
     conf.setBoolean(TxConstants.Manager.CFG_DO_PERSIST, false);
     conf.set(TxConstants.Manager.CFG_TX_SNAPSHOT_DIR, "/tx.snapshot");
+
+    // Tune down the connection thread pool size
+    conf.setInt("hbase.hconnection.threads.core", 5);
+    conf.setInt("hbase.hconnection.threads.max", 10);
+    // Tunn down handler threads in regionserver
+    conf.setInt("hbase.regionserver.handler.count", 10);
+
+    // Set to random port
+    conf.setInt("hbase.master.port", 0);
+    conf.setInt("hbase.master.info.port", 0);
+    conf.setInt("hbase.regionserver.port", 0);
+    conf.setInt("hbase.regionserver.info.port", 0);
+
     testUtil.startMiniCluster();
 
     String zkClusterKey = testUtil.getClusterKey(); // hostname:clientPort:parentZnode
