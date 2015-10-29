@@ -104,8 +104,21 @@ public class TransactionAwareHTableTest {
   @BeforeClass
   public static void setupBeforeClass() throws Exception {
     testUtil = new HBaseTestingUtility();
-    testUtil.startMiniCluster();
     conf = testUtil.getConfiguration();
+
+    // Tune down the connection thread pool size
+    conf.setInt("hbase.hconnection.threads.core", 5);
+    conf.setInt("hbase.hconnection.threads.max", 10);
+    // Tunn down handler threads in regionserver
+    conf.setInt("hbase.regionserver.handler.count", 10);
+
+    // Set to random port
+    conf.setInt("hbase.master.port", 0);
+    conf.setInt("hbase.master.info.port", 0);
+    conf.setInt("hbase.regionserver.port", 0);
+    conf.setInt("hbase.regionserver.info.port", 0);
+
+    testUtil.startMiniCluster();
     hBaseAdmin = testUtil.getHBaseAdmin();
     txStateStorage = new InMemoryTransactionStateStorage();
     txManager = new TransactionManager(conf, txStateStorage, new TxMetricsCollector());
