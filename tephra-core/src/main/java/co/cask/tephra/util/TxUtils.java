@@ -127,7 +127,7 @@ public class TxUtils {
    * This takes into account pre-existing non-transactional cells while calculating the time.
    */
   public static long getTimestampForTTL(long cellTs) {
-    return cellTs < MAX_NON_TX_TIMESTAMP ? cellTs * TxConstants.MAX_TX_PER_MS : cellTs;
+    return isPreExistingVersion(cellTs) ? cellTs * TxConstants.MAX_TX_PER_MS : cellTs;
   }
 
   /**
@@ -139,5 +139,12 @@ public class TxUtils {
       maxTTL = Math.max(familyTTL <= 0 ? Long.MAX_VALUE : familyTTL, maxTTL);
     }
     return maxTTL == 0 ? Long.MAX_VALUE : maxTTL;
+  }
+
+  /**
+   * Returns true if version was written before table was converted into transactional table, false otherwise.
+   */
+  public static boolean isPreExistingVersion(long version) {
+    return version < MAX_NON_TX_TIMESTAMP;
   }
 }

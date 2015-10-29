@@ -33,6 +33,7 @@ import org.apache.hadoop.hbase.Cell;
 import org.apache.hadoop.hbase.CellUtil;
 import org.apache.hadoop.hbase.HBaseTestingUtility;
 import org.apache.hadoop.hbase.HColumnDescriptor;
+import org.apache.hadoop.hbase.HConstants;
 import org.apache.hadoop.hbase.HTableDescriptor;
 import org.apache.hadoop.hbase.KeyValue;
 import org.apache.hadoop.hbase.TableName;
@@ -955,6 +956,9 @@ public class TransactionAwareHTableTest {
     nonTxTable.put(new Put(TestBytes.row).add(TestBytes.family, TestBytes.qualifier2, val12));
     nonTxTable.put(new Put(TestBytes.row2).add(TestBytes.family, TestBytes.qualifier, val21));
     nonTxTable.put(new Put(TestBytes.row2).add(TestBytes.family, TestBytes.qualifier2, val22));
+    nonTxTable.put(new Put(TestBytes.row4).add(TestBytes.family, TxConstants.FAMILY_DELETE_QUALIFIER,
+                                               HConstants.EMPTY_BYTE_ARRAY));
+    nonTxTable.put(new Put(TestBytes.row4).add(TestBytes.family, TestBytes.qualifier, HConstants.EMPTY_BYTE_ARRAY));
     nonTxTable.flushCommits();
 
     // Add transactional data
@@ -969,20 +973,33 @@ public class TransactionAwareHTableTest {
     verifyRow(txTable, new Get(TestBytes.row2).addColumn(TestBytes.family, TestBytes.qualifier), val21);
     verifyRow(txTable, new Get(TestBytes.row2).addColumn(TestBytes.family, TestBytes.qualifier2), val22);
     verifyRow(txTable, new Get(TestBytes.row3).addColumn(TestBytes.family, TestBytes.qualifier), val31);
+    verifyRow(txTable, new Get(TestBytes.row4).addColumn(TestBytes.family, TxConstants.FAMILY_DELETE_QUALIFIER),
+              HConstants.EMPTY_BYTE_ARRAY);
+    verifyRow(txTable, new Get(TestBytes.row4).addColumn(TestBytes.family, TestBytes.qualifier),
+              HConstants.EMPTY_BYTE_ARRAY);
 
     // test scan
     try (ResultScanner scanner = txTable.getScanner(new Scan())) {
       Result result = scanner.next();
       assertNotNull(result);
+      assertArrayEquals(TestBytes.row, result.getRow());
       assertArrayEquals(val11, result.getValue(TestBytes.family, TestBytes.qualifier));
       assertArrayEquals(val12, result.getValue(TestBytes.family, TestBytes.qualifier2));
       result = scanner.next();
       assertNotNull(result);
+      assertArrayEquals(TestBytes.row2, result.getRow());
       assertArrayEquals(val21, result.getValue(TestBytes.family, TestBytes.qualifier));
       assertArrayEquals(val22, result.getValue(TestBytes.family, TestBytes.qualifier2));
       result = scanner.next();
       assertNotNull(result);
+      assertArrayEquals(TestBytes.row3, result.getRow());
       assertArrayEquals(val31, result.getValue(TestBytes.family, TestBytes.qualifier));
+      result = scanner.next();
+      assertNotNull(result);
+      assertArrayEquals(TestBytes.row4, result.getRow());
+      assertArrayEquals(HConstants.EMPTY_BYTE_ARRAY, result.getValue(TestBytes.family,
+                                                                     TxConstants.FAMILY_DELETE_QUALIFIER));
+      assertArrayEquals(HConstants.EMPTY_BYTE_ARRAY, result.getValue(TestBytes.family, TestBytes.qualifier));
       assertNull(scanner.next());
     }
     txContext.finish();
@@ -999,6 +1016,10 @@ public class TransactionAwareHTableTest {
     verifyRow(txTable, new Get(TestBytes.row2).addColumn(TestBytes.family, TestBytes.qualifier), null);
     verifyRow(txTable, new Get(TestBytes.row2).addColumn(TestBytes.family, TestBytes.qualifier2), val22);
     verifyRow(txTable, new Get(TestBytes.row3).addColumn(TestBytes.family, TestBytes.qualifier), val31);
+    verifyRow(txTable, new Get(TestBytes.row4).addColumn(TestBytes.family, TxConstants.FAMILY_DELETE_QUALIFIER),
+              HConstants.EMPTY_BYTE_ARRAY);
+    verifyRow(txTable, new Get(TestBytes.row4).addColumn(TestBytes.family, TestBytes.qualifier),
+              HConstants.EMPTY_BYTE_ARRAY);
     txContext.finish();
 
     // test scan
@@ -1006,15 +1027,24 @@ public class TransactionAwareHTableTest {
     try (ResultScanner scanner = txTable.getScanner(new Scan())) {
       Result result = scanner.next();
       assertNotNull(result);
+      assertArrayEquals(TestBytes.row, result.getRow());
       assertArrayEquals(val111, result.getValue(TestBytes.family, TestBytes.qualifier));
       assertArrayEquals(val12, result.getValue(TestBytes.family, TestBytes.qualifier2));
       result = scanner.next();
       assertNotNull(result);
+      assertArrayEquals(TestBytes.row2, result.getRow());
       assertArrayEquals(null, result.getValue(TestBytes.family, TestBytes.qualifier));
       assertArrayEquals(val22, result.getValue(TestBytes.family, TestBytes.qualifier2));
       result = scanner.next();
       assertNotNull(result);
+      assertArrayEquals(TestBytes.row3, result.getRow());
       assertArrayEquals(val31, result.getValue(TestBytes.family, TestBytes.qualifier));
+      result = scanner.next();
+      assertNotNull(result);
+      assertArrayEquals(TestBytes.row4, result.getRow());
+      assertArrayEquals(HConstants.EMPTY_BYTE_ARRAY, result.getValue(TestBytes.family,
+                                                                     TxConstants.FAMILY_DELETE_QUALIFIER));
+      assertArrayEquals(HConstants.EMPTY_BYTE_ARRAY, result.getValue(TestBytes.family, TestBytes.qualifier));
       assertNull(scanner.next());
     }
     txContext.finish();
@@ -1066,9 +1096,10 @@ public class TransactionAwareHTableTest {
 
   @Test
   public void testVisibilityAll() throws Exception {
+    HTable nonTxTable = createTable(Bytes.toBytes("testVisibilityAll"),
+                                           new byte[][]{TestBytes.family, TestBytes.family2}, true);
     TransactionAwareHTable txTable =
-      new TransactionAwareHTable(createTable(Bytes.toBytes("testVisibilityAll"),
-                                             new byte[][]{TestBytes.family, TestBytes.family2}, true),
+      new TransactionAwareHTable(nonTxTable,
                                  TxConstants.ConflictDetection.ROW); // ROW conflict detection to verify family deletes
     TransactionContext txContext = new TransactionContext(new InMemoryTxSystemClient(txManager), txTable);
 
@@ -1224,6 +1255,34 @@ public class TransactionAwareHTableTest {
               TestBytes.value2);
     verifyRow(txTable, new Get(TestBytes.row2).addColumn(TestBytes.family, TestBytes.qualifier),
               TestBytes.value3);
+    txContext.finish();
+
+    // Test with regular HBase deletes in pre-existing data
+    long now = System.currentTimeMillis();
+    Delete deleteColumn = new Delete(TestBytes.row3).deleteColumn(TestBytes.family, TestBytes.qualifier, now - 1);
+    // to prevent Tephra from replacing delete with delete marker
+    deleteColumn.setAttribute(TxConstants.TX_ROLLBACK_ATTRIBUTE_KEY, new byte[0]);
+    nonTxTable.delete(deleteColumn);
+    Delete deleteFamily = new Delete(TestBytes.row3).deleteFamily(TestBytes.family2, now);
+    // to prevent Tephra from replacing delete with delete marker
+    deleteFamily.setAttribute(TxConstants.TX_ROLLBACK_ATTRIBUTE_KEY, new byte[0]);
+    nonTxTable.delete(deleteFamily);
+    nonTxTable.flushCommits();
+
+    txContext.start();
+    txContext.getCurrentTransaction().setVisibility(Transaction.VisibilityLevel.SNAPSHOT_ALL);
+    expected = ImmutableList.of(
+      new KeyValue(TestBytes.row, TestBytes.family, TestBytes.qualifier, txWp2, KeyValue.Type.DeleteColumn),
+      new KeyValue(TestBytes.row, TestBytes.family, TestBytes.qualifier2, txWp2, TestBytes.value2),
+      new KeyValue(TestBytes.row, TestBytes.family2, null, txWp2, KeyValue.Type.DeleteFamily),
+      new KeyValue(TestBytes.row2, TestBytes.family, TestBytes.qualifier, txWp2, TestBytes.value3),
+      new KeyValue(TestBytes.row3, TestBytes.family, TestBytes.qualifier, now - 1, KeyValue.Type.Delete),
+      new KeyValue(TestBytes.row3, TestBytes.family2, null, now, KeyValue.Type.DeleteFamily)
+    );
+    // test scan
+    Scan scan = new Scan();
+    scan.setRaw(true);
+    verifyScan(txTable, scan, expected);
     txContext.finish();
   }
 }

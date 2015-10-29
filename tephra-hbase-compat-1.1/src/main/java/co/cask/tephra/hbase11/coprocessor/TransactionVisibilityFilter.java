@@ -177,15 +177,16 @@ public class TransactionVisibilityFilter extends FilterBase {
   }
 
   private boolean isColumnDelete(Cell cell) {
-    return cell.getValueLength() == 0 && !allowEmptyValues;
+    return !TxUtils.isPreExistingVersion(cell.getTimestamp()) && cell.getValueLength() == 0 && !allowEmptyValues;
   }
 
   private static final class DeleteTracker {
     private long familyDeleteTs;
 
     public static boolean isFamilyDelete(Cell cell) {
-      return CellUtil.matchingQualifier(cell, TxConstants.FAMILY_DELETE_QUALIFIER) &&
-              CellUtil.matchingValue(cell, HConstants.EMPTY_BYTE_ARRAY);
+      return !TxUtils.isPreExistingVersion(cell.getTimestamp()) &&
+        CellUtil.matchingQualifier(cell, TxConstants.FAMILY_DELETE_QUALIFIER) &&
+        CellUtil.matchingValue(cell, HConstants.EMPTY_BYTE_ARRAY);
     }
 
     public void addFamilyDelete(Cell delete) {
