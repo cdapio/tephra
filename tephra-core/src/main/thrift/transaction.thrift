@@ -21,7 +21,8 @@ enum TTransactionType {
 
 enum TVisibilityLevel {
   SNAPSHOT = 1,
-  SNAPSHOT_EXCLUDE_CURRENT = 2
+  SNAPSHOT_EXCLUDE_CURRENT = 2,
+  SNAPSHOT_ALL = 3
 }
 
 struct TTransaction {

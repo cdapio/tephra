@@ -67,6 +67,8 @@ public final class TransactionConverterUtils {
         return Transaction.VisibilityLevel.SNAPSHOT;
       case SNAPSHOT_EXCLUDE_CURRENT:
         return Transaction.VisibilityLevel.SNAPSHOT_EXCLUDE_CURRENT;
+      case SNAPSHOT_ALL:
+        return Transaction.VisibilityLevel.SNAPSHOT_ALL;
       default:
         throw new IllegalArgumentException("Unknown TVisibilityLevel: " + tLevel);
     }
@@ -78,6 +80,8 @@ public final class TransactionConverterUtils {
         return TVisibilityLevel.SNAPSHOT;
       case SNAPSHOT_EXCLUDE_CURRENT:
         return TVisibilityLevel.SNAPSHOT_EXCLUDE_CURRENT;
+      case SNAPSHOT_ALL:
+        return TVisibilityLevel.SNAPSHOT_ALL;
       default:
         throw new IllegalArgumentException("Unknown VisibilityLevel: " + level);
     }

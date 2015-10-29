@@ -26,12 +26,15 @@ import co.cask.tephra.inmemory.InMemoryTxSystemClient;
 import co.cask.tephra.metrics.TxMetricsCollector;
 import co.cask.tephra.persist.InMemoryTransactionStateStorage;
 import co.cask.tephra.persist.TransactionStateStorage;
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.Lists;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.Cell;
 import org.apache.hadoop.hbase.CellUtil;
 import org.apache.hadoop.hbase.HBaseTestingUtility;
 import org.apache.hadoop.hbase.HColumnDescriptor;
 import org.apache.hadoop.hbase.HTableDescriptor;
+import org.apache.hadoop.hbase.KeyValue;
 import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.client.Delete;
 import org.apache.hadoop.hbase.client.Get;
@@ -53,7 +56,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 
 import static org.junit.Assert.assertArrayEquals;
@@ -78,6 +84,7 @@ public class TransactionAwareHTableTest {
   private static Configuration conf;
   private TransactionContext transactionContext;
   private TransactionAwareHTable transactionAwareHTable;
+  private HTable hTable;
 
   private static final class TestBytes {
     private static final byte[] table = Bytes.toBytes("testtable");
@@ -91,6 +98,7 @@ public class TransactionAwareHTableTest {
     private static final byte[] row4 = Bytes.toBytes("row4");
     private static final byte[] value = Bytes.toBytes("value");
     private static final byte[] value2 = Bytes.toBytes("value2");
+    private static final byte[] value3 = Bytes.toBytes("value3");
   }
 
   @BeforeClass
@@ -112,7 +120,7 @@ public class TransactionAwareHTableTest {
 
   @Before
   public void setupBeforeTest() throws Exception {
-    HTable hTable = createTable(TestBytes.table, new byte[][]{TestBytes.family});
+    hTable = createTable(TestBytes.table, new byte[][]{TestBytes.family});
     transactionAwareHTable = new TransactionAwareHTable(hTable);
     transactionContext = new TransactionContext(new InMemoryTxSystemClient(txManager), transactionAwareHTable);
   }
@@ -194,7 +202,7 @@ public class TransactionAwareHTableTest {
   @Test
   public void testValidTransactionalDelete() throws Exception {
     HTable hTable = createTable(Bytes.toBytes("TestValidTransactionalDelete"),
-        new byte[][]{TestBytes.family, TestBytes.family2});
+                                new byte[][]{TestBytes.family, TestBytes.family2});
     try {
       TransactionAwareHTable txTable = new TransactionAwareHTable(hTable);
       TransactionContext txContext = new TransactionContext(new InMemoryTxSystemClient(txManager), txTable);
@@ -1017,18 +1025,205 @@ public class TransactionAwareHTableTest {
   }
 
   private void verifyRow(HTableInterface table, Get get, byte[] expectedValue) throws Exception {
+    verifyRows(table, get, expectedValue == null ? null : ImmutableList.of(expectedValue));
+  }
+
+  private void verifyRows(HTableInterface table, Get get, List<byte[]> expectedValues) throws Exception {
     Result result = table.get(get);
-    if (expectedValue == null) {
+    if (expectedValues == null) {
       assertTrue(result.isEmpty());
     } else {
       assertFalse(result.isEmpty());
+      byte[] family = TestBytes.family;
+      byte[] col = TestBytes.qualifier;
       if (get.hasFamilies()) {
-        byte[] family = get.getFamilyMap().keySet().iterator().next();
-        byte[] col = get.getFamilyMap().get(family).first();
-        assertArrayEquals(expectedValue, result.getValue(family, col));
-      } else {
-        assertArrayEquals(expectedValue, result.getValue(TestBytes.family, TestBytes.qualifier));
+        family = get.getFamilyMap().keySet().iterator().next();
+        col = get.getFamilyMap().get(family).first();
+      }
+      Iterator<Cell> it = result.getColumnCells(family, col).iterator();
+      for (byte[] expectedValue : expectedValues) {
+        Assert.assertTrue(it.hasNext());
+        assertArrayEquals(expectedValue, CellUtil.cloneValue(it.next()));
       }
     }
+  }
+
+  private Cell[] getRow(HTableInterface table, Get get) throws Exception {
+    Result result = table.get(get);
+    return result.rawCells();
+  }
+
+  private void verifyScan(HTableInterface table, Scan scan, List<KeyValue> expectedCells) throws Exception {
+    List<Cell> actualCells = new ArrayList<>();
+    try (ResultScanner scanner = table.getScanner(scan)) {
+      Result[] results = scanner.next(expectedCells.size() + 1);
+      for (Result result : results) {
+        actualCells.addAll(Lists.newArrayList(result.rawCells()));
+      }
+      Assert.assertEquals(expectedCells, actualCells);
+    }
+  }
+
+  @Test
+  public void testVisibilityAll() throws Exception {
+    TransactionAwareHTable txTable =
+      new TransactionAwareHTable(createTable(Bytes.toBytes("testVisibilityAll"),
+                                             new byte[][]{TestBytes.family, TestBytes.family2}, true),
+                                 TxConstants.ConflictDetection.ROW); // ROW conflict detection to verify family deletes
+    TransactionContext txContext = new TransactionContext(new InMemoryTxSystemClient(txManager), txTable);
+
+    // start a transaction and create a delete marker
+    txContext.start();
+    //noinspection ConstantConditions
+    long txWp0 = txContext.getCurrentTransaction().getWritePointer();
+    txTable.delete(new Delete(TestBytes.row).deleteColumn(TestBytes.family, TestBytes.qualifier2));
+    txContext.finish();
+
+    // start a new transaction and write some values
+    txContext.start();
+    @SuppressWarnings("ConstantConditions")
+    long txWp1 = txContext.getCurrentTransaction().getWritePointer();
+    txTable.put(new Put(TestBytes.row).add(TestBytes.family, TestBytes.qualifier, TestBytes.value));
+    txTable.put(new Put(TestBytes.row).add(TestBytes.family, TestBytes.qualifier2, TestBytes.value2));
+    txTable.put(new Put(TestBytes.row2).add(TestBytes.family, TestBytes.qualifier, TestBytes.value));
+    txTable.put(new Put(TestBytes.row).add(TestBytes.family2, TestBytes.qualifier, TestBytes.value));
+    txTable.put(new Put(TestBytes.row).add(TestBytes.family2, TestBytes.qualifier2, TestBytes.value2));
+
+    // verify written data
+    verifyRow(txTable, new Get(TestBytes.row).addColumn(TestBytes.family, TestBytes.qualifier),
+              TestBytes.value);
+    verifyRow(txTable, new Get(TestBytes.row).addColumn(TestBytes.family, TestBytes.qualifier2),
+              TestBytes.value2);
+    verifyRow(txTable, new Get(TestBytes.row2).addColumn(TestBytes.family, TestBytes.qualifier),
+              TestBytes.value);
+    verifyRow(txTable, new Get(TestBytes.row).addColumn(TestBytes.family2, TestBytes.qualifier),
+              TestBytes.value);
+    verifyRow(txTable, new Get(TestBytes.row).addColumn(TestBytes.family2, TestBytes.qualifier2),
+              TestBytes.value2);
+
+    // checkpoint and make changes to written data now
+    txContext.checkpoint();
+    long txWp2 = txContext.getCurrentTransaction().getWritePointer();
+    // delete a column
+    txTable.delete(new Delete(TestBytes.row).deleteColumn(TestBytes.family, TestBytes.qualifier));
+    // no change to a column
+    txTable.put(new Put(TestBytes.row).add(TestBytes.family, TestBytes.qualifier2, TestBytes.value2));
+    // update a column
+    txTable.put(new Put(TestBytes.row2).add(TestBytes.family, TestBytes.qualifier, TestBytes.value3));
+    // delete column family
+    txTable.delete(new Delete(TestBytes.row).deleteFamily(TestBytes.family2));
+
+    // verify changed values
+    verifyRow(txTable, new Get(TestBytes.row).addColumn(TestBytes.family, TestBytes.qualifier),
+              null);
+    verifyRow(txTable, new Get(TestBytes.row).addColumn(TestBytes.family, TestBytes.qualifier2),
+              TestBytes.value2);
+    verifyRow(txTable, new Get(TestBytes.row2).addColumn(TestBytes.family, TestBytes.qualifier),
+              TestBytes.value3);
+    verifyRow(txTable, new Get(TestBytes.row).addColumn(TestBytes.family2, TestBytes.qualifier),
+              null);
+    verifyRow(txTable, new Get(TestBytes.row).addColumn(TestBytes.family2, TestBytes.qualifier2),
+              null);
+
+    // run a scan with VisibilityLevel.ALL, this should return all raw changes by this transaction,
+    // and the raw change by prior transaction
+    //noinspection ConstantConditions
+    txContext.getCurrentTransaction().setVisibility(Transaction.VisibilityLevel.SNAPSHOT_ALL);
+    List<KeyValue> expected = ImmutableList.of(
+      new KeyValue(TestBytes.row, TestBytes.family, TestBytes.qualifier, txWp2, KeyValue.Type.DeleteColumn),
+      new KeyValue(TestBytes.row, TestBytes.family, TestBytes.qualifier, txWp1, TestBytes.value),
+      new KeyValue(TestBytes.row, TestBytes.family, TestBytes.qualifier2, txWp2, TestBytes.value2),
+      new KeyValue(TestBytes.row, TestBytes.family, TestBytes.qualifier2, txWp1, TestBytes.value2),
+      new KeyValue(TestBytes.row, TestBytes.family, TestBytes.qualifier2, txWp0, KeyValue.Type.DeleteColumn),
+      new KeyValue(TestBytes.row, TestBytes.family2, null, txWp2, KeyValue.Type.DeleteFamily),
+      new KeyValue(TestBytes.row, TestBytes.family2, TestBytes.qualifier, txWp1, TestBytes.value),
+      new KeyValue(TestBytes.row, TestBytes.family2, TestBytes.qualifier2, txWp1, TestBytes.value2),
+      new KeyValue(TestBytes.row2, TestBytes.family, TestBytes.qualifier, txWp2, TestBytes.value3),
+      new KeyValue(TestBytes.row2, TestBytes.family, TestBytes.qualifier, txWp1, TestBytes.value)
+    );
+    verifyScan(txTable, new Scan(), expected);
+
+    // verify a Get is also able to return all snapshot versions
+    Get get = new Get(TestBytes.row).addColumn(TestBytes.family, TestBytes.qualifier);
+    Cell[] cells = getRow(txTable, get);
+    Assert.assertEquals(2, cells.length);
+    Assert.assertTrue(CellUtil.isDelete(cells[0]));
+    Assert.assertArrayEquals(TestBytes.value, CellUtil.cloneValue(cells[1]));
+
+    get = new Get(TestBytes.row).addColumn(TestBytes.family, TestBytes.qualifier2);
+    cells = getRow(txTable, get);
+    Assert.assertEquals(3, cells.length);
+    Assert.assertArrayEquals(TestBytes.value2, CellUtil.cloneValue(cells[0]));
+    Assert.assertArrayEquals(TestBytes.value2, CellUtil.cloneValue(cells[1]));
+    Assert.assertTrue(CellUtil.isDeleteColumns(cells[2]));
+
+    verifyRows(txTable, new Get(TestBytes.row2).addColumn(TestBytes.family, TestBytes.qualifier),
+               ImmutableList.of(TestBytes.value3, TestBytes.value));
+
+    get = new Get(TestBytes.row).addColumn(TestBytes.family2, TestBytes.qualifier);
+    cells = getRow(txTable, get);
+    Assert.assertEquals(2, cells.length);
+    Assert.assertTrue(CellUtil.isDelete(cells[0]));
+    Assert.assertArrayEquals(TestBytes.value, CellUtil.cloneValue(cells[1]));
+
+    get = new Get(TestBytes.row).addColumn(TestBytes.family2, TestBytes.qualifier2);
+    cells = getRow(txTable, get);
+    Assert.assertEquals(2, cells.length);
+    Assert.assertTrue(CellUtil.isDelete(cells[0]));
+    Assert.assertArrayEquals(TestBytes.value2, CellUtil.cloneValue(cells[1]));
+
+    // Verify VisibilityLevel.SNAPSHOT
+    txContext.getCurrentTransaction().setVisibility(Transaction.VisibilityLevel.SNAPSHOT);
+    expected = ImmutableList.of(
+      new KeyValue(TestBytes.row, TestBytes.family, TestBytes.qualifier2, txWp2, TestBytes.value2),
+      new KeyValue(TestBytes.row2, TestBytes.family, TestBytes.qualifier, txWp2, TestBytes.value3)
+    );
+    verifyScan(txTable, new Scan(), expected);
+
+    // Verify VisibilityLevel.SNAPSHOT_EXCLUDE_CURRENT
+    txContext.getCurrentTransaction().setVisibility(Transaction.VisibilityLevel.SNAPSHOT_EXCLUDE_CURRENT);
+    expected = ImmutableList.of(
+      new KeyValue(TestBytes.row, TestBytes.family, TestBytes.qualifier, txWp1, TestBytes.value),
+      new KeyValue(TestBytes.row, TestBytes.family, TestBytes.qualifier2, txWp1, TestBytes.value2),
+      new KeyValue(TestBytes.row, TestBytes.family2, TestBytes.qualifier, txWp1, TestBytes.value),
+      new KeyValue(TestBytes.row, TestBytes.family2, TestBytes.qualifier2, txWp1, TestBytes.value2),
+      new KeyValue(TestBytes.row2, TestBytes.family, TestBytes.qualifier, txWp1, TestBytes.value)
+    );
+    verifyScan(txTable, new Scan(), expected);
+    txContext.finish();
+
+    // finally verify values once more after commit, this time we should get only committed raw values for
+    // all visibility levels
+    txContext.start();
+    txContext.getCurrentTransaction().setVisibility(Transaction.VisibilityLevel.SNAPSHOT_ALL);
+    expected = ImmutableList.of(
+      new KeyValue(TestBytes.row, TestBytes.family, TestBytes.qualifier, txWp2, KeyValue.Type.DeleteColumn),
+      new KeyValue(TestBytes.row, TestBytes.family, TestBytes.qualifier2, txWp2, TestBytes.value2),
+      new KeyValue(TestBytes.row, TestBytes.family2, null, txWp2, KeyValue.Type.DeleteFamily),
+      new KeyValue(TestBytes.row2, TestBytes.family, TestBytes.qualifier, txWp2, TestBytes.value3)
+    );
+    verifyScan(txTable, new Scan(), expected);
+
+    txContext.getCurrentTransaction().setVisibility(Transaction.VisibilityLevel.SNAPSHOT);
+    expected = ImmutableList.of(
+      new KeyValue(TestBytes.row, TestBytes.family, TestBytes.qualifier2, txWp2, TestBytes.value2),
+      new KeyValue(TestBytes.row2, TestBytes.family, TestBytes.qualifier, txWp2, TestBytes.value3)
+    );
+    verifyScan(txTable, new Scan(), expected);
+
+    txContext.getCurrentTransaction().setVisibility(Transaction.VisibilityLevel.SNAPSHOT_EXCLUDE_CURRENT);
+    expected = ImmutableList.of(
+      new KeyValue(TestBytes.row, TestBytes.family, TestBytes.qualifier2, txWp2, TestBytes.value2),
+      new KeyValue(TestBytes.row2, TestBytes.family, TestBytes.qualifier, txWp2, TestBytes.value3)
+    );
+    verifyScan(txTable, new Scan(), expected);
+
+    verifyRow(txTable, new Get(TestBytes.row).addColumn(TestBytes.family, TestBytes.qualifier),
+              null);
+    verifyRow(txTable, new Get(TestBytes.row).addColumn(TestBytes.family, TestBytes.qualifier2),
+              TestBytes.value2);
+    verifyRow(txTable, new Get(TestBytes.row2).addColumn(TestBytes.family, TestBytes.qualifier),
+              TestBytes.value3);
+    txContext.finish();
   }
 }

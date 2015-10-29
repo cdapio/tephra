@@ -23,6 +23,7 @@ import com.google.common.collect.Maps;
 import org.apache.hadoop.hbase.Cell;
 import org.apache.hadoop.hbase.CellUtil;
 import org.apache.hadoop.hbase.HConstants;
+import org.apache.hadoop.hbase.KeyValue;
 import org.apache.hadoop.hbase.filter.Filter;
 import org.apache.hadoop.hbase.filter.FilterBase;
 import org.apache.hadoop.hbase.regionserver.ScanType;
@@ -92,7 +93,8 @@ public class TransactionVisibilityFilter extends FilterBase {
     }
     this.allowEmptyValues = allowEmptyValues;
     this.clearDeletes =
-        scanType == ScanType.COMPACT_DROP_DELETES || scanType == ScanType.USER_SCAN;
+      scanType == ScanType.COMPACT_DROP_DELETES ||
+        (scanType == ScanType.USER_SCAN && tx.getVisibilityLevel() != Transaction.VisibilityLevel.SNAPSHOT_ALL);
     this.cellFilter = cellFilter;
   }
 
@@ -111,7 +113,11 @@ public class TransactionVisibilityFilter extends FilterBase {
       // passed TTL for this column, seek to next
       return ReturnCode.NEXT_COL;
     } else if (tx.isVisible(kvTimestamp)) {
-      if (deleteTracker.isFamilyDelete(cell)) {
+      // Return all writes done by current transaction (including deletes) for VisibilityLevel.SNAPSHOT_ALL
+      if (tx.getVisibilityLevel() == Transaction.VisibilityLevel.SNAPSHOT_ALL && tx.isCurrentWrite(kvTimestamp)) {
+        return ReturnCode.INCLUDE;
+      }
+      if (DeleteTracker.isFamilyDelete(cell)) {
         deleteTracker.addFamilyDelete(cell);
         if (clearDeletes) {
           return ReturnCode.NEXT_COL;
@@ -124,7 +130,7 @@ public class TransactionVisibilityFilter extends FilterBase {
         return ReturnCode.NEXT_COL;
       }
       // check for column delete
-      if (cell.getValueLength() == 0 && !allowEmptyValues) {
+      if (isColumnDelete(cell)) {
         if (clearDeletes) {
           // skip "deleted" cell
           return ReturnCode.NEXT_COL;
@@ -146,14 +152,38 @@ public class TransactionVisibilityFilter extends FilterBase {
   }
 
   @Override
+  public Cell transformCell(Cell cell) throws IOException {
+    // Convert Tephra deletes back into HBase deletes
+    if (tx.getVisibilityLevel() == Transaction.VisibilityLevel.SNAPSHOT_ALL) {
+      if (DeleteTracker.isFamilyDelete(cell)) {
+        return new KeyValue(CellUtil.cloneRow(cell), CellUtil.cloneFamily(cell), null, cell.getTimestamp(),
+                            KeyValue.Type.DeleteFamily);
+      } else if (isColumnDelete(cell)) {
+        // Note: in some cases KeyValue.Type.Delete is used in Delete object,
+        // and in some other cases KeyValue.Type.DeleteColumn is used.
+        // Since Tephra cannot distinguish between the two, we return KeyValue.Type.DeleteColumn.
+        // KeyValue.Type.DeleteColumn makes both CellUtil.isDelete and CellUtil.isDeleteColumns return true, and will
+        // work in both cases.
+        return new KeyValue(CellUtil.cloneRow(cell), CellUtil.cloneFamily(cell), CellUtil.cloneQualifier(cell),
+                            cell.getTimestamp(), KeyValue.Type.DeleteColumn);
+      }
+    }
+    return cell;
+  }
+
+  @Override
   public void reset() {
     deleteTracker.reset();
+  }
+
+  private boolean isColumnDelete(Cell cell) {
+    return cell.getValueLength() == 0 && !allowEmptyValues;
   }
 
   private static final class DeleteTracker {
     private long familyDeleteTs;
 
-    public boolean isFamilyDelete(Cell cell) {
+    public static boolean isFamilyDelete(Cell cell) {
       return CellUtil.matchingQualifier(cell, TxConstants.FAMILY_DELETE_QUALIFIER) &&
               CellUtil.matchingValue(cell, HConstants.EMPTY_BYTE_ARRAY);
     }
