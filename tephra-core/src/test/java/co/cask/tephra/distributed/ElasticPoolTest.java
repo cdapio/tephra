@@ -63,33 +63,8 @@ public class ElasticPoolTest {
   public void testFewerThreadsThanElements() throws InterruptedException {
     final DummyPool pool = new DummyPool(5);
     Dummy.count.set(0);
-    Thread[] threads = new Thread[2];
-    for (int i = 0; i < threads.length; ++i) {
-      threads[i] = new Thread() {
-        public void run() {
-          for (int j = 0; j < 5; ++j) {
-            Dummy dummy = null;
-            try {
-              dummy = pool.obtain();
-            } catch (InterruptedException e) {
-              Throwables.propagate(e);
-            }
-            try {
-              Thread.sleep(100L);
-            } catch (Exception e) {
-
-            }
-            pool.release(dummy);
-          }
-        }
-      };
-    }
-    for (Thread t : threads) {
-      t.start();
-    }
-    for (Thread t : threads) {
-      t.join();
-    }
+    createAndRunThreads(2, pool, false);
+    // we only ran 2 threads, so only 2 elements got created, even though pool size is 5
     Assert.assertEquals(2, Dummy.count.get());
   }
 
@@ -97,56 +72,47 @@ public class ElasticPoolTest {
   public void testMoreThreadsThanElements() throws InterruptedException {
     final DummyPool pool = new DummyPool(2);
     Dummy.count.set(0);
-    Thread[] threads = new Thread[5];
-    for (int i = 0; i < threads.length; ++i) {
-      threads[i] = new Thread() {
-        public void run() {
-          for (int j = 0; j < 5; ++j) {
-            Dummy dummy = null;
-            try {
-              dummy = pool.obtain();
-            } catch (InterruptedException e) {
-              Throwables.propagate(e);
-            }
-            try {
-              Thread.sleep(100L);
-            } catch (Exception e) {
-            }
-            pool.release(dummy);
-          }
-        }
-      };
-    }
-    for (Thread t : threads) {
-      t.start();
-    }
-    for (Thread t : threads) {
-      t.join();
-    }
+    createAndRunThreads(5, pool, false);
+    // even though we ran 5 threads, only 2 elements got created because pool size is 2
     Assert.assertEquals(2, Dummy.count.get());
   }
 
   @Test(timeout = 5000)
-  public void testMoreThreadsThanElementsWithDiscard() throws
-    InterruptedException {
-    Dummy.count.set(0);
+  public void testMoreThreadsThanElementsWithDiscard() throws InterruptedException {
     final DummyPool pool = new DummyPool(2);
-    Thread[] threads = new Thread[3];
-    for (int i = 0; i < threads.length; ++i) {
+    Dummy.count.set(0);
+    int numThreads = 3;
+    // pass 'true' as the last parameter, which results in the elements being discarded after each obtain() call.
+    createAndRunThreads(numThreads, pool, true);
+    // this results in (5 * numThreads) number of elements being created since each thread obtains a client 5 times.
+    Assert.assertEquals(5 * numThreads, Dummy.count.get());
+  }
+
+  // Creates a list of threads which obtain a client from the pool, sleeps for a certain amount of time, and then
+  // releases the client back to the pool, optionally marking it invalid before doing so. It repeats this five times.
+  // Then, runs these threads to completion.
+  private void createAndRunThreads(int numThreads, final DummyPool pool,
+                                   final boolean discardAtEnd) throws InterruptedException {
+    Thread[] threads = new Thread[numThreads];
+    for (int i = 0; i < numThreads; i++) {
       threads[i] = new Thread() {
+        @Override
         public void run() {
           for (int j = 0; j < 5; ++j) {
-            Dummy dummy = null;
+            Dummy dummy;
             try {
               dummy = pool.obtain();
             } catch (InterruptedException e) {
-              Throwables.propagate(e);
+              throw Throwables.propagate(e);
             }
             try {
-              Thread.sleep(100L);
-            } catch (Exception e) {
+              Thread.sleep(10L);
+            } catch (InterruptedException e) {
+              // ignored
             }
-            dummy.markInvalid();
+            if (discardAtEnd) {
+              dummy.markInvalid();
+            }
             pool.release(dummy);
           }
         }
@@ -158,6 +124,5 @@ public class ElasticPoolTest {
     for (Thread t : threads) {
       t.join();
     }
-    Assert.assertEquals(5 * threads.length, Dummy.count.get());
   }
 }
