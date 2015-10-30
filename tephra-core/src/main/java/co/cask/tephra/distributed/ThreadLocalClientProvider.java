@@ -22,23 +22,25 @@ import org.apache.twill.discovery.DiscoveryServiceClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.concurrent.TimeoutException;
+
 /**
  * An tx client provider that uses thread local to maintain at most one open connection per thread.
+ * Note that there can be a connection leak if the threads are recycled.
  */
 public class ThreadLocalClientProvider extends AbstractClientProvider {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(ThreadLocalClientProvider.class);
 
-  ThreadLocal<TransactionServiceThriftClient> clients =
-      new ThreadLocal<TransactionServiceThriftClient>();
+  ThreadLocal<TransactionServiceThriftClient> clients = new ThreadLocal<>();
 
   public ThreadLocalClientProvider(Configuration conf, DiscoveryServiceClient discoveryServiceClient) {
     super(conf, discoveryServiceClient);
   }
 
   @Override
-  public TransactionServiceThriftClient getClient() throws TException {
+  public CloseableThriftClient getCloseableClient() throws TException, TimeoutException, InterruptedException {
     TransactionServiceThriftClient client = this.clients.get();
     if (client == null) {
       try {
@@ -49,19 +51,16 @@ public class ThreadLocalClientProvider extends AbstractClientProvider {
                     + e.getMessage());
         throw e;
       }
-  }
-    return client;
+    }
+    return new CloseableThriftClient(this, client);
   }
 
   @Override
   public void returnClient(TransactionServiceThriftClient client) {
-    // nothing to do
-  }
-
-  @Override
-  public void discardClient(TransactionServiceThriftClient client) {
-    client.close();
-    clients.remove();
+    if (!client.isValid()) {
+      client.close();
+      clients.remove();
+    }
   }
 
   @Override

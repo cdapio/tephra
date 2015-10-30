@@ -111,7 +111,7 @@ public abstract class AbstractClientProvider implements ThriftClientProvider {
     // now we have an address and port, try to connect a client
     if (timeout < 0) {
       timeout = configuration.getInt(TxConstants.Service.CFG_DATA_TX_CLIENT_TIMEOUT,
-          TxConstants.Service.DEFAULT_DATA_TX_CLIENT_TIMEOUT);
+          TxConstants.Service.DEFAULT_DATA_TX_CLIENT_TIMEOUT_MS);
     }
     LOG.info("Attempting to connect to tx service at " +
                address + ":" + port + " with timeout " + timeout + " ms.");
