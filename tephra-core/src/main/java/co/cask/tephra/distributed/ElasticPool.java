@@ -97,7 +97,7 @@ public abstract class ElasticPool<T, E extends Exception> {
    *
    * @return an element
    */
-  public T obtain() throws E, TimeoutException, InterruptedException {
+  public T obtain() throws E, InterruptedException {
     semaphore.acquire();
     return getOrCreate();
   }
