@@ -24,9 +24,11 @@ import co.cask.tephra.coprocessor.TransactionStateCacheSupplier;
 import co.cask.tephra.hbase96.Filters;
 import co.cask.tephra.persist.TransactionVisibilityState;
 import co.cask.tephra.util.TxUtils;
+
 import com.google.common.base.Supplier;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
+
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.hbase.Cell;
@@ -192,6 +194,9 @@ public class TransactionProcessor extends BaseRegionObserver {
                   HConstants.EMPTY_BYTE_ARRAY);
         }
       }
+    }
+    for (Map.Entry<String, byte[]> entry : delete.getAttributesMap().entrySet()) {
+        deleteMarkers.setAttribute(entry.getKey(), entry.getValue());
     }
     e.getEnvironment().getRegion().put(deleteMarkers);
     // skip normal delete handling
