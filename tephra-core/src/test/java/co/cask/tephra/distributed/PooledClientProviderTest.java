@@ -121,10 +121,12 @@ public class PooledClientProviderTest {
 
     //Now race to get MAX_CLIENT_COUNT+1 clients, exhausting the pool and requesting 1 more.
     List<Future<Integer>> clientIds = new ArrayList<Future<Integer>>();
+    CountDownLatch countDownLatch = new CountDownLatch(1);
     ExecutorService executor = Executors.newFixedThreadPool(MAX_CLIENT_COUNT + 1);
     for (int i = 0; i < MAX_CLIENT_COUNT + 1; i++) {
-      clientIds.add(executor.submit(new RetrieveClient(clientProvider, CLIENT_OBTAIN_TIMEOUT / 2)));
+      clientIds.add(executor.submit(new RetrieveClient(clientProvider, CLIENT_OBTAIN_TIMEOUT / 2, countDownLatch)));
     }
+    countDownLatch.countDown();
 
     Set<Integer> ids = new HashSet<Integer>();
     for (Future<Integer> id : clientIds) {
@@ -135,9 +137,11 @@ public class PooledClientProviderTest {
     // now, try it again with, where each thread holds onto the client for twice the client.obtain.timeout value.
     // one of the threads should throw a TimeOutException, because the other threads don't release their clients
     // within the configured timeout.
+    countDownLatch = new CountDownLatch(1);
     for (int i = 0; i < MAX_CLIENT_COUNT + 1; i++) {
-      clientIds.add(executor.submit(new RetrieveClient(clientProvider, CLIENT_OBTAIN_TIMEOUT * 2)));
+      clientIds.add(executor.submit(new RetrieveClient(clientProvider, CLIENT_OBTAIN_TIMEOUT * 2, countDownLatch)));
     }
+    countDownLatch.countDown();
     int numTimeoutExceptions = 0;
     for (Future<Integer> clientId : clientIds) {
       try {
@@ -158,14 +162,18 @@ public class PooledClientProviderTest {
   private static class RetrieveClient implements Callable<Integer> {
     private final PooledClientProvider pool;
     private final long holdClientMs;
+    private final CountDownLatch begin;
 
-    public RetrieveClient(PooledClientProvider pool, long holdClientMs) {
+    public RetrieveClient(PooledClientProvider pool, long holdClientMs,
+                          CountDownLatch begin) {
       this.pool = pool;
       this.holdClientMs = holdClientMs;
+      this.begin = begin;
     }
 
     @Override
     public Integer call() throws Exception {
+      begin.await();
       try (CloseableThriftClient client = pool.getCloseableClient()) {
         int id = System.identityHashCode(client.getThriftClient());
         // "use" the client for a configured amount of milliseconds
