@@ -26,6 +26,7 @@ import com.google.protobuf.ServiceException;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.Cell;
 import org.apache.hadoop.hbase.CellUtil;
+import org.apache.hadoop.hbase.HColumnDescriptor;
 import org.apache.hadoop.hbase.HTableDescriptor;
 import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.client.Append;
@@ -589,11 +590,15 @@ public class TransactionAwareHTable extends AbstractTransactionAwareTable
 
     Map<byte[], List<Cell>> familyToDelete = delete.getFamilyCellMap();
     if (familyToDelete.isEmpty()) {
-      // perform a row delete is we are using row-level conflict detection
+      // perform a row delete if we are using row-level conflict detection
       if (conflictLevel == TxConstants.ConflictDetection.ROW ||
-          conflictLevel == TxConstants.ConflictDetection.NONE) {
-        // no need to identify individual columns deleted
-        addToChangeSet(deleteRow, null, null);
+        conflictLevel == TxConstants.ConflictDetection.NONE) {
+        // Row delete leaves delete markers in all column families of the table
+        // Therefore get all the column families of the hTable from the HTableDescriptor and add them to the changeSet
+        for (HColumnDescriptor columnDescriptor : hTable.getTableDescriptor().getColumnFamilies()) {
+          // no need to identify individual columns deleted
+          addToChangeSet(deleteRow, columnDescriptor.getName(), null);
+        }
       } else {
         Result result = get(new Get(delete.getRow()));
         // Delete everything
@@ -620,7 +625,7 @@ public class TransactionAwareHTable extends AbstractTransactionAwareTable
               conflictLevel == TxConstants.ConflictDetection.NONE) {
             // no need to identify individual columns deleted
             txDelete.deleteFamily(family);
-            addToChangeSet(deleteRow, null, null);
+            addToChangeSet(deleteRow, family, null);
           } else {
             Result result = get(new Get(delete.getRow()).addFamily(family));
             // Delete entire family

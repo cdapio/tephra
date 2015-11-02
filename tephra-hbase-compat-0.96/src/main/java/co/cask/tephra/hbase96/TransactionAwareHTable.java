@@ -24,6 +24,7 @@ import com.google.protobuf.ServiceException;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.Cell;
 import org.apache.hadoop.hbase.CellUtil;
+import org.apache.hadoop.hbase.HColumnDescriptor;
 import org.apache.hadoop.hbase.HTableDescriptor;
 import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.client.Append;
@@ -128,7 +129,7 @@ public class TransactionAwareHTable extends AbstractTransactionAwareTable
       for (Set<ActionChange> cs : changeSets.values()) {
         size += cs.size();
       }
-      List<Delete> rollbackDeletes = new ArrayList<Delete>(size);
+      List<Delete> rollbackDeletes = new ArrayList<>(size);
       for (Map.Entry<Long, Set<ActionChange>> entry : changeSets.entrySet()) {
         long transactionTimestamp = entry.getKey();
         for (ActionChange change : entry.getValue()) {
@@ -528,11 +529,15 @@ public class TransactionAwareHTable extends AbstractTransactionAwareTable
 
     Map<byte[], List<Cell>> familyToDelete = delete.getFamilyCellMap();
     if (familyToDelete.isEmpty()) {
-      // perform a row delete is we are using row-level conflict detection
+      // perform a row delete if we are using row-level conflict detection
       if (conflictLevel == TxConstants.ConflictDetection.ROW ||
           conflictLevel == TxConstants.ConflictDetection.NONE) {
-        // no need to identify individual columns deleted
-        addToChangeSet(deleteRow, null, null);
+        // Row delete leaves delete markers in all column families of the table
+        // Therefore get all the column families of the hTable from the HTableDescriptor and add them to the changeSet
+        for (HColumnDescriptor columnDescriptor : hTable.getTableDescriptor().getColumnFamilies()) {
+          // no need to identify individual columns deleted
+          addToChangeSet(deleteRow, columnDescriptor.getName(), null);
+        }
       } else {
         Result result = get(new Get(delete.getRow()));
         // Delete everything
@@ -561,7 +566,7 @@ public class TransactionAwareHTable extends AbstractTransactionAwareTable
             // Older versions of HBase 0.96 lack HBASE-10964, so family deletes do not correctly
             // inherit the common Delete timestamp, so must explicitly set the timestamp here.
             txDelete.deleteFamily(family, transactionTimestamp);
-            addToChangeSet(deleteRow, null, null);
+            addToChangeSet(deleteRow, family, null);
           } else {
             Result result = get(new Get(delete.getRow()).addFamily(family));
             // Delete entire family
@@ -583,7 +588,7 @@ public class TransactionAwareHTable extends AbstractTransactionAwareTable
   }
 
   private List<? extends Row> transactionalizeActions(List<? extends Row> actions) throws IOException {
-    List<Row> transactionalizedActions = new ArrayList<Row>(actions.size());
+    List<Row> transactionalizedActions = new ArrayList<>(actions.size());
     for (Row action : actions) {
       if (action instanceof Get) {
         transactionalizedActions.add(transactionalizeAction((Get) action));
