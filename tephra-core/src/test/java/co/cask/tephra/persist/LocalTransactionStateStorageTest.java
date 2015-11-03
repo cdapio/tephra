@@ -23,7 +23,7 @@ import co.cask.tephra.TxConstants;
 import co.cask.tephra.metrics.TxMetricsCollector;
 import co.cask.tephra.snapshot.DefaultSnapshotCodec;
 import co.cask.tephra.snapshot.SnapshotCodecProvider;
-import co.cask.tephra.snapshot.SnapshotCodecV2;
+import co.cask.tephra.snapshot.SnapshotCodecV4;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSortedSet;
 import com.google.common.collect.Lists;
@@ -56,8 +56,7 @@ public class LocalTransactionStateStorageTest extends AbstractTransactionStateSt
     File testDir = tmpDir.newFolder(testName);
     Configuration conf = new Configuration();
     conf.set(TxConstants.Manager.CFG_TX_SNAPSHOT_LOCAL_DIR, testDir.getAbsolutePath());
-    conf.set(TxConstants.Persist.CFG_TX_SNAPHOT_CODEC_CLASSES, SnapshotCodecV2.class.getName());
-
+    conf.set(TxConstants.Persist.CFG_TX_SNAPHOT_CODEC_CLASSES, SnapshotCodecV4.class.getName());
     return conf;
   }
 

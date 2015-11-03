@@ -22,6 +22,7 @@ import co.cask.tephra.TransactionManager;
 import co.cask.tephra.TransactionType;
 import co.cask.tephra.TxConstants;
 import co.cask.tephra.metrics.TxMetricsCollector;
+import co.cask.tephra.util.TransactionEditUtil;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
@@ -81,7 +82,7 @@ public abstract class AbstractTransactionStateStorageTest {
     Configuration conf = getConfiguration("testLogWriteAndRead");
 
     // create some random entries
-    List<TransactionEdit> edits = createRandomEdits(100);
+    List<TransactionEdit> edits = TransactionEditUtil.createRandomEdits(100);
     TransactionStateStorage storage = getStorage(conf);
     try {
       long now = System.currentTimeMillis();
@@ -548,45 +549,5 @@ public abstract class AbstractTransactionStateStorageTest {
       changes.add(new ChangeId(bytes));
     }
     return changes;
-  }
-
-  /**
-   * Generates a number of semi-random {@link TransactionEdit} instances.
-   * These are just randomly selected from the possible states, so would not necessarily reflect a real-world
-   * distribution.
-   *
-   * @param numEntries how many entries to generate in the returned list.
-   * @return a list of randomly generated transaction log edits.
-   */
-  private List<TransactionEdit> createRandomEdits(int numEntries) {
-    List<TransactionEdit> edits = Lists.newArrayListWithCapacity(numEntries);
-    for (int i = 0; i < numEntries; i++) {
-      TransactionEdit.State nextType = TransactionEdit.State.values()[random.nextInt(6)];
-      long writePointer = Math.abs(random.nextLong());
-      switch (nextType) {
-        case INPROGRESS:
-          edits.add(
-            TransactionEdit.createStarted(writePointer, writePointer - 1,
-                                          System.currentTimeMillis() + 300000L, TransactionType.SHORT));
-          break;
-        case COMMITTING:
-          edits.add(TransactionEdit.createCommitting(writePointer, generateChangeSet(10)));
-          break;
-        case COMMITTED:
-          edits.add(TransactionEdit.createCommitted(writePointer, generateChangeSet(10), writePointer + 1,
-                                                    random.nextBoolean()));
-          break;
-        case INVALID:
-          edits.add(TransactionEdit.createInvalid(writePointer));
-          break;
-        case ABORTED:
-          edits.add(TransactionEdit.createAborted(writePointer, TransactionType.SHORT, null));
-          break;
-        case MOVE_WATERMARK:
-          edits.add(TransactionEdit.createMoveWatermark(writePointer));
-          break;
-      }
-    }
-    return edits;
   }
 }

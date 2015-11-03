@@ -19,7 +19,6 @@ package co.cask.tephra.persist;
 import co.cask.tephra.TxConstants;
 import co.cask.tephra.metrics.TxMetricsCollector;
 import co.cask.tephra.snapshot.SnapshotCodecProvider;
-import co.cask.tephra.snapshot.SnapshotCodecV2;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
 import org.junit.AfterClass;
@@ -61,7 +60,6 @@ public class HDFSTransactionStateStorageTest extends AbstractTransactionStateSto
     // tests should use the current user for HDFS
     conf.unset(TxConstants.Manager.CFG_TX_HDFS_USER);
     conf.set(TxConstants.Manager.CFG_TX_SNAPSHOT_DIR, tmpFolder.newFolder().getAbsolutePath());
-    conf.set(TxConstants.Persist.CFG_TX_SNAPHOT_CODEC_CLASSES, SnapshotCodecV2.class.getName());
     return conf;
   }
 
