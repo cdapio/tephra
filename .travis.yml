@@ -24,3 +24,10 @@ branches:
     - develop
     - /^feature\/.*$/
     - /^hotfix\/.*$/
+    - /^release\/.*$/
+
+sudo: false
+
+cache:
+  directories:
+    - $HOME/.m2
