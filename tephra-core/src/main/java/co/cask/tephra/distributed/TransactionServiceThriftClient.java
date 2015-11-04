@@ -16,7 +16,11 @@
 
 package co.cask.tephra.distributed;
 
+import co.cask.tephra.InvalidTruncateTimeException;
 import co.cask.tephra.Transaction;
+import co.cask.tephra.TransactionNotInProgressException;
+import co.cask.tephra.distributed.thrift.TInvalidTruncateTimeException;
+import co.cask.tephra.distributed.thrift.TTransactionNotInProgressException;
 import co.cask.tephra.distributed.thrift.TTransactionServer;
 import com.google.common.base.Function;
 import com.google.common.collect.ImmutableSet;
@@ -31,6 +35,7 @@ import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.util.Collection;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * This class is a wrapper around the thrift tx service client, it takes
@@ -57,9 +62,14 @@ public class TransactionServiceThriftClient {
   TTransactionServer.Client client;
 
   /**
+   * Whether this client is valid for use.
+   */
+  private final AtomicBoolean isValid = new AtomicBoolean(true);
+
+  /**
    * Constructor from an existing, connected thrift transport.
    *
-   * @param transport the thrift transport layer. It must already be comnnected
+   * @param transport the thrift transport layer. It must already be connected
    */
   public TransactionServiceThriftClient(TTransport transport) {
     this.transport = transport;
@@ -79,34 +89,74 @@ public class TransactionServiceThriftClient {
   }
 
   public Transaction startLong() throws TException {
-    return TransactionConverterUtils.unwrap(client.startLong());
+    try {
+      return TransactionConverterUtils.unwrap(client.startLong());
+    } catch (TException e) {
+      isValid.set(false);
+      throw e;
+    }
   }
 
   public Transaction startShort() throws TException {
+    try {
       return TransactionConverterUtils.unwrap(client.startShort());
+    } catch (TException e) {
+      isValid.set(false);
+      throw e;
+    }
   }
 
   public Transaction startShort(int timeout) throws TException {
+    try {
       return TransactionConverterUtils.unwrap(client.startShortTimeout(timeout));
+    } catch (TException e) {
+      isValid.set(false);
+      throw e;
+    }
   }
 
-  public boolean canCommit(Transaction tx, Collection<byte[]> changeIds) throws TException {
-
+  public boolean canCommit(Transaction tx, Collection<byte[]> changeIds)
+    throws TException, TransactionNotInProgressException {
+    try {
       return client.canCommitTx(TransactionConverterUtils.wrap(tx),
                                 ImmutableSet.copyOf(Iterables.transform(changeIds, BYTES_WRAPPER))).isValue();
+    } catch (TTransactionNotInProgressException e) {
+      throw new TransactionNotInProgressException(e.getMessage());
+    } catch (TException e) {
+      isValid.set(false);
+      throw e;
+    }
   }
 
-  public boolean commit(Transaction tx) throws TException {
 
+
+  public boolean commit(Transaction tx) throws TException, TransactionNotInProgressException {
+    try {
       return client.commitTx(TransactionConverterUtils.wrap(tx)).isValue();
+    } catch (TTransactionNotInProgressException e) {
+      throw new TransactionNotInProgressException(e.getMessage());
+    } catch (TException e) {
+      isValid.set(false);
+      throw e;
+    }
   }
 
   public void abort(Transaction tx) throws TException {
+    try {
       client.abortTx(TransactionConverterUtils.wrap(tx));
+    } catch (TException e) {
+      isValid.set(false);
+      throw e;
+    }
   }
 
   public boolean invalidate(long tx) throws TException {
-    return client.invalidateTx(tx);
+    try {
+      return client.invalidateTx(tx);
+    } catch (TException e) {
+      isValid.set(false);
+      throw e;
+    }
   }
 
   public InputStream getSnapshotStream() throws TException {
@@ -121,21 +171,54 @@ public class TransactionServiceThriftClient {
     return new ByteArrayInputStream(snapshot);
   }
 
-  public String status() throws TException { return client.status(); }
+  public String status() throws TException {
+    try {
+      return client.status();
+    } catch (TException e) {
+      isValid.set(false);
+      throw e;
+    }
+  }
 
   public void resetState() throws TException {
-    client.resetState();
+    try {
+        client.resetState();
+    } catch (TException e) {
+      isValid.set(false);
+      throw e;
+    }
   }
 
   public boolean truncateInvalidTx(Set<Long> invalidTxIds) throws TException {
-    return client.truncateInvalidTx(invalidTxIds).isValue();
+    try {
+      return client.truncateInvalidTx(invalidTxIds).isValue();
+    } catch (TException e) {
+      isValid.set(false);
+      throw e;
+    }
   }
   
-  public boolean truncateInvalidTxBefore(long time) throws TException {
-    return client.truncateInvalidTxBefore(time).isValue();
+  public boolean truncateInvalidTxBefore(long time) throws TException, InvalidTruncateTimeException {
+    try {
+      return client.truncateInvalidTxBefore(time).isValue();
+    } catch (TInvalidTruncateTimeException e) {
+      throw new InvalidTruncateTimeException(e.getMessage());
+    } catch (TException e) {
+      isValid.set(false);
+      throw e;
+    }
   }
   
   public int getInvalidSize() throws TException {
-    return client.invalidTxSize();
+    try {
+      return client.invalidTxSize();
+    } catch (TException e) {
+      isValid.set(false);
+      throw e;
+    }
+  }
+
+  public boolean isValid() {
+    return isValid.get();
   }
 }
