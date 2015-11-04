@@ -24,6 +24,7 @@ branches:
     - develop
     - /^feature\/.*$/
     - /^hotfix\/.*$/
+    - /^release\/.*$/
 
 sudo: false
 
