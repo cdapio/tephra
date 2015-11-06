@@ -20,7 +20,7 @@
 
   <groupId>co.cask.tephra</groupId>
   <artifactId>tephra</artifactId>
-  <version>0.6.3-SNAPSHOT</version>
+  <version>0.6.3</version>
   <packaging>pom</packaging>
   <name>Tephra Transaction System</name>
   <description>Tephra Transaction System</description>
@@ -58,7 +58,7 @@
     <connection>scm:git:https://github.com/caskdata/tephra.git</connection>
     <developerConnection>scm:git:git@github.com:caskdata/tephra.git</developerConnection>
     <url>https://github.com/caskdata/tephra.git</url>
-    <tag>HEAD</tag>
+    <tag>v0.6.3</tag>
   </scm>
 
   <issueManagement>
