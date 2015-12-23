@@ -26,10 +26,8 @@ import co.cask.tephra.inmemory.InMemoryTxSystemClient;
 import co.cask.tephra.metrics.TxMetricsCollector;
 import co.cask.tephra.persist.InMemoryTransactionStateStorage;
 import co.cask.tephra.persist.TransactionStateStorage;
-
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
-
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.Cell;
 import org.apache.hadoop.hbase.CellUtil;
@@ -113,26 +111,32 @@ public class TransactionAwareHTableTest {
   }
   
   private static final String TEST_ATTRIBUTE = "TEST_ATTRIBUTE";
-  
+
   public static class TestRegionObserver extends BaseRegionObserver {
-      @Override
-      public void prePut(final ObserverContext<RegionCoprocessorEnvironment> c,
-          final Put put, final WALEdit edit,
-          final Durability durability) throws IOException {
-          if (put.getAttribute(TEST_ATTRIBUTE) == null) {
-              throw new DoNotRetryIOException("Put should preserve attributes");
-          }
+    @Override
+    public void prePut(final ObserverContext<RegionCoprocessorEnvironment> c,
+                       final Put put, final WALEdit edit,
+                       final Durability durability) throws IOException {
+      if (put.getAttribute(TEST_ATTRIBUTE) == null) {
+        throw new DoNotRetryIOException("Put should preserve attributes");
       }
-            
-      @Override
-      public void preDelete(final ObserverContext<RegionCoprocessorEnvironment> c,
-          final Delete delete, final WALEdit edit,
-          final Durability durability) throws IOException {
-          if (delete.getAttribute(TEST_ATTRIBUTE) == null) {
-              throw new DoNotRetryIOException("Delete should preserve attributes");
-          }
+      if (put.getDurability() != Durability.USE_DEFAULT) {
+        throw new DoNotRetryIOException("Durability is not propagated correctly");
       }
-  }  
+    }
+
+    @Override
+    public void preDelete(final ObserverContext<RegionCoprocessorEnvironment> c,
+                          final Delete delete, final WALEdit edit,
+                          final Durability durability) throws IOException {
+      if (delete.getAttribute(TEST_ATTRIBUTE) == null) {
+        throw new DoNotRetryIOException("Delete should preserve attributes");
+      }
+      if (delete.getDurability() != Durability.USE_DEFAULT) {
+        throw new DoNotRetryIOException("Durability is not propagated correctly");
+      }
+    }
+  }
 
   @BeforeClass
   public static void setupBeforeClass() throws Exception {
