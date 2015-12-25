@@ -15,71 +15,70 @@
  */
 package co.cask.tephra.hbase96;
 
-import co.cask.tephra.Transaction;
-import co.cask.tephra.TransactionConflictException;
-import co.cask.tephra.TransactionContext;
-import co.cask.tephra.TransactionManager;
-import co.cask.tephra.TransactionSystemClient;
-import co.cask.tephra.TxConstants;
-import co.cask.tephra.hbase96.coprocessor.TransactionProcessor;
-import co.cask.tephra.inmemory.InMemoryTxSystemClient;
-import co.cask.tephra.metrics.TxMetricsCollector;
-import co.cask.tephra.persist.InMemoryTransactionStateStorage;
-import co.cask.tephra.persist.TransactionStateStorage;
-import com.google.common.collect.ImmutableList;
-import com.google.common.collect.Lists;
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hbase.Cell;
-import org.apache.hadoop.hbase.CellUtil;
-import org.apache.hadoop.hbase.Coprocessor;
-import org.apache.hadoop.hbase.DoNotRetryIOException;
-import org.apache.hadoop.hbase.HBaseTestingUtility;
-import org.apache.hadoop.hbase.HColumnDescriptor;
-import org.apache.hadoop.hbase.HConstants;
-import org.apache.hadoop.hbase.HTableDescriptor;
-import org.apache.hadoop.hbase.KeyValue;
-import org.apache.hadoop.hbase.TableName;
-import org.apache.hadoop.hbase.client.Delete;
-import org.apache.hadoop.hbase.client.Durability;
-import org.apache.hadoop.hbase.client.Get;
-import org.apache.hadoop.hbase.client.HBaseAdmin;
-import org.apache.hadoop.hbase.client.HTable;
-import org.apache.hadoop.hbase.client.HTableInterface;
-import org.apache.hadoop.hbase.client.Put;
-import org.apache.hadoop.hbase.client.Result;
-import org.apache.hadoop.hbase.client.ResultScanner;
-import org.apache.hadoop.hbase.client.Scan;
-import org.apache.hadoop.hbase.coprocessor.BaseRegionObserver;
-import org.apache.hadoop.hbase.coprocessor.ObserverContext;
-import org.apache.hadoop.hbase.coprocessor.RegionCoprocessorEnvironment;
-import org.apache.hadoop.hbase.regionserver.wal.WALEdit;
-import org.apache.hadoop.hbase.util.Bytes;
-import org.junit.After;
-import org.junit.AfterClass;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.BeforeClass;
-import org.junit.Test;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+ import co.cask.tephra.Transaction;
+ import co.cask.tephra.TransactionConflictException;
+ import co.cask.tephra.TransactionContext;
+ import co.cask.tephra.TransactionManager;
+ import co.cask.tephra.TransactionSystemClient;
+ import co.cask.tephra.TxConstants;
+ import co.cask.tephra.hbase96.coprocessor.TransactionProcessor;
+ import co.cask.tephra.inmemory.InMemoryTxSystemClient;
+ import co.cask.tephra.metrics.TxMetricsCollector;
+ import co.cask.tephra.persist.InMemoryTransactionStateStorage;
+ import co.cask.tephra.persist.TransactionStateStorage;
+ import com.google.common.collect.ImmutableList;
+ import com.google.common.collect.Lists;
+ import org.apache.hadoop.conf.Configuration;
+ import org.apache.hadoop.hbase.Cell;
+ import org.apache.hadoop.hbase.CellUtil;
+ import org.apache.hadoop.hbase.Coprocessor;
+ import org.apache.hadoop.hbase.DoNotRetryIOException;
+ import org.apache.hadoop.hbase.HBaseTestingUtility;
+ import org.apache.hadoop.hbase.HColumnDescriptor;
+ import org.apache.hadoop.hbase.HConstants;
+ import org.apache.hadoop.hbase.HTableDescriptor;
+ import org.apache.hadoop.hbase.KeyValue;
+ import org.apache.hadoop.hbase.TableName;
+ import org.apache.hadoop.hbase.client.Delete;
+ import org.apache.hadoop.hbase.client.Durability;
+ import org.apache.hadoop.hbase.client.Get;
+ import org.apache.hadoop.hbase.client.HBaseAdmin;
+ import org.apache.hadoop.hbase.client.HTable;
+ import org.apache.hadoop.hbase.client.HTableInterface;
+ import org.apache.hadoop.hbase.client.Put;
+ import org.apache.hadoop.hbase.client.Result;
+ import org.apache.hadoop.hbase.client.ResultScanner;
+ import org.apache.hadoop.hbase.client.Scan;
+ import org.apache.hadoop.hbase.coprocessor.BaseRegionObserver;
+ import org.apache.hadoop.hbase.coprocessor.ObserverContext;
+ import org.apache.hadoop.hbase.coprocessor.RegionCoprocessorEnvironment;
+ import org.apache.hadoop.hbase.regionserver.wal.WALEdit;
+ import org.apache.hadoop.hbase.util.Bytes;
+ import org.junit.After;
+ import org.junit.AfterClass;
+ import org.junit.Assert;
+ import org.junit.Before;
+ import org.junit.BeforeClass;
+ import org.junit.Test;
+ import org.slf4j.Logger;
+ import org.slf4j.LoggerFactory;
 
+ import java.io.IOException;
+ import java.util.ArrayList;
+ import java.util.Collection;
+ import java.util.Collections;
+ import java.util.Iterator;
+ import java.util.List;
+ import java.util.Map;
 
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-
-import static org.junit.Assert.assertArrayEquals;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotEquals;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
+ import static org.junit.Assert.assertArrayEquals;
+ import static org.junit.Assert.assertEquals;
+ import static org.junit.Assert.assertFalse;
+ import static org.junit.Assert.assertNotEquals;
+ import static org.junit.Assert.assertNotNull;
+ import static org.junit.Assert.assertNull;
+ import static org.junit.Assert.assertTrue;
+ import static org.junit.Assert.fail;
 
 /**
  * Tests for TransactionAwareHTables.
@@ -112,25 +111,31 @@ public class TransactionAwareHTableTest {
   }
 
   private static final String TEST_ATTRIBUTE = "TEST_ATTRIBUTE";
-  
+
   public static class TestRegionObserver extends BaseRegionObserver {
-      @Override
-      public void prePut(final ObserverContext<RegionCoprocessorEnvironment> c,
-          final Put put, final WALEdit edit,
-          final Durability durability) throws IOException {
-          if (put.getAttribute(TEST_ATTRIBUTE) == null) {
-              throw new DoNotRetryIOException("Put should preserve attributes");
-          }
+    @Override
+    public void prePut(final ObserverContext<RegionCoprocessorEnvironment> c,
+                       final Put put, final WALEdit edit,
+                       final Durability durability) throws IOException {
+      if (put.getAttribute(TEST_ATTRIBUTE) == null) {
+        throw new DoNotRetryIOException("Put should preserve attributes");
       }
-            
-      @Override
-      public void preDelete(final ObserverContext<RegionCoprocessorEnvironment> c,
-          final Delete delete, final WALEdit edit,
-          final Durability durability) throws IOException {
-          if (delete.getAttribute(TEST_ATTRIBUTE) == null) {
-              throw new DoNotRetryIOException("Delete should preserve attributes");
-          }
+      if (put.getDurability() != Durability.USE_DEFAULT) {
+        throw new DoNotRetryIOException("Durability is not propagated correctly");
       }
+    }
+
+    @Override
+    public void preDelete(final ObserverContext<RegionCoprocessorEnvironment> c,
+                          final Delete delete, final WALEdit edit,
+                          final Durability durability) throws IOException {
+      if (delete.getAttribute(TEST_ATTRIBUTE) == null) {
+        throw new DoNotRetryIOException("Delete should preserve attributes");
+      }
+      if (delete.getDurability() != Durability.USE_DEFAULT) {
+        throw new DoNotRetryIOException("Durability is not propagated correctly");
+      }
+    }
   }
   
   @BeforeClass
