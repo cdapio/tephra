@@ -26,10 +26,11 @@ import org.apache.hadoop.hbase.HConstants;
 import org.apache.hadoop.hbase.KeyValue;
 import org.apache.hadoop.hbase.filter.Filter;
 import org.apache.hadoop.hbase.filter.FilterBase;
+import org.apache.hadoop.hbase.io.ImmutableBytesWritable;
 import org.apache.hadoop.hbase.regionserver.ScanType;
-import org.apache.hadoop.hbase.util.Bytes;
 
 import java.io.IOException;
+import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
 
@@ -41,7 +42,7 @@ import javax.annotation.Nullable;
 public class TransactionVisibilityFilter extends FilterBase {
   private final Transaction tx;
   // oldest visible timestamp by column family, used to apply TTL when reading
-  private final Map<byte[], Long> oldestTsByFamily;
+  private final Map<ImmutableBytesWritable, Long> oldestTsByFamily;
   // if false, empty values will be interpreted as deletes
   private final boolean allowEmptyValues;
   // whether or not we can remove delete markers
@@ -49,9 +50,9 @@ public class TransactionVisibilityFilter extends FilterBase {
   private final boolean clearDeletes;
   // optional sub-filter to apply to visible cells
   private final Filter cellFilter;
-
   // since we traverse KVs in order, cache the current oldest TS to avoid map lookups per KV
-  private byte[] currentFamily = new byte[0];
+  private final ImmutableBytesWritable currentFamily = new ImmutableBytesWritable(HConstants.EMPTY_BYTE_ARRAY);
+  
   private long currentOldestTs;
 
   private DeleteTracker deleteTracker = new DeleteTracker();
@@ -85,10 +86,10 @@ public class TransactionVisibilityFilter extends FilterBase {
   public TransactionVisibilityFilter(Transaction tx, Map<byte[], Long> ttlByFamily, boolean allowEmptyValues,
                                      ScanType scanType, @Nullable Filter cellFilter) {
     this.tx = tx;
-    this.oldestTsByFamily = Maps.newTreeMap(Bytes.BYTES_COMPARATOR);
+    this.oldestTsByFamily = Maps.newTreeMap();
     for (Map.Entry<byte[], Long> ttlEntry : ttlByFamily.entrySet()) {
       long familyTTL = ttlEntry.getValue();
-      oldestTsByFamily.put(ttlEntry.getKey(),
+      oldestTsByFamily.put(new ImmutableBytesWritable(ttlEntry.getKey()),
                            familyTTL <= 0 ? 0 : tx.getVisibilityUpperBound() - familyTTL * TxConstants.MAX_TX_PER_MS);
     }
     this.allowEmptyValues = allowEmptyValues;
@@ -100,9 +101,9 @@ public class TransactionVisibilityFilter extends FilterBase {
 
   @Override
   public ReturnCode filterKeyValue(Cell cell) throws IOException {
-    if (!CellUtil.matchingFamily(cell, currentFamily)) {
+    if (!CellUtil.matchingFamily(cell, currentFamily.get(), currentFamily.getOffset(), currentFamily.getLength())) {
       // column family changed
-      currentFamily = CellUtil.cloneFamily(cell);
+      currentFamily.set(cell.getFamilyArray(), cell.getFamilyOffset(), cell.getFamilyLength());
       Long familyOldestTs = oldestTsByFamily.get(currentFamily);
       currentOldestTs = familyOldestTs != null ? familyOldestTs : 0;
       deleteTracker.reset();
@@ -115,14 +116,18 @@ public class TransactionVisibilityFilter extends FilterBase {
     } else if (tx.isVisible(kvTimestamp)) {
       // Return all writes done by current transaction (including deletes) for VisibilityLevel.SNAPSHOT_ALL
       if (tx.getVisibilityLevel() == Transaction.VisibilityLevel.SNAPSHOT_ALL && tx.isCurrentWrite(kvTimestamp)) {
-        return ReturnCode.INCLUDE;
+        // cell is visible
+        // visibility SNAPSHOT_ALL needs all matches
+        return runSubFilter(ReturnCode.INCLUDE, cell);
       }
       if (DeleteTracker.isFamilyDelete(cell)) {
         deleteTracker.addFamilyDelete(cell);
         if (clearDeletes) {
           return ReturnCode.NEXT_COL;
         } else {
-          return ReturnCode.INCLUDE_AND_NEXT_COL;
+          // cell is visible
+          // as soon as we find a KV to include we can move to the next column
+          return runSubFilter(ReturnCode.INCLUDE_AND_NEXT_COL, cell);
         }
       }
       // check if masked by family delete
@@ -136,21 +141,43 @@ public class TransactionVisibilityFilter extends FilterBase {
           return ReturnCode.NEXT_COL;
         } else {
           // keep the marker but skip any remaining versions
-          return ReturnCode.INCLUDE_AND_NEXT_COL;
+          return runSubFilter(ReturnCode.INCLUDE_AND_NEXT_COL, cell);
         }
       }
       // cell is visible
-      if (cellFilter != null) {
-        return cellFilter.filterKeyValue(cell);
-      } else {
-        // as soon as we find a KV to include we can move to the next column
-        return ReturnCode.INCLUDE_AND_NEXT_COL;
-      }
+      // as soon as we find a KV to include we can move to the next column
+      return runSubFilter(ReturnCode.INCLUDE_AND_NEXT_COL, cell);
     } else {
       return ReturnCode.SKIP;
     }
   }
 
+  private ReturnCode runSubFilter(ReturnCode includeCode, Cell cell) throws IOException {
+    if (cellFilter != null) {
+      ReturnCode filterCode = cellFilter.filterKeyValue(cell);
+      // Return the more restrictive of the two filter responses
+      switch (filterCode) {
+        case INCLUDE:
+          return includeCode;
+        case INCLUDE_AND_NEXT_COL:
+          return ReturnCode.INCLUDE_AND_NEXT_COL;
+        case SKIP:
+          return includeCode == ReturnCode.INCLUDE ? ReturnCode.SKIP :  ReturnCode.NEXT_COL;
+        default:
+          return filterCode;
+      }
+    }
+    return includeCode;
+  }
+
+  @Override
+  public boolean filterRow() throws IOException {
+    if (cellFilter != null) {
+      return cellFilter.filterRow();
+    }
+    return super.filterRow();
+  }
+  
   @Override
   public Cell transformCell(Cell cell) throws IOException {
     // Convert Tephra deletes back into HBase deletes
@@ -172,8 +199,69 @@ public class TransactionVisibilityFilter extends FilterBase {
   }
 
   @Override
-  public void reset() {
+  public void reset() throws IOException {
     deleteTracker.reset();
+    if (cellFilter != null) {
+      cellFilter.reset();
+    }
+  }
+
+  @Override
+  public boolean filterRowKey(byte[] buffer, int offset, int length) throws IOException {
+    if (cellFilter != null) {
+      return cellFilter.filterRowKey(buffer, offset, length);
+    }
+    return super.filterRowKey(buffer, offset, length);
+  }
+
+  @Override
+  public boolean filterAllRemaining() throws IOException {
+    if (cellFilter != null) {
+      return cellFilter.filterAllRemaining();
+    }
+    return super.filterAllRemaining();
+  }
+
+  @Override
+  public void filterRowCells(List<Cell> kvs) throws IOException {
+    if (cellFilter != null) {
+      cellFilter.filterRowCells(kvs);
+    } else {
+      super.filterRowCells(kvs);
+    }
+  }
+
+  @Override
+  public boolean hasFilterRow() {
+    if (cellFilter != null) {
+      return cellFilter.hasFilterRow();
+    }
+    return super.hasFilterRow();
+  }
+
+  @SuppressWarnings("deprecation")
+  @Override
+  public KeyValue getNextKeyHint(KeyValue currentKV) throws IOException {
+    if (cellFilter != null) {
+      return cellFilter.getNextKeyHint(currentKV);
+    }
+    return super.getNextKeyHint(currentKV);
+  }
+
+  @Override
+  public Cell getNextCellHint(Cell currentKV) throws IOException {
+    if (cellFilter != null) {
+      return cellFilter.getNextCellHint(currentKV);
+    }
+    return super.getNextCellHint(currentKV);
+  }
+
+  @Override
+  public boolean isFamilyEssential(byte[] name) throws IOException {
+    if (cellFilter != null) {
+      return cellFilter.isFamilyEssential(name);
+    }
+    return super.isFamilyEssential(name);
   }
 
   private boolean isColumnDelete(Cell cell) {

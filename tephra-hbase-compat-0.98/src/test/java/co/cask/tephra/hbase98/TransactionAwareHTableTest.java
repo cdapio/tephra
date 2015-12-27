@@ -52,6 +52,9 @@ import org.apache.hadoop.hbase.client.Scan;
 import org.apache.hadoop.hbase.coprocessor.BaseRegionObserver;
 import org.apache.hadoop.hbase.coprocessor.ObserverContext;
 import org.apache.hadoop.hbase.coprocessor.RegionCoprocessorEnvironment;
+import org.apache.hadoop.hbase.filter.CompareFilter;
+import org.apache.hadoop.hbase.filter.LongComparator;
+import org.apache.hadoop.hbase.filter.ValueFilter;
 import org.apache.hadoop.hbase.regionserver.wal.WALEdit;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.junit.After;
@@ -1456,5 +1459,92 @@ public class TransactionAwareHTableTest {
     scan.setRaw(true);
     verifyScan(txTable, scan, expected);
     txContext.finish();
+  }
+
+  @Test
+  public void testFilters() throws Exception {
+    // Add some values to table
+    transactionContext.start();
+    Put put = new Put(TestBytes.row);
+    byte[] val1 = Bytes.toBytes(1L);
+    put.add(TestBytes.family, TestBytes.qualifier, val1);
+    transactionAwareHTable.put(put);
+    put = new Put(TestBytes.row2);
+    byte[] val2 = Bytes.toBytes(2L);
+    put.add(TestBytes.family, TestBytes.qualifier, val2);
+    transactionAwareHTable.put(put);
+    put = new Put(TestBytes.row3);
+    byte[] val3 = Bytes.toBytes(3L);
+    put.add(TestBytes.family, TestBytes.qualifier, val3);
+    transactionAwareHTable.put(put);
+    put = new Put(TestBytes.row4);
+    byte[] val4 = Bytes.toBytes(4L);
+    put.add(TestBytes.family, TestBytes.qualifier, val4);
+    transactionAwareHTable.put(put);
+    transactionContext.finish();
+
+    // Delete cell with value 2
+    transactionContext.start();
+    Delete delete = new Delete(TestBytes.row2);
+    delete.deleteColumn(TestBytes.family, TestBytes.qualifier);
+    transactionAwareHTable.delete(delete);
+    transactionContext.finish();
+
+    // Scan for values less than 4, should get only values 1 and 3
+    transactionContext.start();
+    Scan scan = new Scan(TestBytes.row, new ValueFilter(CompareFilter.CompareOp.LESS, new LongComparator(4)));
+    try (ResultScanner scanner = transactionAwareHTable.getScanner(scan)) {
+      Result result = scanner.next();
+      assertNotNull(result);
+      assertArrayEquals(TestBytes.row, result.getRow());
+      assertArrayEquals(val1, result.getValue(TestBytes.family, TestBytes.qualifier));
+      result = scanner.next();
+      assertNotNull(result);
+      assertArrayEquals(TestBytes.row3, result.getRow());
+      assertArrayEquals(val3, result.getValue(TestBytes.family, TestBytes.qualifier));
+      result = scanner.next();
+      assertNull(result);
+    }
+    transactionContext.finish();
+
+    // Run a Get with a filter for less than 10 on row4, should get value 4
+    transactionContext.start();
+    Get get = new Get(TestBytes.row4);
+    get.setFilter(new ValueFilter(CompareFilter.CompareOp.LESS, new LongComparator(10)));
+    Result result = transactionAwareHTable.get(get);
+    assertFalse(result.isEmpty());
+    assertArrayEquals(val4, result.getValue(TestBytes.family, TestBytes.qualifier));
+    transactionContext.finish();
+
+    // Change value of row4 to 40
+    transactionContext.start();
+    put = new Put(TestBytes.row4);
+    byte[] val40 = Bytes.toBytes(40L);
+    put.add(TestBytes.family, TestBytes.qualifier, val40);
+    transactionAwareHTable.put(put);
+    transactionContext.finish();
+
+    // Scan for values less than 10, should get only values 1 and 3
+    transactionContext.start();
+    scan = new Scan(TestBytes.row, new ValueFilter(CompareFilter.CompareOp.LESS, new LongComparator(10)));
+    try (ResultScanner scanner = transactionAwareHTable.getScanner(scan)) {
+      result = scanner.next();
+      assertNotNull(result);
+      assertArrayEquals(TestBytes.row, result.getRow());
+      assertArrayEquals(val1, result.getValue(TestBytes.family, TestBytes.qualifier));
+      result = scanner.next();
+      assertNotNull(result);
+      assertArrayEquals(TestBytes.row3, result.getRow());
+      assertArrayEquals(val3, result.getValue(TestBytes.family, TestBytes.qualifier));
+      result = scanner.next();
+      assertNull(result);
+    }
+    transactionContext.finish();
+
+    // Run the Get again with a filter for less than 10 on row4, this time should not get any results
+    transactionContext.start();
+    result = transactionAwareHTable.get(get);
+    assertTrue(result.isEmpty());
+    transactionContext.finish();
   }
 }

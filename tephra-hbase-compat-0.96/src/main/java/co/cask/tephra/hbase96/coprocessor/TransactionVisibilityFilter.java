@@ -30,6 +30,7 @@ import org.apache.hadoop.hbase.regionserver.ScanType;
 import org.apache.hadoop.hbase.util.Bytes;
 
 import java.io.IOException;
+import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
 
@@ -115,14 +116,18 @@ public class TransactionVisibilityFilter extends FilterBase {
     } else if (tx.isVisible(kvTimestamp)) {
       // Return all writes done by current transaction (including deletes) for VisibilityLevel.SNAPSHOT_ALL
       if (tx.getVisibilityLevel() == Transaction.VisibilityLevel.SNAPSHOT_ALL && tx.isCurrentWrite(kvTimestamp)) {
-        return ReturnCode.INCLUDE;
+        // cell is visible
+        // visibility SNAPSHOT_ALL needs all matches
+        return runSubFilter(ReturnCode.INCLUDE, cell);
       }
       if (DeleteTracker.isFamilyDelete(cell)) {
         deleteTracker.addFamilyDelete(cell);
         if (clearDeletes) {
           return ReturnCode.NEXT_COL;
         } else {
-          return ReturnCode.INCLUDE_AND_NEXT_COL;
+          // cell is visible
+          // as soon as we find a KV to include we can move to the next column
+          return runSubFilter(ReturnCode.INCLUDE_AND_NEXT_COL, cell);
         }
       }
       // check if masked by family delete
@@ -136,19 +141,41 @@ public class TransactionVisibilityFilter extends FilterBase {
           return ReturnCode.NEXT_COL;
         } else {
           // keep the marker but skip any remaining versions
-          return ReturnCode.INCLUDE_AND_NEXT_COL;
+          return runSubFilter(ReturnCode.INCLUDE_AND_NEXT_COL, cell);
         }
       }
       // cell is visible
-      if (cellFilter != null) {
-        return cellFilter.filterKeyValue(cell);
-      } else {
-        // as soon as we find a KV to include we can move to the next column
-        return ReturnCode.INCLUDE_AND_NEXT_COL;
-      }
+      // as soon as we find a KV to include we can move to the next column
+      return runSubFilter(ReturnCode.INCLUDE_AND_NEXT_COL, cell);
     } else {
       return ReturnCode.SKIP;
     }
+  }
+
+  private ReturnCode runSubFilter(ReturnCode includeCode, Cell cell) throws IOException {
+    if (cellFilter != null) {
+      ReturnCode filterCode = cellFilter.filterKeyValue(cell);
+      // Return the more restrictive of the two filter responses
+      switch (filterCode) {
+        case INCLUDE:
+          return includeCode;
+        case INCLUDE_AND_NEXT_COL:
+          return ReturnCode.INCLUDE_AND_NEXT_COL;
+        case SKIP:
+          return includeCode == ReturnCode.INCLUDE ? ReturnCode.SKIP :  ReturnCode.NEXT_COL;
+        default:
+          return filterCode;
+      }
+    }
+    return includeCode;
+  }
+
+  @Override
+  public boolean filterRow() throws IOException {
+    if (cellFilter != null) {
+      return cellFilter.filterRow();
+    }
+    return super.filterRow();
   }
 
   @Override
@@ -172,8 +199,69 @@ public class TransactionVisibilityFilter extends FilterBase {
   }
 
   @Override
-  public void reset() {
+  public void reset() throws IOException {
     deleteTracker.reset();
+    if (cellFilter != null) {
+      cellFilter.reset();
+    }
+  }
+
+  @Override
+  public boolean filterRowKey(byte[] buffer, int offset, int length) throws IOException {
+    if (cellFilter != null) {
+      return cellFilter.filterRowKey(buffer, offset, length);
+    }
+    return super.filterRowKey(buffer, offset, length);
+  }
+
+  @Override
+  public boolean filterAllRemaining() throws IOException {
+    if (cellFilter != null) {
+      return cellFilter.filterAllRemaining();
+    }
+    return super.filterAllRemaining();
+  }
+
+  @Override
+  public void filterRowCells(List<Cell> kvs) throws IOException {
+    if (cellFilter != null) {
+      cellFilter.filterRowCells(kvs);
+    } else {
+      super.filterRowCells(kvs);
+    }
+  }
+
+  @Override
+  public boolean hasFilterRow() {
+    if (cellFilter != null) {
+      return cellFilter.hasFilterRow();
+    }
+    return super.hasFilterRow();
+  }
+
+  @SuppressWarnings("deprecation")
+  @Override
+  public KeyValue getNextKeyHint(KeyValue currentKV) throws IOException {
+    if (cellFilter != null) {
+      return cellFilter.getNextKeyHint(currentKV);
+    }
+    return super.getNextKeyHint(currentKV);
+  }
+
+  @Override
+  public Cell getNextCellHint(Cell currentKV) throws IOException {
+    if (cellFilter != null) {
+      return cellFilter.getNextCellHint(currentKV);
+    }
+    return super.getNextCellHint(currentKV);
+  }
+
+  @Override
+  public boolean isFamilyEssential(byte[] name) throws IOException {
+    if (cellFilter != null) {
+      return cellFilter.isFamilyEssential(name);
+    }
+    return super.isFamilyEssential(name);
   }
 
   @Override
