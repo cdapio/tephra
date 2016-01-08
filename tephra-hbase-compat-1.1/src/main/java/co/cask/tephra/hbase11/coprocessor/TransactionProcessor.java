@@ -21,14 +21,11 @@ import co.cask.tephra.TransactionCodec;
 import co.cask.tephra.TxConstants;
 import co.cask.tephra.coprocessor.TransactionStateCache;
 import co.cask.tephra.coprocessor.TransactionStateCacheSupplier;
-import co.cask.tephra.hbase11.Filters;
 import co.cask.tephra.persist.TransactionVisibilityState;
 import co.cask.tephra.util.TxUtils;
-
 import com.google.common.base.Supplier;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
-
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.hbase.Cell;
@@ -160,7 +157,7 @@ public class TransactionProcessor extends BaseRegionObserver {
       get.setMaxVersions();
       get.setTimeRange(TxUtils.getOldestVisibleTimestamp(ttlByFamily, tx, readNonTxnData),
                        TxUtils.getMaxVisibleTimestamp(tx));
-      Filter newFilter = Filters.combine(getTransactionFilter(tx, ScanType.USER_SCAN), get.getFilter());
+      Filter newFilter = getTransactionFilter(tx, ScanType.USER_SCAN, get.getFilter());
       get.setFilter(newFilter);
     }
   }
@@ -215,7 +212,7 @@ public class TransactionProcessor extends BaseRegionObserver {
       scan.setMaxVersions();
       scan.setTimeRange(TxUtils.getOldestVisibleTimestamp(ttlByFamily, tx, readNonTxnData),
                         TxUtils.getMaxVisibleTimestamp(tx));
-      Filter newFilter = Filters.combine(getTransactionFilter(tx, ScanType.USER_SCAN), scan.getFilter());
+      Filter newFilter = getTransactionFilter(tx, ScanType.USER_SCAN, scan.getFilter());
       scan.setFilter(newFilter);
     }
     return s;
@@ -293,7 +290,7 @@ public class TransactionProcessor extends BaseRegionObserver {
     scan.setFilter(
         new IncludeInProgressFilter(dummyTx.getVisibilityUpperBound(),
             snapshot.getInvalid(),
-            getTransactionFilter(dummyTx, type)));
+            getTransactionFilter(dummyTx, type, null)));
 
     return new StoreScanner(store, store.getScanInfo(), scan, scanners,
                             type, store.getSmallestReadPoint(), earliestPutTs);
@@ -314,8 +311,8 @@ public class TransactionProcessor extends BaseRegionObserver {
    * @param tx the current transaction to apply
    * @param type the type of scan being performed
    */
-  protected Filter getTransactionFilter(Transaction tx, ScanType type) {
-    return new TransactionVisibilityFilter(tx, ttlByFamily, allowEmptyValues, type);
+  protected Filter getTransactionFilter(Transaction tx, ScanType type, Filter filter) {
+    return new TransactionVisibilityFilter(tx, ttlByFamily, allowEmptyValues, type, filter);
   }
 
   /**
