@@ -1,5 +1,5 @@
 /*
- * Copyright © 2014 Cask Data, Inc.
+ * Copyright © 2015-2016 Cask Data, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not
  * use this file except in compliance with the License. You may obtain a copy of
@@ -66,7 +66,7 @@ public class TransactionVisibilityFilter extends FilterBase {
    *                         these will be interpreted as "delete" markers and the column will be filtered out
    * @param scanType the type of scan operation being performed
    */
-  public TransactionVisibilityFilter(Transaction tx, Map<byte[], Long> ttlByFamily, boolean allowEmptyValues,
+  TransactionVisibilityFilter(Transaction tx, Map<byte[], Long> ttlByFamily, boolean allowEmptyValues,
                                      ScanType scanType) {
     this(tx, ttlByFamily, allowEmptyValues, scanType, null);
   }
@@ -83,8 +83,8 @@ public class TransactionVisibilityFilter extends FilterBase {
    *                   calling {@link Filter#filterKeyValue(org.apache.hadoop.hbase.Cell)}.  If null, then
    *                   {@link Filter.ReturnCode#INCLUDE_AND_NEXT_COL} will be returned instead.
    */
-  public TransactionVisibilityFilter(Transaction tx, Map<byte[], Long> ttlByFamily, boolean allowEmptyValues,
-                                     ScanType scanType, @Nullable Filter cellFilter) {
+  TransactionVisibilityFilter(Transaction tx, Map<byte[], Long> ttlByFamily, boolean allowEmptyValues,
+                              ScanType scanType, @Nullable Filter cellFilter) {
     this.tx = tx;
     this.oldestTsByFamily = Maps.newTreeMap();
     for (Map.Entry<byte[], Long> ttlEntry : ttlByFamily.entrySet()) {
