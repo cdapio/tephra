@@ -1,5 +1,5 @@
 /*
- * Copyright © 2012-2014 Cask Data, Inc.
+ * Copyright © 2015-2016 Cask Data, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not
  * use this file except in compliance with the License. You may obtain a copy of
@@ -318,8 +318,8 @@ public class TransactionProcessorTest {
 
       // read all back
       scan = new Scan(row);
-      scan.setFilter(new TransactionVisibilityFilter(
-        TxUtils.createDummyTransaction(txVisibilityState), new TreeMap<byte[], Long>(), false, ScanType.USER_SCAN));
+      scan.setFilter(TransactionFilters.getVisibilityFilter(TxUtils.createDummyTransaction(txVisibilityState),
+                                                            new TreeMap<byte[], Long>(), false, ScanType.USER_SCAN));
       regionScanner = region.getScanner(scan);
       results = Lists.newArrayList();
       assertFalse(regionScanner.next(results));
@@ -340,8 +340,9 @@ public class TransactionProcessorTest {
       region.flushcache();
 
       scan = new Scan(row);
-      scan.setFilter(new TransactionVisibilityFilter(
-        TxUtils.createDummyTransaction(txVisibilityState), new TreeMap<byte[], Long>(), false, ScanType.USER_SCAN));
+      scan.setFilter(TransactionFilters.getVisibilityFilter(TxUtils.createDummyTransaction(txVisibilityState),
+                                                            new TreeMap<byte[], Long>(), false, ScanType.USER_SCAN));
+
       regionScanner = region.getScanner(scan);
       results = Lists.newArrayList();
       assertFalse(regionScanner.next(results));
@@ -426,8 +427,9 @@ public class TransactionProcessorTest {
       // with a filtered scan the original put should disappear
       scan = new Scan();
       scan.setMaxVersions();
-      scan.setFilter(new TransactionVisibilityFilter(
-        TxUtils.createDummyTransaction(txVisibilityState), new TreeMap<byte[], Long>(), false, ScanType.USER_SCAN));
+      scan.setFilter(TransactionFilters.getVisibilityFilter(TxUtils.createDummyTransaction(txVisibilityState),
+                                                            new TreeMap<byte[], Long>(), false, ScanType.USER_SCAN));
+
       scanner = region.getScanner(scan);
       results = Lists.newArrayList();
       scanner.next(results);
@@ -480,7 +482,7 @@ public class TransactionProcessorTest {
       txScan.setMaxVersions();
       txScan.setTimeRange(TxUtils.getOldestVisibleTimestamp(ttls, dummyTransaction, true),
                           TxUtils.getMaxVisibleTimestamp(dummyTransaction));
-      txScan.setFilter(new TransactionVisibilityFilter(dummyTransaction, ttls, false, ScanType.USER_SCAN));
+      txScan.setFilter(TransactionFilters.getVisibilityFilter(dummyTransaction, ttls, false, ScanType.USER_SCAN));
 
       // read all back with raw scanner
       scanAndAssert(region, cells, rawScan);
@@ -502,7 +504,7 @@ public class TransactionProcessorTest {
       ttls.put(familyBytes, newTtl);
       txScan.setTimeRange(TxUtils.getOldestVisibleTimestamp(ttls, dummyTransaction, true),
                           TxUtils.getMaxVisibleTimestamp(dummyTransaction));
-      txScan.setFilter(new TransactionVisibilityFilter(dummyTransaction, ttls, false, ScanType.USER_SCAN));
+      txScan.setFilter(TransactionFilters.getVisibilityFilter(dummyTransaction, ttls, false, ScanType.USER_SCAN));
 
       // Raw scan should still give all cells
       scanAndAssert(region, cells, rawScan);
@@ -523,7 +525,7 @@ public class TransactionProcessorTest {
       ttls.put(familyBytes, newTtl);
       txScan.setTimeRange(TxUtils.getOldestVisibleTimestamp(ttls, dummyTransaction, true),
                           TxUtils.getMaxVisibleTimestamp(dummyTransaction));
-      txScan.setFilter(new TransactionVisibilityFilter(dummyTransaction, ttls, false, ScanType.USER_SCAN));
+      txScan.setFilter(TransactionFilters.getVisibilityFilter(dummyTransaction, ttls, false, ScanType.USER_SCAN));
 
       // force a major compaction to remove expired cells
       region.compactStores(true);
