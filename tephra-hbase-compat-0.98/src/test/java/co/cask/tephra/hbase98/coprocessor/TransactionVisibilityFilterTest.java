@@ -1,5 +1,5 @@
 /*
- * Copyright © 2014 Cask Data, Inc.
+ * Copyright © 2015-2016 Cask Data, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not
  * use this file except in compliance with the License. You may obtain a copy of
@@ -19,14 +19,20 @@ package co.cask.tephra.hbase98.coprocessor;
 import co.cask.tephra.Transaction;
 import co.cask.tephra.TxConstants;
 import co.cask.tephra.hbase.AbstractTransactionVisibilityFilterTest;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Maps;
+import org.apache.hadoop.hbase.Cell;
 import org.apache.hadoop.hbase.KeyValue;
 import org.apache.hadoop.hbase.filter.Filter;
+import org.apache.hadoop.hbase.filter.FilterBase;
 import org.apache.hadoop.hbase.regionserver.ScanType;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.junit.Test;
 
+import java.io.IOException;
+import java.util.List;
 import java.util.Map;
+import javax.annotation.Nullable;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
@@ -41,6 +47,191 @@ public class TransactionVisibilityFilterTest extends AbstractTransactionVisibili
    */
   @Test
   public void testFiltering() throws Exception {
+    TxFilterFactory txFilterFactory = new TxFilterFactory() {
+      @Override
+      public Filter getTxFilter(Transaction tx, Map<byte[], Long> familyTTLs) {
+        return new TransactionVisibilityFilter(tx, familyTTLs, false, ScanType.USER_SCAN);
+      }
+    };
+    runFilteringTest(txFilterFactory,
+                     ImmutableList.of(Filter.ReturnCode.INCLUDE_AND_NEXT_COL,
+                                      Filter.ReturnCode.INCLUDE_AND_NEXT_COL,
+                                      Filter.ReturnCode.SKIP,
+                                      Filter.ReturnCode.SKIP,
+                                      Filter.ReturnCode.INCLUDE_AND_NEXT_COL,
+                                      Filter.ReturnCode.INCLUDE_AND_NEXT_COL));
+  }
+
+  @Test
+  public void testSubFilter() throws Exception {
+    final FilterBase includeFilter = new FilterBase() {
+      @Override
+      public ReturnCode filterKeyValue(Cell ignored) throws IOException {
+        return ReturnCode.INCLUDE;
+      }
+    };
+    TxFilterFactory txFilterFactory = new TxFilterFactory() {
+      @Override
+      public Filter getTxFilter(Transaction tx, Map<byte[], Long> familyTTLs) {
+        return new TransactionVisibilityFilter(tx, familyTTLs, false, ScanType.USER_SCAN, includeFilter);
+      }
+    };
+    runFilteringTest(txFilterFactory,
+                     ImmutableList.of(Filter.ReturnCode.INCLUDE_AND_NEXT_COL,
+                                      Filter.ReturnCode.INCLUDE_AND_NEXT_COL,
+                                      Filter.ReturnCode.SKIP,
+                                      Filter.ReturnCode.SKIP,
+                                      Filter.ReturnCode.INCLUDE_AND_NEXT_COL,
+                                      Filter.ReturnCode.INCLUDE_AND_NEXT_COL));
+
+    final Filter skipFilter = new FilterBase() {
+      @Override
+      public ReturnCode filterKeyValue(Cell ignored) throws IOException {
+        return ReturnCode.SKIP;
+      }
+    };
+    txFilterFactory = new TxFilterFactory() {
+      @Override
+      public Filter getTxFilter(Transaction tx, Map<byte[], Long> familyTTLs) {
+        return new TransactionVisibilityFilter(tx, familyTTLs, false, ScanType.USER_SCAN, skipFilter);
+      }
+    };
+    runFilteringTest(txFilterFactory,
+                     ImmutableList.of(Filter.ReturnCode.NEXT_COL,
+                                      Filter.ReturnCode.NEXT_COL,
+                                      Filter.ReturnCode.SKIP,
+                                      Filter.ReturnCode.SKIP,
+                                      Filter.ReturnCode.NEXT_COL,
+                                      Filter.ReturnCode.NEXT_COL));
+
+    final Filter includeNextFilter = new FilterBase() {
+      @Override
+      public ReturnCode filterKeyValue(Cell ignored) throws IOException {
+        return ReturnCode.INCLUDE_AND_NEXT_COL;
+      }
+    };
+    txFilterFactory = new TxFilterFactory() {
+      @Override
+      public Filter getTxFilter(Transaction tx, Map<byte[], Long> familyTTLs) {
+        return new TransactionVisibilityFilter(tx, familyTTLs, false, ScanType.USER_SCAN, includeNextFilter);
+      }
+    };
+    runFilteringTest(txFilterFactory,
+                     ImmutableList.of(Filter.ReturnCode.INCLUDE_AND_NEXT_COL,
+                                      Filter.ReturnCode.INCLUDE_AND_NEXT_COL,
+                                      Filter.ReturnCode.SKIP,
+                                      Filter.ReturnCode.SKIP,
+                                      Filter.ReturnCode.INCLUDE_AND_NEXT_COL,
+                                      Filter.ReturnCode.INCLUDE_AND_NEXT_COL));
+
+    final Filter nextColFilter = new FilterBase() {
+      @Override
+      public ReturnCode filterKeyValue(Cell ignored) throws IOException {
+        return ReturnCode.NEXT_COL;
+      }
+    };
+    txFilterFactory = new TxFilterFactory() {
+      @Override
+      public Filter getTxFilter(Transaction tx, Map<byte[], Long> familyTTLs) {
+        return new TransactionVisibilityFilter(tx, familyTTLs, false, ScanType.USER_SCAN, nextColFilter);
+      }
+    };
+    runFilteringTest(txFilterFactory,
+                     ImmutableList.of(Filter.ReturnCode.NEXT_COL,
+                                      Filter.ReturnCode.NEXT_COL,
+                                      Filter.ReturnCode.SKIP,
+                                      Filter.ReturnCode.SKIP,
+                                      Filter.ReturnCode.NEXT_COL,
+                                      Filter.ReturnCode.NEXT_COL));
+
+  }
+
+  @Test
+  public void testSubFilterOverride() throws Exception {
+    final FilterBase includeFilter = new FilterBase() {
+      @Override
+      public ReturnCode filterKeyValue(Cell ignored) throws IOException {
+        return ReturnCode.INCLUDE;
+      }
+    };
+    TxFilterFactory txFilterFactory = new TxFilterFactory() {
+      @Override
+      public Filter getTxFilter(Transaction tx, Map<byte[], Long> familyTTLs) {
+        return new CustomTxFilter(tx, familyTTLs, false, ScanType.USER_SCAN, includeFilter);
+      }
+    };
+    runFilteringTest(txFilterFactory,
+                     ImmutableList.of(Filter.ReturnCode.INCLUDE,
+                                      Filter.ReturnCode.INCLUDE,
+                                      Filter.ReturnCode.SKIP,
+                                      Filter.ReturnCode.SKIP,
+                                      Filter.ReturnCode.INCLUDE,
+                                      Filter.ReturnCode.INCLUDE));
+
+    final Filter skipFilter = new FilterBase() {
+      @Override
+      public ReturnCode filterKeyValue(Cell ignored) throws IOException {
+        return ReturnCode.SKIP;
+      }
+    };
+    txFilterFactory = new TxFilterFactory() {
+      @Override
+      public Filter getTxFilter(Transaction tx, Map<byte[], Long> familyTTLs) {
+        return new CustomTxFilter(tx, familyTTLs, false, ScanType.USER_SCAN, skipFilter);
+      }
+    };
+    runFilteringTest(txFilterFactory,
+                     ImmutableList.of(Filter.ReturnCode.NEXT_COL,
+                                      Filter.ReturnCode.NEXT_COL,
+                                      Filter.ReturnCode.SKIP,
+                                      Filter.ReturnCode.SKIP,
+                                      Filter.ReturnCode.NEXT_COL,
+                                      Filter.ReturnCode.NEXT_COL));
+
+    final Filter includeNextFilter = new FilterBase() {
+      @Override
+      public ReturnCode filterKeyValue(Cell ignored) throws IOException {
+        return ReturnCode.INCLUDE_AND_NEXT_COL;
+      }
+    };
+    txFilterFactory = new TxFilterFactory() {
+      @Override
+      public Filter getTxFilter(Transaction tx, Map<byte[], Long> familyTTLs) {
+        return new CustomTxFilter(tx, familyTTLs, false, ScanType.USER_SCAN, includeNextFilter);
+      }
+    };
+    runFilteringTest(txFilterFactory,
+                     ImmutableList.of(Filter.ReturnCode.INCLUDE_AND_NEXT_COL,
+                                      Filter.ReturnCode.INCLUDE_AND_NEXT_COL,
+                                      Filter.ReturnCode.SKIP,
+                                      Filter.ReturnCode.SKIP,
+                                      Filter.ReturnCode.INCLUDE_AND_NEXT_COL,
+                                      Filter.ReturnCode.INCLUDE_AND_NEXT_COL));
+
+    final Filter nextColFilter = new FilterBase() {
+      @Override
+      public ReturnCode filterKeyValue(Cell ignored) throws IOException {
+        return ReturnCode.NEXT_COL;
+      }
+    };
+    txFilterFactory = new TxFilterFactory() {
+      @Override
+      public Filter getTxFilter(Transaction tx, Map<byte[], Long> familyTTLs) {
+        return new CustomTxFilter(tx, familyTTLs, false, ScanType.USER_SCAN, nextColFilter);
+      }
+    };
+    runFilteringTest(txFilterFactory,
+                     ImmutableList.of(Filter.ReturnCode.NEXT_COL,
+                                      Filter.ReturnCode.NEXT_COL,
+                                      Filter.ReturnCode.SKIP,
+                                      Filter.ReturnCode.SKIP,
+                                      Filter.ReturnCode.NEXT_COL,
+                                      Filter.ReturnCode.NEXT_COL));
+
+  }
+
+  private void runFilteringTest(TxFilterFactory txFilterFactory,
+                                List<Filter.ReturnCode> assertCodes) throws Exception {
     /*
      * Start and stop some transactions.  This will give us a transaction state something like the following
      * (numbers only reflect ordering, not actual transaction IDs):
@@ -74,18 +265,20 @@ public class TransactionVisibilityFilterTest extends AbstractTransactionVisibili
     Transaction tx6 = txManager.startShort();
 
     Map<byte[], Long> ttls = Maps.newTreeMap(Bytes.BYTES_COMPARATOR);
-    Filter filter = createFilter(tx6, ttls);
+    Filter filter = txFilterFactory.getTxFilter(tx6, ttls);
 
-    assertEquals(Filter.ReturnCode.INCLUDE_AND_NEXT_COL,
+    assertEquals(assertCodes.get(5),
                  filter.filterKeyValue(newKeyValue("row1", "val1", tx6.getTransactionId())));
-    assertEquals(Filter.ReturnCode.INCLUDE_AND_NEXT_COL,
+    assertEquals(assertCodes.get(4),
                  filter.filterKeyValue(newKeyValue("row1", "val1", tx5.getTransactionId())));
-    assertEquals(Filter.ReturnCode.SKIP,
+    assertEquals(assertCodes.get(3),
                  filter.filterKeyValue(newKeyValue("row1", "val1", tx4.getTransactionId())));
-    assertEquals(Filter.ReturnCode.SKIP,
+    assertEquals(assertCodes.get(2),
                  filter.filterKeyValue(newKeyValue("row1", "val1", tx3.getTransactionId())));
-    assertEquals(Filter.ReturnCode.INCLUDE_AND_NEXT_COL,
+    assertEquals(assertCodes.get(1),
                  filter.filterKeyValue(newKeyValue("row1", "val1", tx2.getTransactionId())));
+    assertEquals(assertCodes.get(0),
+                 filter.filterKeyValue(newKeyValue("row1", "val1", tx1.getTransactionId())));
   }
 
   /**
@@ -101,7 +294,7 @@ public class TransactionVisibilityFilterTest extends AbstractTransactionVisibili
 
     Transaction tx = txManager.startShort();
     long now = tx.getVisibilityUpperBound();
-    Filter filter = createFilter(tx, ttls);
+    Filter filter = new TransactionVisibilityFilter(tx, ttls, false, ScanType.USER_SCAN);
     assertEquals(Filter.ReturnCode.INCLUDE_AND_NEXT_COL,
                  filter.filterKeyValue(newKeyValue("row1", FAM, "val1", now)));
     assertEquals(Filter.ReturnCode.INCLUDE_AND_NEXT_COL,
@@ -143,15 +336,36 @@ public class TransactionVisibilityFilterTest extends AbstractTransactionVisibili
                  filter.filterKeyValue(newKeyValue("row1", FAM3, "val1", preNow - 1001L)));
   }
 
-  protected Filter createFilter(Transaction tx, Map<byte[], Long> familyTTLs) {
-    return new TransactionVisibilityFilter(tx, familyTTLs, false, ScanType.USER_SCAN);
-  }
-
   protected KeyValue newKeyValue(String rowkey, String value, long timestamp) {
     return new KeyValue(Bytes.toBytes(rowkey), FAM, COL, timestamp, Bytes.toBytes(value));
   }
 
   protected KeyValue newKeyValue(String rowkey, byte[] family, String value, long timestamp) {
     return new KeyValue(Bytes.toBytes(rowkey), family, COL, timestamp, Bytes.toBytes(value));
+  }
+
+  private interface TxFilterFactory {
+    Filter getTxFilter(Transaction tx, Map<byte[], Long> familyTTLs);
+  }
+
+  private class CustomTxFilter extends TransactionVisibilityFilter {
+    public CustomTxFilter(Transaction tx, Map<byte[], Long> ttlByFamily, boolean allowEmptyValues, ScanType scanType,
+                          @Nullable Filter cellFilter) {
+      super(tx, ttlByFamily, allowEmptyValues, scanType, cellFilter);
+    }
+
+    @Override
+    protected ReturnCode determineReturnCode(ReturnCode txFilterCode, ReturnCode subFilterCode) {
+      switch (subFilterCode) {
+        case INCLUDE:
+          return ReturnCode.INCLUDE;
+        case INCLUDE_AND_NEXT_COL:
+          return ReturnCode.INCLUDE_AND_NEXT_COL;
+        case SKIP:
+          return txFilterCode == ReturnCode.INCLUDE ? ReturnCode.SKIP : ReturnCode.NEXT_COL;
+        default:
+          return subFilterCode;
+      }
+    }
   }
 }

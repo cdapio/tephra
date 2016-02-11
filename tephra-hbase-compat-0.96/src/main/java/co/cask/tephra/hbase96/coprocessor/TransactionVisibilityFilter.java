@@ -66,7 +66,7 @@ public class TransactionVisibilityFilter extends FilterBase {
    *                         these will be interpreted as "delete" markers and the column will be filtered out
    * @param scanType the type of scan operation being performed
    */
-  TransactionVisibilityFilter(Transaction tx, Map<byte[], Long> ttlByFamily, boolean allowEmptyValues,
+  public TransactionVisibilityFilter(Transaction tx, Map<byte[], Long> ttlByFamily, boolean allowEmptyValues,
                                      ScanType scanType) {
     this(tx, ttlByFamily, allowEmptyValues, scanType, null);
   }
@@ -83,7 +83,7 @@ public class TransactionVisibilityFilter extends FilterBase {
    *                   calling {@link Filter#filterKeyValue(org.apache.hadoop.hbase.Cell)}.  If null, then
    *                   {@link Filter.ReturnCode#INCLUDE_AND_NEXT_COL} will be returned instead.
    */
-   TransactionVisibilityFilter(Transaction tx, Map<byte[], Long> ttlByFamily, boolean allowEmptyValues,
+   public TransactionVisibilityFilter(Transaction tx, Map<byte[], Long> ttlByFamily, boolean allowEmptyValues,
                                ScanType scanType, @Nullable Filter cellFilter) {
     this.tx = tx;
     this.oldestTsByFamily = Maps.newTreeMap(Bytes.BYTES_COMPARATOR);
@@ -152,22 +152,36 @@ public class TransactionVisibilityFilter extends FilterBase {
     }
   }
 
-  private ReturnCode runSubFilter(ReturnCode includeCode, Cell cell) throws IOException {
+  private ReturnCode runSubFilter(ReturnCode txFilterCode, Cell cell) throws IOException {
     if (cellFilter != null) {
-      ReturnCode filterCode = cellFilter.filterKeyValue(cell);
-      // Return the more restrictive of the two filter responses
-      switch (filterCode) {
-        case INCLUDE:
-          return includeCode;
-        case INCLUDE_AND_NEXT_COL:
-          return ReturnCode.INCLUDE_AND_NEXT_COL;
-        case SKIP:
-          return includeCode == ReturnCode.INCLUDE ? ReturnCode.SKIP :  ReturnCode.NEXT_COL;
-        default:
-          return filterCode;
-      }
+      ReturnCode subFilterCode = cellFilter.filterKeyValue(cell);
+      return determineReturnCode(txFilterCode, subFilterCode);
     }
-    return includeCode;
+    return txFilterCode;
+  }
+
+  /**
+   * Determines the return code of TransactionVisibilityFilter based on sub-filter's return code.
+   * Sub-filter can only exclude cells included by TransactionVisibilityFilter, i.e., sub-filter's
+   * INCLUDE will be ignored. This behavior makes sure that sub-filter only sees cell versions valid for the
+   * given transaction. If sub-filter needs to see older versions of cell, then this method can be overridden.
+   *
+   * @param txFilterCode return code from TransactionVisibilityFilter
+   * @param subFilterCode return code from sub-filter
+   * @return final return code
+   */
+  protected ReturnCode determineReturnCode(ReturnCode txFilterCode, ReturnCode subFilterCode) {
+    // Return the more restrictive of the two filter responses
+    switch (subFilterCode) {
+      case INCLUDE:
+        return txFilterCode;
+      case INCLUDE_AND_NEXT_COL:
+        return ReturnCode.INCLUDE_AND_NEXT_COL;
+      case SKIP:
+        return txFilterCode == ReturnCode.INCLUDE ? ReturnCode.SKIP : ReturnCode.NEXT_COL;
+      default:
+        return subFilterCode;
+    }
   }
 
   @Override
