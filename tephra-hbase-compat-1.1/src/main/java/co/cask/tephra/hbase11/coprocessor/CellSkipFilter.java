@@ -38,7 +38,7 @@ public class CellSkipFilter extends FilterBase {
   // remember the previous keyvalue processed by filter when the return code was NEXT_COL or INCLUDE_AND_NEXT_COL
   private KeyValue skipColumn = null;
 
-  CellSkipFilter(Filter filter) {
+  public CellSkipFilter(Filter filter) {
     this.filter = filter;
   }
 
