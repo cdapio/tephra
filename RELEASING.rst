@@ -109,8 +109,11 @@ After the release is complete, update the other git branches with the release ch
   
   git checkout master
   git merge release/N.N.N
+  git push origin master
+
   git checkout develop
   git merge master
+  git push origin develop
 
 
 Announcing and Completing the Release
