@@ -21,6 +21,7 @@ import co.cask.tephra.distributed.thrift.TTransactionServer;
 import co.cask.tephra.inmemory.InMemoryTransactionService;
 import co.cask.tephra.rpc.ThriftRPCServer;
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.util.concurrent.CaskServiceListenerAdapter;
 import com.google.common.util.concurrent.MoreExecutors;
 import com.google.common.util.concurrent.Uninterruptibles;
 import com.google.inject.Inject;
@@ -28,7 +29,6 @@ import com.google.inject.Provider;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.twill.api.ElectionHandler;
 import org.apache.twill.discovery.DiscoveryService;
-import org.apache.twill.internal.ServiceListenerAdapter;
 import org.apache.twill.internal.zookeeper.LeaderElection;
 import org.apache.twill.zookeeper.ZKClient;
 import org.slf4j.Logger;
@@ -80,7 +80,7 @@ public final class TransactionService extends InMemoryTransactionService {
       public void leader() {
         // if the txManager fails, we should stop the server
         txManager = txManagerProvider.get();
-        txManager.addListener(new ServiceListenerAdapter() {
+        txManager.addListener(new CaskServiceListenerAdapter() {
           @Override
           public void failed(State from, Throwable failure) {
             LOG.error("Transaction manager aborted, stopping transaction service");

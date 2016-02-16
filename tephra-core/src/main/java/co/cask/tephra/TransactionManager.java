@@ -33,7 +33,8 @@ import com.google.common.base.Throwables;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
-import com.google.common.util.concurrent.AbstractService;
+import com.google.common.util.concurrent.CaskAbstractService;
+import com.google.common.util.concurrent.Service;
 import com.google.inject.Inject;
 import it.unimi.dsi.fastutil.longs.LongArrayList;
 import org.apache.hadoop.conf.Configuration;
@@ -101,7 +102,7 @@ import javax.annotation.Nullable;
  * are not tracked, and therefore cannot be rolled back. Hence, when a long transaction is aborted, it remains in the
  * list of excluded transactions to make its writes invisible.
  */
-public class TransactionManager extends AbstractService {
+public class TransactionManager extends CaskAbstractService {
   // todo: optimize heavily
 
   private static final Logger LOG = LoggerFactory.getLogger(TransactionManager.class);
@@ -203,7 +204,7 @@ public class TransactionManager extends AbstractService {
   }
 
   private boolean isStopping() {
-    return State.STOPPING.equals(state());
+    return Service.State.STOPPING.equals(state());
   }
 
   @Override
