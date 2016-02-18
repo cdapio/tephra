@@ -17,6 +17,8 @@
 package co.cask.tephra.runtime;
 
 import co.cask.tephra.TxConstants;
+import co.cask.tephra.zookeeper.TephraZKClientService;
+import com.google.common.collect.ArrayListMultimap;
 import com.google.inject.AbstractModule;
 import com.google.inject.Provides;
 import com.google.inject.Singleton;
@@ -52,14 +54,12 @@ public class ZKModule extends AbstractModule {
       zkStr = conf.get(TxConstants.HBase.ZOOKEEPER_QUORUM);
     }
 
+    int timeOut = conf.getInt(TxConstants.HBase.ZK_SESSION_TIMEOUT, TxConstants.HBase.DEFAULT_ZK_SESSION_TIMEOUT);
+    ZKClientService zkClientService = new TephraZKClientService(zkStr, timeOut, null,
+                                                                ArrayListMultimap.<String, byte[]>create());
     return ZKClientServices.delegate(
       ZKClients.reWatchOnExpire(
-        ZKClients.retryOnFailure(
-          ZKClientService.Builder.of(zkStr)
-            .setSessionTimeout(conf.getInt(TxConstants.HBase.ZK_SESSION_TIMEOUT,
-                TxConstants.HBase.DEFAULT_ZK_SESSION_TIMEOUT))
-            .build(),
-          RetryStrategies.exponentialDelay(500, 2000, TimeUnit.MILLISECONDS)
+        ZKClients.retryOnFailure(zkClientService, RetryStrategies.exponentialDelay(500, 2000, TimeUnit.MILLISECONDS)
         )
       )
     );
