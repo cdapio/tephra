@@ -1,5 +1,5 @@
 /*
- * Copyright © 2015 Cask Data, Inc.
+ * Copyright © 2015-2016 Cask Data, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not
  * use this file except in compliance with the License. You may obtain a copy of
@@ -34,6 +34,7 @@ public class HBaseVersion {
   private static final String HBASE_98_VERSION = "0.98";
   private static final String HBASE_10_VERSION = "1.0";
   private static final String HBASE_11_VERSION = "1.1";
+  private static final String HBASE_12_VERSION = "1.2";
   private static final String CDH_CLASSIFIER = "cdh";
 
   private static final Logger LOG = LoggerFactory.getLogger(HBaseVersion.class);
@@ -48,6 +49,7 @@ public class HBaseVersion {
     HBASE_10("1.0"),
     HBASE_10_CDH("1.0-cdh"),
     HBASE_11("1.1"),
+    HBASE_12_CDH("1.2-cdh"),
     UNKNOWN("unknown");
 
     final String majorVersion;
@@ -83,6 +85,15 @@ public class HBaseVersion {
         }
       } else if (versionString.startsWith(HBASE_11_VERSION)) {
         currentVersion = Version.HBASE_11;
+      } else if (versionString.startsWith(HBASE_12_VERSION)) {
+        VersionNumber ver = VersionNumber.create(versionString);
+        if (ver.getClassifier() != null && ver.getClassifier().startsWith(CDH_CLASSIFIER)) {
+          currentVersion = Version.HBASE_12_CDH;
+        } else {
+          // CDH 5.7 comes with HBase version 1.2.0-CDH5.7.0. However currently there is no
+          // other hadoop distribution that uses HBase 1.2, so the version is set here to UNKNOWN.
+          currentVersion = Version.UNKNOWN;
+        }
       } else {
         currentVersion = Version.UNKNOWN;
       }

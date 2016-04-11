@@ -103,19 +103,19 @@ component versions:
 +===============+===================+=========================================================+
 | **HDFS**      | Apache Hadoop     | 2.0.2-alpha through 2.6.0                               |
 +               +-------------------+---------------------------------------------------------+
-|               | CDH or HDP        | (CDH) 5.0.0 through 5.4.4 or (HDP) 2.0, 2.1, 2.2 or 2.3 |
+|               | CDH or HDP        | (CDH) 5.0.0 through 5.7.0 or (HDP) 2.0, 2.1, 2.2 or 2.3 |
 +               +-------------------+---------------------------------------------------------+
 |               | MapR              | 4.1 (with MapR-FS)                                      |
 +---------------+-------------------+---------------------------------------------------------+
 | **HBase**     | Apache            | 0.96.x, 0.98.x, 1.0.x, and 1.1.x                        |
 +               +-------------------+---------------------------------------------------------+
-|               | CDH or HDP        | (CDH) 5.0.0 through 5.4.4 or (HDP) 2.0, 2.1, 2.2 or 2.3 |
+|               | CDH or HDP        | (CDH) 5.0.0 through 5.7.0 or (HDP) 2.0, 2.1, 2.2 or 2.3 |
 +               +-------------------+---------------------------------------------------------+
 |               | MapR              | 4.1 (with Apache HBase)                                 |
 +---------------+-------------------+---------------------------------------------------------+
 | **Zookeeper** | Apache            | Version 3.4.3 through 3.4.5                             |
 +               +-------------------+---------------------------------------------------------+
-|               | CDH or HDP        | (CDH) 5.0.0 through 5.4.4 or (HDP) 2.0, 2.1, 2.2 or 2.3 |
+|               | CDH or HDP        | (CDH) 5.0.0 through 5.7.0 or (HDP) 2.0, 2.1, 2.2 or 2.3 |
 +               +-------------------+---------------------------------------------------------+
 |               | MapR              | 4.1                                                     |
 +---------------+-------------------+---------------------------------------------------------+
@@ -144,12 +144,12 @@ build system's equivalent configuration), in order to make use of Tephra classes
   <dependency>
     <groupId>co.cask.tephra</groupId>
     <artifactId>tephra-api</artifactId>
-    <version>0.6.2</version>
+    <version>0.7.1</version>
   </dependency>
   <dependency>
     <groupId>co.cask.tephra</groupId>
     <artifactId>tephra-core</artifactId>
-    <version>0.6.2</version>
+    <version>0.7.1</version>
   </dependency>
 
 Since the HBase APIs have changed between versions, you will need to select the
@@ -160,7 +160,7 @@ For HBase 0.96.x::
   <dependency>
     <groupId>co.cask.tephra</groupId>
     <artifactId>tephra-hbase-compat-0.96</artifactId>
-    <version>0.6.2</version>
+    <version>0.7.1</version>
   </dependency>
 
 For HBase 0.98.x::
@@ -168,7 +168,7 @@ For HBase 0.98.x::
   <dependency>
     <groupId>co.cask.tephra</groupId>
     <artifactId>tephra-hbase-compat-0.98</artifactId>
-    <version>0.6.2</version>
+    <version>0.7.1</version>
   </dependency>
 
 For HBase 1.0.x::
@@ -176,24 +176,24 @@ For HBase 1.0.x::
   <dependency>
     <groupId>co.cask.tephra</groupId>
     <artifactId>tephra-hbase-compat-1.0</artifactId>
-    <version>0.6.2</version>
+    <version>0.7.1</version>
   </dependency>
 
-If you are running the CDH 5.4 version of HBase 1.0.x (this version contains API incompatibilities
+If you are running the CDH 5.4, 5.5, or 5.6 version of HBase 1.0.x (this version contains API incompatibilities
 with Apache HBase 1.0.x)::
 
   <dependency>
     <groupId>co.cask.tephra</groupId>
     <artifactId>tephra-hbase-compat-1.0-cdh</artifactId>
-    <version>0.6.2</version>
+    <version>0.7.1</version>
   </dependency>
 
-For HBase 1.1.x::
+For HBase 1.1.x or CDH 5.7 version of HBase 1.2.x::
 
   <dependency>
     <groupId>co.cask.tephra</groupId>
     <artifactId>tephra-hbase-compat-1.1</artifactId>
-    <version>0.6.2</version>
+    <version>0.7.1</version>
   </dependency>
 
 Deployment and Configuration
@@ -298,35 +298,35 @@ tables where transactional reads and writes will be performed.
 
 To configure the coprocessor on all HBase tables, add the following to ``hbase-site.xml``.
 
-For HBase 0.96::
+For HBase 0.96.x::
 
   <property>
     <name>hbase.coprocessor.region.classes</name>
     <value>co.cask.tephra.hbase96.coprocessor.TransactionProcessor</value>
   </property>
 
-For HBase 0.98::
+For HBase 0.98.x::
 
   <property>
     <name>hbase.coprocessor.region.classes</name>
     <value>co.cask.tephra.hbase98.coprocessor.TransactionProcessor</value>
   </property>
 
-For HBase 1.0::
+For HBase 1.0.x::
 
   <property>
     <name>hbase.coprocessor.region.classes</name>
     <value>co.cask.tephra.hbase10.coprocessor.TransactionProcessor</value>
   </property>
 
-For the CDH 5.4 version of HBase 1.0::
+For the CDH 5.4, 5.5, or 5.6 version of HBase 1.0.x::
 
   <property>
     <name>hbase.coprocessor.region.classes</name>
     <value>co.cask.tephra.hbase10cdh.coprocessor.TransactionProcessor</value>
   </property>
 
-For HBase 1.1::
+For HBase 1.1.x or CDH 5.7 version of HBase 1.2.x::
 
   <property>
     <name>hbase.coprocessor.region.classes</name>
