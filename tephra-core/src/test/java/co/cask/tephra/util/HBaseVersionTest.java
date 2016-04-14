@@ -76,6 +76,9 @@ public class HBaseVersionTest {
     } catch (ParseException pe) {
       // expected
     }
+
+    ver = HBaseVersion.VersionNumber.create("1.2.0-CDH5.7.0");
+    assertVersionNumber(ver, 1, 2, 0, "CDH5.7.0", false);
   }
 
   private void assertVersionNumber(HBaseVersion.VersionNumber version, Integer expectedMajor, Integer expectedMinor,
