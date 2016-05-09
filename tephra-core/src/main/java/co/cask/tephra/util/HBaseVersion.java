@@ -50,6 +50,7 @@ public class HBaseVersion {
     HBASE_10_CDH("1.0-cdh"),
     HBASE_11("1.1"),
     HBASE_12_CDH("1.2-cdh"),
+    HBASE_12("1.2"),
     UNKNOWN("unknown");
 
     final String majorVersion;
