@@ -122,7 +122,7 @@ component versions:
 
 **Note:** Components versions shown in this table are those that we have tested and are
 confident of their suitability and compatibility. Later versions of components may work,
-but have not necessarily have been either tested or confirmed compatible.
+but have not necessarily been either tested or confirmed compatible.
 
 
 Getting Started
