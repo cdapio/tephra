@@ -4,6 +4,12 @@
 
 |(Tephra)|
 
+Note: **Tephra has moved to Apache Incubator**
+----------------------------------------------
+For latest updates on Apache Tephra go to its new site at `http://tephra.incubator.apache.org <http://tephra.incubator.apache.org>`__.
+
+-----
+
 **Transactions for Apache HBase** |(TM)|:
 Cask Tephra provides globally consistent transactions on top of Apache HBase.  While HBase
 provides strong consistency with row- or region-level ACID operations, it sacrifices
