@@ -42,6 +42,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.io.OutputStream;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
@@ -160,6 +161,15 @@ public class TransactionManager extends AbstractService {
   // fudge factor (in milliseconds) used when interpreting transactions as LONG based on expiration
   // TODO: REMOVE WITH txnBackwardsCompatCheck()
   private final long longTimeoutTolerance;
+
+  private final List<Listener> failureListeners = new ArrayList<>();
+
+  /**
+   * Listener for the service failures.
+   */
+  public interface Listener {
+    void failed(Throwable cause);
+  }
 
   public TransactionManager(Configuration config) {
     this(config, new NoOpTransactionStateStorage(new SnapshotCodecProvider(config)), new DefaultMetricsCollector());
@@ -692,6 +702,14 @@ public class TransactionManager extends AbstractService {
   }
 
   /**
+   * Adds a {@link Listener} for the service failure.
+   * @param listener listener to be added
+   */
+  public void addListener(Listener listener) {
+    failureListeners.add(listener);
+  }
+
+  /**
    * Immediately shuts down the service, without going through the normal close process.
    * @param message A message describing the source of the failure.
    * @param error Any exception that caused the failure.
@@ -700,6 +718,9 @@ public class TransactionManager extends AbstractService {
     if (isRunning()) {
       LOG.error("Aborting transaction manager due to: " + message, error);
       notifyFailed(error);
+      for (Listener listener : failureListeners) {
+        listener.failed(error);
+      }
     }
   }
 
