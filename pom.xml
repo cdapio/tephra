@@ -93,7 +93,7 @@
     <gson.version>2.2.4</gson.version>
     <guava.version>13.0.1</guava.version>
     <guice.version>3.0</guice.version>
-    <logback.version>1.0.9</logback.version>
+    <logback.version>1.2.0</logback.version>
     <hadoop.version>2.2.0</hadoop.version>
     <hbase96.version>0.96.2-hadoop2</hbase96.version>
     <hbase98.version>0.98.11-hadoop2</hbase98.version>
