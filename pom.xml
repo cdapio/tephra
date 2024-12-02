@@ -100,7 +100,7 @@
     <hbase10.version>1.0.1.1</hbase10.version>
     <hbase10cdh.version>1.0.0-cdh5.4.2</hbase10cdh.version>
     <hbase11.version>1.1.1</hbase11.version>
-    <junit.version>4.11</junit.version>
+    <junit.version>4.13.1</junit.version>
     <slf4j.version>1.7.5</slf4j.version>
     <thrift.version>0.9.0</thrift.version>
     <twill.version>0.6.0-incubating</twill.version>
